@@ -1,8 +1,14 @@
 ﻿# VizRack
 
-VizRack은 Windows에서 재생 중인 소리를 읽어 내장 시각화 또는 지원 VST3에 전달하고,
+VizRack은 Windows에서 재생 중인 소리를 읽어 내장 시각화 또는 지원 대상으로 지정된
+VST® 3 플러그인에 전달하고,
 그 화면을 독립 창으로 보여 주는 포터블 앱입니다. 원래 소리를 다시 출력하거나
 Windows의 재생 경로를 바꾸지 않으므로 VizRack을 종료해도 시스템 재생은 계속됩니다.
+
+<img src="docs/assets/VST_Compatible_Logo_Steinberg.svg" alt="VST Compatible" width="116">
+
+VST® 3 호환 표시는 아래 표의 지원 대상으로 지정된 플러그인에 한정됩니다. VizRack은
+임의의 VST 3 플러그인을 불러오는 범용 호스트가 아닙니다.
 
 ## 처음 사용하는 사람을 위한 빠른 시작
 
@@ -122,6 +128,11 @@ VizRack/
 ├─ LICENSE
 ├─ THIRD_PARTY_NOTICES.md
 ├─ licenses/
+├─ docs/
+│  ├─ ARCHITECTURE.md
+│  ├─ BUILTIN_VISUALIZER_CORE.md
+│  └─ assets/
+│     └─ VST_Compatible_Logo_Steinberg.svg
 └─ data/
    ├─ settings.json
    ├─ plugins/
@@ -210,5 +221,19 @@ powershell -ExecutionPolicy Bypass -File scripts\package.ps1
 ```
 
 결과는 `out\package\VizRack\`과 `out\package\VizRack-win-x64.zip`입니다. 패키지에는
-EXE, README, 설계 문서와 라이선스만 들어갑니다. 두 내장 플러그인은 EXE에 포함되며
-`data`, PDB, SDK와 외부 플러그인 바이너리는 포함하지 않습니다.
+EXE, README, 설계 문서, VST Compatible 로고와 라이선스만 들어갑니다. 두 내장
+플러그인은 EXE에 포함되며 `data`, PDB, SDK와 외부 플러그인 바이너리는 포함하지
+않습니다.
+
+## 라이선스
+
+VizRack 자체 소스 코드는 [MIT License](LICENSE)로 공개됩니다. 빌드할 때 일부
+Steinberg VST 3 SDK 코드가 `VizRack.exe`에 정적으로 포함되므로, 바이너리 배포본에는
+[`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)와
+[`licenses/Steinberg-VST3-SDK-MIT.txt`](licenses/Steinberg-VST3-SDK-MIT.txt)를 함께
+유지해야 합니다. mvMeter2와 AnSpec의 바이너리·설치 프로그램·아트워크는 이 저장소와
+배포본에 포함되지 않으며 각 제품의 라이선스는 사용자가 별도로 설치할 때 적용됩니다.
+공식 VST Compatible 로고와 VST 상표는 VizRack의 MIT License로 재허가되는 자산이
+아니며, Steinberg의 VST 사용 지침에 따라 사용됩니다.
+
+VST is a registered trademark of Steinberg Media Technologies GmbH.

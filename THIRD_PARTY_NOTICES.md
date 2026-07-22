@@ -6,11 +6,21 @@ This project uses the Steinberg VST 3 SDK, pinned to tag `v3.8.0_build_66`
 (`9fad9770f2ae8542ab1a548a68c1ad1ac690abe0`) and obtained at build time from
 <https://github.com/steinbergmedia/vst3sdk>.
 
-The VST 3 SDK is licensed under the MIT License. Its license text is included
-at `licenses/Steinberg-VST3-SDK-MIT.txt`.
+The SDK source tree is not redistributed with this project, but portions of
+the SDK are compiled and statically linked into `VizRack.exe`. The VST 3 SDK
+is licensed under the MIT License. Its license text is therefore included at
+`licenses/Steinberg-VST3-SDK-MIT.txt` and in binary release packages.
 
-VST is a trademark of Steinberg Media Technologies GmbH. This project is an
-independent personal host and is not affiliated with or endorsed by Steinberg.
+VST is a registered trademark of Steinberg Media Technologies GmbH. This
+project is an independent personal host and is not affiliated with or endorsed
+by Steinberg.
+
+The official VST Compatible logo is included unmodified at
+`docs/assets/VST_Compatible_Logo_Steinberg.svg` and is used with the limited
+compatibility statement in this project's documentation under Steinberg's VST
+usage guidelines:
+<https://steinbergmedia.github.io/vst3_dev_portal/pages/VST%2B3%2BLicensing/Usage%2Bguidelines.html>.
+The logo and VST trademark are not offered under VizRack's MIT License.
 
 ## TBProAudio mvMeter2
 

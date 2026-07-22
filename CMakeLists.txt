@@ -130,6 +130,9 @@ set_target_properties(VizRack PROPERTIES
 
 install(TARGETS VizRack RUNTIME DESTINATION .)
 install(FILES README.md LICENSE THIRD_PARTY_NOTICES.md DESTINATION .)
+install(FILES licenses/Steinberg-VST3-SDK-MIT.txt DESTINATION licenses)
+install(FILES docs/ARCHITECTURE.md docs/BUILTIN_VISUALIZER_CORE.md DESTINATION docs)
+install(FILES docs/assets/VST_Compatible_Logo_Steinberg.svg DESTINATION docs/assets)
 
 if(VIZRACK_BUILD_TESTS)
     enable_testing()

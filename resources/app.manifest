@@ -2,7 +2,7 @@
 <assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
   <assemblyIdentity version="1.0.0.0" processorArchitecture="amd64"
                     name="VizRack" type="win32"/>
-  <description>Portable system-audio visualization VST3 host</description>
+  <description>Portable visualizer with selected audio plug-in support</description>
   <trustInfo xmlns="urn:schemas-microsoft-com:asm.v3">
     <security>
       <requestedPrivileges>
