@@ -70,6 +70,17 @@ void GdiDrawListRenderer::render(HDC dc, const builtin::DrawList& list) {
                 graphics.FillRectangle(&brush, command.x, command.y, command.width, command.height);
                 break;
             }
+            case builtin::DrawPrimitive::radialGradientEllipse: {
+                Gdiplus::GraphicsPath path;
+                path.AddEllipse(command.x, command.y, command.width, command.height);
+                Gdiplus::PathGradientBrush brush(&path);
+                brush.SetCenterColor(toGdiColor(command.primary));
+                Gdiplus::Color edge = toGdiColor(command.secondary);
+                INT count = 1;
+                brush.SetSurroundColors(&edge, &count);
+                graphics.FillPath(&brush, &path);
+                break;
+            }
             case builtin::DrawPrimitive::line: {
                 configurePen(pen, command.primary, command.strokeWidth, command.roundStroke);
                 graphics.DrawLine(&pen, command.x, command.y, command.x2, command.y2);
@@ -97,6 +108,14 @@ void GdiDrawListRenderer::render(HDC dc, const builtin::DrawList& list) {
             case builtin::DrawPrimitive::strokeEllipse: {
                 configurePen(pen, command.primary, command.strokeWidth, false);
                 graphics.DrawEllipse(&pen, command.x, command.y, command.width, command.height);
+                break;
+            }
+            case builtin::DrawPrimitive::fillPolygon: {
+                const auto points = pointsFor(list, command.points);
+                if (points.size() < 3) break;
+                solidBrush.SetColor(toGdiColor(command.primary));
+                graphics.FillPolygon(&solidBrush, points.data(), static_cast<INT>(points.size()),
+                                     Gdiplus::FillModeWinding);
                 break;
             }
             case builtin::DrawPrimitive::strokePolygon: {

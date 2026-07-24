@@ -1,4 +1,5 @@
 #include "builtin/art_visualizer_engine.h"
+#include "builtin/campfire_engine.h"
 #include "builtin/draw_list.h"
 #include "builtin/oscilloscope_engine.h"
 #include "core/audio_ring.h"
@@ -75,6 +76,12 @@ void testSettings(const std::filesystem::path& directory) {
     original.oscilloscopeHistoryMode = true;
     original.artScene = 5;
     original.artPalette = 4;
+    original.campfireFlameResponse = 30;
+    original.campfireStarSpeed = 70;
+    original.campfireStarBrightness = 40;
+    original.campfireStarResponse = 80;
+    original.campfireParticleAmount = 90;
+    original.campfireParticleIntensity = 60;
     std::string error;
     const auto path = directory / L"settings.json";
     CHECK(vizrack::saveSettings(path, original, error));
@@ -93,6 +100,12 @@ void testSettings(const std::filesystem::path& directory) {
     CHECK(loaded.value.oscilloscopeHistoryMode);
     CHECK(loaded.value.artScene == 5);
     CHECK(loaded.value.artPalette == 4);
+    CHECK(loaded.value.campfireFlameResponse == 30);
+    CHECK(loaded.value.campfireStarSpeed == 70);
+    CHECK(loaded.value.campfireStarBrightness == 40);
+    CHECK(loaded.value.campfireStarResponse == 80);
+    CHECK(loaded.value.campfireParticleAmount == 90);
+    CHECK(loaded.value.campfireParticleIntensity == 60);
     {
         std::ifstream input(path, std::ios::binary);
         const std::string json((std::istreambuf_iterator<char>(input)), {});
@@ -141,6 +154,15 @@ void testPluginCatalogAndStorage(const std::filesystem::path& directory) {
         CHECK(art->displayName == "내장 아트 비주얼라이저");
         CHECK(art->installUrl.empty());
         CHECK(art->searchLocations.empty());
+    }
+    const auto* campfire = vizrack::findPluginDefinition("builtin-campfire");
+    CHECK(campfire != nullptr);
+    if (campfire) {
+        CHECK(campfire->kind == vizrack::PluginKind::builtIn);
+        CHECK(campfire->displayName == "내장 캠프파이어");
+        CHECK(campfire->editionLabel == "Natural Flame / Audio Reactive");
+        CHECK(campfire->installUrl.empty());
+        CHECK(campfire->searchLocations.empty());
     }
     const auto* definition = vizrack::findPluginDefinition("mvmeter2");
     CHECK(definition != nullptr);
@@ -259,12 +281,15 @@ void checkDrawList(const vizrack::builtin::DrawList& drawList) {
         CHECK(std::isfinite(command.startAngle));
         CHECK(std::isfinite(command.sweepAngle));
         if (command.primitive == vizrack::builtin::DrawPrimitive::polyline ||
+            command.primitive == vizrack::builtin::DrawPrimitive::fillPolygon ||
             command.primitive == vizrack::builtin::DrawPrimitive::strokePolygon) {
             CHECK(command.points.offset <= points.size());
             if (command.points.offset <= points.size()) {
                 CHECK(command.points.count <= points.size() - command.points.offset);
             }
-            CHECK(command.points.count >= 2);
+            const uint32_t minimum =
+                command.primitive == vizrack::builtin::DrawPrimitive::fillPolygon ? 3u : 2u;
+            CHECK(command.points.count >= minimum);
         }
     }
 }
@@ -328,6 +353,230 @@ void testArtVisualizerCore() {
     CHECK(drawList.points().empty());
     engine.update(0, std::numeric_limits<float>::quiet_NaN());
     engine.buildFrame(std::numeric_limits<float>::quiet_NaN(), 1080.0f, drawList);
+    CHECK(drawList.commands().empty());
+}
+
+void testCampfireCore() {
+    using vizrack::CampfireOptions;
+    using vizrack::builtin::CampfireEngine;
+    using vizrack::builtin::DrawList;
+    using vizrack::builtin::DrawPrimitive;
+
+    CampfireEngine engine;
+    engine.setOptions({-1, 101, -20, 140, -50, 120});
+    const auto normalized = engine.options();
+    CHECK(normalized.flameResponse == 0);
+    CHECK(normalized.starSpeed == 100);
+    CHECK(normalized.starBrightness == 0);
+    CHECK(normalized.starResponse == 100);
+    CHECK(normalized.particleAmount == 0);
+    CHECK(normalized.particleIntensity == 100);
+    engine.setOptions(CampfireOptions{});
+    engine.setSampleRate(96000);
+    engine.setSampleRate(1);
+    auto left = engine.inputLeft();
+    auto right = engine.inputRight();
+    for (size_t index = 0; index < left.size(); ++index) {
+        const float phase = static_cast<float>(index) * 0.027f;
+        left[index] = std::sin(phase) * 0.32f;
+        right[index] = std::cos(phase * 0.91f) * 0.27f;
+    }
+    left[11] = std::numeric_limits<float>::quiet_NaN();
+    right[17] = std::numeric_limits<float>::infinity();
+    engine.update(CampfireEngine::kMaxSamples + 64, 1.0f / 60.0f);
+
+    DrawList drawList;
+    engine.buildFrame(1920.0f, 1080.0f, drawList);
+    CHECK(!drawList.commands().empty());
+    CHECK(drawList.commands().front().primitive == DrawPrimitive::verticalGradient);
+    CHECK(drawList.commands().size() <= 600);
+    CHECK(drawList.points().size() <= 800);
+    bool hasRadialGlow = false;
+    bool hasFilledFlame = false;
+    bool hasGroundRectangle = false;
+    for (const auto& command : drawList.commands()) {
+        hasRadialGlow = hasRadialGlow ||
+                        command.primitive == DrawPrimitive::radialGradientEllipse;
+        hasFilledFlame = hasFilledFlame ||
+                         command.primitive == DrawPrimitive::fillPolygon;
+        hasGroundRectangle = hasGroundRectangle ||
+                             command.primitive == DrawPrimitive::fillRectangle;
+    }
+    CHECK(hasRadialGlow);
+    CHECK(hasFilledFlame);
+    CHECK(!hasGroundRectangle);
+    checkDrawList(drawList);
+    const auto info = engine.frameInfo();
+    CHECK(std::isfinite(info.lowLevel) && info.lowLevel >= 0.0f && info.lowLevel <= 1.0f);
+    CHECK(std::isfinite(info.midLevel) && info.midLevel >= 0.0f && info.midLevel <= 1.0f);
+    CHECK(std::isfinite(info.highLevel) && info.highLevel >= 0.0f && info.highLevel <= 1.0f);
+    CHECK(std::isfinite(info.stereoLevel) && info.stereoLevel >= 0.0f &&
+          info.stereoLevel <= 1.0f);
+    CHECK(std::isfinite(info.beatLevel) && info.beatLevel >= 0.0f &&
+          info.beatLevel <= 1.0f);
+    CHECK(std::isfinite(info.particleActivity) && info.particleActivity >= 0.0f &&
+          info.particleActivity <= 1.0f);
+    CHECK(std::isfinite(info.meteorActivity) && info.meteorActivity >= 0.0f &&
+          info.meteorActivity <= 1.0f);
+    CHECK(info.intensity >= 1.0f && info.intensity <= 1.38f);
+
+    const size_t commandCapacity = drawList.commandCapacity();
+    const size_t pointCapacity = drawList.pointCapacity();
+    for (int frame = 0; frame < 180; ++frame) {
+        engine.update(0, frame % 2 == 0 ? 1.0f / 15.0f : 1.0f / 60.0f);
+        engine.buildFrame(frame % 3 == 0 ? 640.0f : 2560.0f,
+                          frame % 3 == 0 ? 480.0f : 1440.0f, drawList);
+        CHECK(drawList.commandCapacity() == commandCapacity);
+        CHECK(drawList.pointCapacity() == pointCapacity);
+        CHECK(drawList.commands().size() <= 600);
+        CHECK(drawList.points().size() <= 800);
+        checkDrawList(drawList);
+    }
+
+    CampfireEngine at15Fps;
+    CampfireEngine at60Fps;
+    for (int frame = 0; frame < 15; ++frame) at15Fps.update(0, 1.0f / 15.0f);
+    for (int frame = 0; frame < 60; ++frame) at60Fps.update(0, 1.0f / 60.0f);
+    DrawList frame15;
+    DrawList frame60;
+    at15Fps.buildFrame(800.0f, 600.0f, frame15);
+    at60Fps.buildFrame(800.0f, 600.0f, frame60);
+    CHECK(frame15.commands().size() == frame60.commands().size());
+    CHECK(frame15.points().size() == frame60.points().size());
+    CHECK(frame15.commands().size() > 1);
+    CHECK(frame60.commands().size() > 1);
+    if (frame15.commands().size() > 1 && frame60.commands().size() > 1) {
+        CHECK(std::abs(frame15.commands()[1].x - frame60.commands()[1].x) < 0.02f);
+        CHECK(std::abs(frame15.commands()[1].y - frame60.commands()[1].y) < 0.02f);
+    }
+    if (!frame15.points().empty() && frame15.points().size() == frame60.points().size()) {
+        float maximumDifference = 0.0f;
+        for (size_t index = 0; index < frame15.points().size(); ++index) {
+            maximumDifference =
+                std::max(maximumDifference,
+                         std::abs(frame15.points()[index].x - frame60.points()[index].x));
+            maximumDifference =
+                std::max(maximumDifference,
+                         std::abs(frame15.points()[index].y - frame60.points()[index].y));
+        }
+        CHECK(maximumDifference < 0.02f);
+    }
+
+    CampfireEngine idleHeight;
+    CampfireEngine reactiveHeight;
+    auto reactiveLeft = reactiveHeight.inputLeft();
+    auto reactiveRight = reactiveHeight.inputRight();
+    for (size_t index = 0; index < reactiveLeft.size(); ++index) {
+        const float lowWave = std::sin(static_cast<float>(index) * 0.011f) * 0.82f;
+        reactiveLeft[index] = lowWave;
+        reactiveRight[index] = lowWave;
+    }
+    idleHeight.update(0, 1.0f / 60.0f);
+    reactiveHeight.update(reactiveLeft.size(), 1.0f / 60.0f);
+    DrawList idleFrame;
+    DrawList reactiveFrame;
+    idleHeight.buildFrame(960.0f, 720.0f, idleFrame);
+    reactiveHeight.buildFrame(960.0f, 720.0f, reactiveFrame);
+    CHECK(reactiveHeight.frameInfo().beatLevel > idleHeight.frameInfo().beatLevel);
+    CHECK(reactiveHeight.frameInfo().particleActivity >
+          idleHeight.frameInfo().particleActivity);
+    const auto firstFlame = [](const DrawList& list) {
+        for (const auto& command : list.commands()) {
+            if (command.primitive == DrawPrimitive::fillPolygon &&
+                command.points.count == 39) {
+                return command.points;
+            }
+        }
+        return vizrack::builtin::PointRange{};
+    };
+    const auto idleFlame = firstFlame(idleFrame);
+    const auto reactiveFlame = firstFlame(reactiveFrame);
+    CHECK(idleFlame.count == 39);
+    CHECK(reactiveFlame.count == 39);
+    if (idleFlame.count == 39 && reactiveFlame.count == 39) {
+        const auto idlePoints = idleFrame.points().subspan(idleFlame.offset, idleFlame.count);
+        const auto reactivePoints =
+            reactiveFrame.points().subspan(reactiveFlame.offset, reactiveFlame.count);
+        const float idleBaseWidth = idlePoints.back().x - idlePoints.front().x;
+        const float reactiveBaseWidth =
+            reactivePoints.back().x - reactivePoints.front().x;
+        CHECK(std::abs(idleBaseWidth - reactiveBaseWidth) < 0.01f);
+        CHECK(reactivePoints[18].y < idlePoints[18].y);
+    }
+
+    CampfireEngine movingSky;
+    DrawList skyStart;
+    DrawList skyLater;
+    movingSky.buildFrame(960.0f, 720.0f, skyStart);
+    for (int frame = 0; frame < 60; ++frame) movingSky.update(0, 1.0f / 60.0f);
+    movingSky.buildFrame(960.0f, 720.0f, skyLater);
+    CHECK(skyStart.commands().size() > 1);
+    CHECK(skyLater.commands().size() > 1);
+    if (skyStart.commands().size() > 1 && skyLater.commands().size() > 1) {
+        CHECK(skyStart.commands()[1].primitive == DrawPrimitive::line);
+        CHECK(skyLater.commands()[1].primitive == DrawPrimitive::line);
+        CHECK(std::abs(skyStart.commands()[1].x - skyLater.commands()[1].x) > 0.1f);
+    }
+    const auto starCenter = [](const DrawList& list, size_t star) {
+        constexpr size_t commandsPerStar = 7;
+        const size_t commandIndex = 1 + star * commandsPerStar + 6;
+        if (commandIndex >= list.commands().size()) return vizrack::builtin::Point{};
+        const auto& command = list.commands()[commandIndex];
+        return vizrack::builtin::Point{command.x + command.width * 0.5f,
+                                       command.y + command.height * 0.5f};
+    };
+    const float poleX = 960.0f * 0.70f;
+    const float skyHeight = std::min(720.0f * 0.76f * 0.82f, 720.0f * 0.72f);
+    const float poleY = skyHeight * 1.16f;
+    for (size_t star = 0; star < 2; ++star) {
+        const auto start = starCenter(skyStart, star);
+        const auto later = starCenter(skyLater, star);
+        const float startX = start.x - poleX;
+        const float startY = (start.y - poleY) / 0.58f;
+        const float laterX = later.x - poleX;
+        const float laterY = (later.y - poleY) / 0.58f;
+        CHECK(startX * laterY - startY * laterX > 0.0f);
+    }
+
+    CampfireEngine quietFire;
+    for (int frame = 0; frame < 9 * 60; ++frame) {
+        quietFire.update(0, 1.0f / 60.0f);
+    }
+    CHECK(quietFire.frameInfo().quietSeconds < 10.0f);
+    CHECK(quietFire.frameInfo().fireScale > 0.95f);
+    for (int frame = 0; frame < 3 * 60; ++frame) {
+        quietFire.update(0, 1.0f / 60.0f);
+    }
+    CHECK(quietFire.frameInfo().quietSeconds >= 10.0f);
+    CHECK(quietFire.frameInfo().fireScale < 0.5f);
+
+    CampfireEngine meteorSky;
+    bool sawMeteor = false;
+    float firstMeteorSeconds = 0.0f;
+    for (int frame = 0; frame < 90 * 60; ++frame) {
+        meteorSky.update(0, 1.0f / 60.0f);
+        if (!sawMeteor && meteorSky.frameInfo().meteorActivity > 0.0f) {
+            sawMeteor = true;
+            firstMeteorSeconds = static_cast<float>(frame + 1) / 60.0f;
+            break;
+        }
+    }
+    CHECK(sawMeteor);
+    CHECK(firstMeteorSeconds >= 38.0f);
+    CHECK(firstMeteorSeconds <= 82.0f);
+    DrawList meteorFrame;
+    meteorSky.buildFrame(960.0f, 720.0f, meteorFrame);
+    CHECK(meteorFrame.commands().size() <= 600);
+    CHECK(meteorFrame.points().size() <= 800);
+    checkDrawList(meteorFrame);
+
+    engine.reset();
+    engine.buildFrame(640.0f, 480.0f, drawList);
+    CHECK(!drawList.commands().empty());
+    engine.buildFrame(0.0f, 480.0f, drawList);
+    CHECK(drawList.commands().empty());
+    engine.update(0, std::numeric_limits<float>::quiet_NaN());
+    engine.buildFrame(std::numeric_limits<float>::infinity(), 480.0f, drawList);
     CHECK(drawList.commands().empty());
 }
 
@@ -443,6 +692,7 @@ int main() {
     testPluginPaths(directory);
     testRing();
     testArtVisualizerCore();
+    testCampfireCore();
     testOscilloscopeCore();
     testReconnect();
     testPluginState(directory);

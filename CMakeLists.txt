@@ -15,6 +15,8 @@ option(VIZRACK_BUILD_TESTS "Build unit tests" ON)
 add_library(vizrack_builtin_core STATIC
     src/builtin/art_visualizer_engine.cpp
     src/builtin/art_visualizer_engine.h
+    src/builtin/campfire_engine.cpp
+    src/builtin/campfire_engine.h
     src/builtin/draw_list.cpp
     src/builtin/draw_list.h
     src/builtin/oscilloscope_engine.cpp
@@ -83,6 +85,8 @@ add_executable(VizRack WIN32
     src/platform/wasapi_capture.h
     src/ui/art_visualizer_view.cpp
     src/ui/art_visualizer_view.h
+    src/ui/campfire_view.cpp
+    src/ui/campfire_view.h
     src/ui/gdi_back_buffer.cpp
     src/ui/gdi_back_buffer.h
     src/ui/gdi_draw_list_renderer.cpp
