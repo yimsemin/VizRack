@@ -55,3 +55,34 @@ implementations of a built-in visualizer.
    same change; a built-in feature is not complete if only one adapter can render it.
 
 See `docs/BUILTIN_VISUALIZER_CORE.md` for ownership, data flow, and the future web path.
+
+## Release workflow
+
+Normal product work happens on a short-lived branch named for the next version, such as
+`v0.2.0`. Its release note is `docs/release-notes/0_2_0.md`. Create that placeholder
+when the version branch starts, but do not update it after each task.
+
+Apply these rules automatically; the user does not need to repeat them:
+
+1. Confirm that normal product work is on a `vMAJOR.MINOR.PATCH` branch, not `main`.
+2. Make focused commits after the required checks pass unless the user explicitly asks
+   not to commit. Never include unrelated or pre-existing user changes.
+3. Use a Conventional Commit subject such as `feat:`, `fix:`, `perf:`, `docs:`,
+   `refactor:`, `test:`, or `build:`. Write every subject as concise, public-facing
+   English because it will appear verbatim in the GitHub release notes.
+4. Do not bump `project(VizRack VERSION ...)`, create a tag, push, or publish a release
+   during normal development.
+
+After the user gives final approval for a version:
+
+1. Run `scripts/generate-release-notes.ps1`. It writes the non-merge commit subjects
+   after the latest reachable version tag to the current version note, in chronological
+   order. Do not categorize, rewrite, summarize, or inspect diffs for release notes.
+2. Update the CMake project version and run the required Release build, tests, smoke
+   test, and package script.
+3. Commit the generated note and version change, integrate the version branch into
+   `main`, create the annotated version tag, push the intended refs, and use
+   `gh release create --notes-file <version-note> <package>` to publish.
+4. The version branch and tag deliberately share a short name. Use fully qualified refs
+   such as `refs/heads/v0.2.0` and `refs/tags/v0.2.0` when a Git command could be
+   ambiguous, then delete the release branch after a successful release.
