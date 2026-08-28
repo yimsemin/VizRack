@@ -24,7 +24,10 @@ constexpr UINT kCommandFollowDefault = 100;
 constexpr UINT kCommandAlwaysOnTop = 120;
 constexpr UINT kCommandBorderless = 121;
 constexpr UINT kCommandExit = 130;
+constexpr UINT kCommandProjectPage = 140;
+constexpr UINT kCommandAbout = 141;
 constexpr UINT kCommandOpacityBase = 200;
+constexpr wchar_t kProjectUrl[] = L"https://github.com/yimsemin/VizRack";
 constexpr UINT kCommandDeviceBase = 1000;
 constexpr UINT kCommandPluginSelectBase = 2000;
 constexpr UINT kCommandPluginFileBase = 3000;
@@ -191,9 +194,15 @@ void MainWindow::createMenus() {
         AppendMenuW(pluginMenu_, MF_POPUP, reinterpret_cast<UINT_PTR>(entryMenu),
                     fromUtf8(definition.displayName).c_str());
     }
+    helpMenu_ = CreatePopupMenu();
+    AppendMenuW(helpMenu_, MF_STRING, kCommandProjectPage, L"GitHub 저장소 열기");
+    AppendMenuW(helpMenu_, MF_SEPARATOR, 0, nullptr);
+    AppendMenuW(helpMenu_, MF_STRING, kCommandAbout, L"VizRack 정보");
+
     AppendMenuW(menuBar_, MF_POPUP, reinterpret_cast<UINT_PTR>(settingsMenu_), L"설정");
     AppendMenuW(menuBar_, MF_POPUP, reinterpret_cast<UINT_PTR>(pluginMenu_),
                 L"플러그인: 찾는 중");
+    AppendMenuW(menuBar_, MF_POPUP, reinterpret_cast<UINT_PTR>(helpMenu_), L"도움말");
     rebuildDeviceMenu();
     setSelectedPluginId(selectedPluginId_);
 }
@@ -417,6 +426,27 @@ void MainWindow::openPluginInstallPage(const std::string& pluginId) {
     }
 }
 
+void MainWindow::openExternalUrl(const wchar_t* url) {
+    const auto result = reinterpret_cast<INT_PTR>(
+        ShellExecuteW(hwnd_, L"open", url, nullptr, nullptr, SW_SHOWNORMAL));
+    if (result <= 32) {
+        MessageBoxW(hwnd_, L"기본 브라우저를 열지 못했습니다.", L"VizRack", MB_OK | MB_ICONERROR);
+    }
+}
+
+void MainWindow::showAboutDialog() {
+    const std::wstring text =
+        L"VizRack " + fromUtf8(VIZRACK_VERSION) +
+        L"\n\n"
+        L"Windows에서 재생 중인 음악에 반응하는 가벼운 포터블 비주얼라이저입니다.\n"
+        L"WASAPI 공유 loopback으로 소리를 읽기만 하며 재생 경로에 개입하지 않습니다.\n\n"
+        L"GitHub: " + kProjectUrl +
+        L"\n"
+        L"라이선스: MIT License, Copyright (c) 2026 SubProject\n\n"
+        L"VST is a registered trademark of Steinberg Media Technologies GmbH.";
+    MessageBoxW(hwnd_, text.c_str(), L"VizRack 정보", MB_OK | MB_ICONINFORMATION);
+}
+
 void MainWindow::scheduleClose(unsigned milliseconds) {
     if (hwnd_) SetTimer(hwnd_, kSmokeTestTimer, milliseconds, nullptr);
 }
@@ -449,6 +479,10 @@ void MainWindow::handleCommand(UINT command) {
         notifySettingsChanged();
     } else if (command == kCommandExit) {
         SendMessageW(hwnd_, WM_CLOSE, 0, 0);
+    } else if (command == kCommandProjectPage) {
+        openExternalUrl(kProjectUrl);
+    } else if (command == kCommandAbout) {
+        showAboutDialog();
     } else {
         const auto& catalog = pluginCatalog();
         if (command >= kCommandPluginSelectBase &&

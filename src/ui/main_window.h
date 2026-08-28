@@ -61,6 +61,8 @@ private:
     void updateWindowRectSettings();
     void notifySettingsChanged();
     void handleCommand(UINT command);
+    void showAboutDialog();
+    void openExternalUrl(const wchar_t* url);
     void ensureVisible(RECT& rect);
     float dpiScale() const;
 
@@ -72,6 +74,7 @@ private:
     HMENU deviceMenu_{};
     HMENU opacityMenu_{};
     HMENU pluginMenu_{};
+    HMENU helpMenu_{};
     Settings settings_;
     MainWindowCallbacks callbacks_;
     CaptureStatus captureStatus_;
