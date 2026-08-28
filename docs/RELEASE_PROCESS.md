@@ -1,52 +1,68 @@
-# VizRack release process
+# VizRack branching, commits and releases
 
-VizRack uses one branch and one release-note file per upcoming version:
+## Branches
 
-- Branch: `v0.2.0`
-- Release note: `docs/release-notes/0_2_0.md`
-- Final tag: `v0.2.0`
+| Branch | Purpose |
+| --- | --- |
+| `main` | Released code only. Every release is a `--no-ff` merge from `develop` plus an annotated `vX.Y.Z` tag. Never commit directly. |
+| `develop` | The default working branch. All normal work lands here and is pushed to `origin` after every step. Branched once from `main`; it is long-lived. |
+| `topic/<slug>` | Optional. Short-lived branch off `develop` for risky or large work; merge back with `--no-ff` (or squash) and delete. |
 
-The repository-level `AGENTS.md` makes this the default Codex workflow, so it does not
-need to be repeated in normal task prompts.
+`main` and the tags use `vX.Y.Z`; the working branch is `develop`, so a bare ref is
+never ambiguous.
 
-## During development
+## Commits
 
-Each logical change is committed with a concise, public-facing Conventional Commit
-subject. Release notes are not edited after each task.
+- One logical, self-contained change per commit. Commit after each meaningful step
+  once `cmake --build`, `ctest` and `VizRack.exe --smoke-test` all pass. Do not
+  batch unrelated work into one commit, and never commit `out/` or other build
+  artifacts.
+- Conventional Commit subject: imperative mood, English, roughly ≤ 72 characters.
+  Types: `feat`, `fix`, `perf`, `refactor`, `docs`, `test`, `build`, `chore`.
+- `feat`, `fix` and `perf` are user-facing and become the changelog. Everything
+  else is internal and is summarised as a count in the release notes, so small
+  `refactor` / `docs` / `test` commits are encouraged.
+- Optional body explains the *why*, wrapped near 72 columns.
+- AI-assisted commits keep the `Co-Authored-By: Claude …` trailer.
 
-```text
-feat: add spectrum smoothing controls
-fix: continue startup when a VST3 plug-in scan fails
-perf: reduce allocations while rendering
-```
+## Pushing
 
-Internal commit subjects are also included in the release note, so every subject should
-be suitable for public display.
+Push `develop` to `origin` continuously. Do **not** push tags or create GitHub
+releases outside the release flow below.
 
-## After final approval
+## Cutting a release
 
-Generate the release note from commit subjects:
+Only after the user gives explicit approval for a version:
 
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts\generate-release-notes.ps1
-```
+1. On `develop`, bump `project(VizRack VERSION X.Y.Z ...)` in `CMakeLists.txt`.
+2. Generate the notes from commit subjects:
 
-The script finds the latest `vMAJOR.MINOR.PATCH` tag reachable from the current version
-branch and lists every subsequent non-merge commit subject in chronological order. It
-does not inspect diffs, categorize entries, or rewrite titles.
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File scripts\generate-release-notes.ps1
+   ```
 
-Then update the CMake version, run the required Release build, tests, smoke test, and
-packaging, and create the release commit. After integrating it into `main`, create and
-push the annotated tag and publish with the generated document:
+   The script reads the version from `CMakeLists.txt`, takes the range from the
+   last `vX.Y.Z` tag to `HEAD`, and writes `docs/release-notes/X_Y_Z.md`. It does
+   not inspect diffs or rewrite subjects.
+3. Run the required Release build, `ctest`, `--smoke-test` and `scripts\package.ps1`.
+4. Commit the version bump and generated note on `develop` and push.
+5. Merge into `main` and tag:
 
-```powershell
-gh release create v0.2.0 `
-    --verify-tag `
-    --title "VizRack v0.2.0" `
-    --notes-file docs/release-notes/0_2_0.md `
-    out/package/VizRack-win-x64.zip
-```
+   ```powershell
+   git checkout main
+   git merge --no-ff refs/heads/develop
+   git tag -a refs/tags/vX.Y.Z -m "VizRack vX.Y.Z"
+   git push origin refs/heads/main refs/tags/vX.Y.Z
+   ```
 
-The version branch is deleted after successful publication. Until then, fully qualified
-refs such as `refs/heads/v0.2.0` and `refs/tags/v0.2.0` avoid ambiguity between the
-same-named branch and tag.
+6. Publish:
+
+   ```powershell
+   gh release create vX.Y.Z `
+       --verify-tag `
+       --title "VizRack vX.Y.Z" `
+       --notes-file docs/release-notes/X_Y_Z.md `
+       out/package/VizRack-win-x64.zip
+   ```
+
+7. `git checkout develop` and continue. `develop` is not deleted.
