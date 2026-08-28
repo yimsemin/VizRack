@@ -153,6 +153,24 @@ SettingsLoadResult loadSettings(const std::filesystem::path& path) {
     }
     if (auto value = readInt(json, "artScene")) result.value.artScene = std::clamp(*value, 0, 5);
     if (auto value = readInt(json, "artPalette")) result.value.artPalette = std::clamp(*value, 0, 5);
+    if (auto value = readInt(json, "campfireFlameResponse")) {
+        result.value.campfireFlameResponse = std::clamp(*value, 0, 100);
+    }
+    if (auto value = readInt(json, "campfireStarSpeed")) {
+        result.value.campfireStarSpeed = std::clamp(*value, 0, 100);
+    }
+    if (auto value = readInt(json, "campfireStarBrightness")) {
+        result.value.campfireStarBrightness = std::clamp(*value, 0, 100);
+    }
+    if (auto value = readInt(json, "campfireStarResponse")) {
+        result.value.campfireStarResponse = std::clamp(*value, 0, 100);
+    }
+    if (auto value = readInt(json, "campfireParticleAmount")) {
+        result.value.campfireParticleAmount = std::clamp(*value, 0, 100);
+    }
+    if (auto value = readInt(json, "campfireParticleIntensity")) {
+        result.value.campfireParticleIntensity = std::clamp(*value, 0, 100);
+    }
     result.loaded = true;
     return result;
 }
@@ -177,7 +195,19 @@ bool saveSettings(const std::filesystem::path& path, const Settings& settings, s
            << "  \"oscilloscopeHistoryMode\": "
            << (settings.oscilloscopeHistoryMode ? "true" : "false") << ",\n"
            << "  \"artScene\": " << std::clamp(settings.artScene, 0, 5) << ",\n"
-           << "  \"artPalette\": " << std::clamp(settings.artPalette, 0, 5) << "\n"
+           << "  \"artPalette\": " << std::clamp(settings.artPalette, 0, 5) << ",\n"
+           << "  \"campfireFlameResponse\": "
+           << std::clamp(settings.campfireFlameResponse, 0, 100) << ",\n"
+           << "  \"campfireStarSpeed\": "
+           << std::clamp(settings.campfireStarSpeed, 0, 100) << ",\n"
+           << "  \"campfireStarBrightness\": "
+           << std::clamp(settings.campfireStarBrightness, 0, 100) << ",\n"
+           << "  \"campfireStarResponse\": "
+           << std::clamp(settings.campfireStarResponse, 0, 100) << ",\n"
+           << "  \"campfireParticleAmount\": "
+           << std::clamp(settings.campfireParticleAmount, 0, 100) << ",\n"
+           << "  \"campfireParticleIntensity\": "
+           << std::clamp(settings.campfireParticleIntensity, 0, 100) << "\n"
            << "}\n";
     const std::string contents = output.str();
     const auto bytes = std::as_bytes(std::span(contents.data(), contents.size()));

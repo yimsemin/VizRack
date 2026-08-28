@@ -31,6 +31,18 @@ const std::vector<PluginDefinition>& pluginCatalog() {
             "",
         },
         {
+            PluginKind::builtIn,
+            "builtin-campfire",
+            "내장 캠프파이어",
+            "VizRack",
+            "",
+            "",
+            "",
+            "Natural Flame / Audio Reactive",
+            {},
+            "",
+        },
+        {
             PluginKind::vst3,
             "mvmeter2",
             "mvMeter2",
