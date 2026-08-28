@@ -45,6 +45,16 @@ void DrawList::addVerticalGradient(float x, float y, float width, float height,
     command.height = height;
 }
 
+void DrawList::addRadialGradientEllipse(float x, float y, float width, float height,
+                                        Color center, Color edge) {
+    auto& command = add(DrawPrimitive::radialGradientEllipse, center);
+    command.secondary = edge;
+    command.x = x;
+    command.y = y;
+    command.width = width;
+    command.height = height;
+}
+
 void DrawList::addLine(float x1, float y1, float x2, float y2, Color value,
                        float strokeWidth, bool roundStroke) {
     auto& command = add(DrawPrimitive::line, value);
@@ -92,6 +102,11 @@ void DrawList::addStrokeEllipse(float x, float y, float width, float height, Col
     command.width = width;
     command.height = height;
     command.strokeWidth = strokeWidth;
+}
+
+void DrawList::addFillPolygon(PointRange points, Color value) {
+    auto& command = add(DrawPrimitive::fillPolygon, value);
+    command.points = points;
 }
 
 void DrawList::addStrokePolygon(PointRange points, Color value, float strokeWidth,

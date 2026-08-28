@@ -6,6 +6,7 @@
 #include "core/settings.h"
 #include "platform/wasapi_capture.h"
 #include "ui/art_visualizer_view.h"
+#include "ui/campfire_view.h"
 #include "ui/oscilloscope_view.h"
 #include "vst/vst_host.h"
 
@@ -56,6 +57,7 @@ private:
     VstHost vstHost_;
     OscilloscopeView oscilloscope_;
     ArtVisualizerView artVisualizer_;
+    CampfireView campfire_;
     WasapiCapture capture_;
     std::unique_ptr<MainWindow> window_;
     std::atomic<uint32_t> sampleRate_{48000};

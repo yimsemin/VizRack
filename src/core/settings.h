@@ -22,6 +22,12 @@ struct Settings {
     bool oscilloscopeHistoryMode{false};
     int artScene{0};
     int artPalette{0};
+    int campfireFlameResponse{20};
+    int campfireStarSpeed{60};
+    int campfireStarBrightness{60};
+    int campfireStarResponse{40};
+    int campfireParticleAmount{60};
+    int campfireParticleIntensity{50};
 };
 
 struct SettingsLoadResult {

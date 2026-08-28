@@ -96,7 +96,7 @@ std::string editionForStatus(const PluginDefinition& definition,
 
 App::App(HINSTANCE instance)
     : instance_(instance), vstHost_(audioRing_, logger_), oscilloscope_(audioRing_),
-      artVisualizer_(audioRing_), capture_(audioRing_, logger_) {}
+      artVisualizer_(audioRing_), campfire_(audioRing_), capture_(audioRing_, logger_) {}
 
 App::~App() { shutdown(); }
 
@@ -137,6 +137,22 @@ bool App::initialize(std::string& error) {
         [this](const ArtVisualizerOptions& options) {
             settings_.artScene = options.scene;
             settings_.artPalette = options.palette;
+            saveSettingsNow();
+        });
+    campfire_.configure(
+        {settings_.campfireFlameResponse,
+         settings_.campfireStarSpeed,
+         settings_.campfireStarBrightness,
+         settings_.campfireStarResponse,
+         settings_.campfireParticleAmount,
+         settings_.campfireParticleIntensity},
+        [this](const CampfireOptions& options) {
+            settings_.campfireFlameResponse = options.flameResponse;
+            settings_.campfireStarSpeed = options.starSpeed;
+            settings_.campfireStarBrightness = options.starBrightness;
+            settings_.campfireStarResponse = options.starResponse;
+            settings_.campfireParticleAmount = options.particleAmount;
+            settings_.campfireParticleIntensity = options.particleIntensity;
             saveSettingsNow();
         });
     std::wstring fixedDevice;
@@ -180,6 +196,7 @@ bool App::initialize(std::string& error) {
         vstHost_.resizeEditor(width, height);
         oscilloscope_.resize(width, height);
         artVisualizer_.resize(width, height);
+        campfire_.resize(width, height);
     });
     window_->setEditorScaleHandler([this](float scale) { vstHost_.setEditorContentScale(scale); });
 
@@ -198,6 +215,7 @@ bool App::initialize(std::string& error) {
             vstHost_.setSampleRate(sampleRate);
             oscilloscope_.setSampleRate(sampleRate);
             artVisualizer_.setSampleRate(sampleRate);
+            campfire_.setSampleRate(sampleRate);
         },
         [this] { vstHost_.notifyDataReady(); });
     if (!captureStarted_) {
@@ -360,6 +378,8 @@ bool App::startBuiltInPlugin(const PluginDefinition& definition, std::string& er
         attached = oscilloscope_.attach(instance_, window_->pluginParent(), error);
     } else if (definition.id == "builtin-art-visualizer") {
         attached = artVisualizer_.attach(instance_, window_->pluginParent(), error);
+    } else if (definition.id == "builtin-campfire") {
+        attached = campfire_.attach(instance_, window_->pluginParent(), error);
     } else {
         error = "지원하지 않는 내장 플러그인입니다: " + definition.id;
     }
@@ -367,6 +387,7 @@ bool App::startBuiltInPlugin(const PluginDefinition& definition, std::string& er
     const uint32_t sampleRate = sampleRate_.load(std::memory_order_acquire);
     oscilloscope_.setSampleRate(sampleRate);
     artVisualizer_.setSampleRate(sampleRate);
+    campfire_.setSampleRate(sampleRate);
     activeBuiltInPluginId_ = definition.id;
     window_->setPluginStatus(definition.displayName);
     pluginSelectionNeeded_ = false;
@@ -498,7 +519,7 @@ void App::logEnvironment() {
 }
 
 bool App::builtInViewActive() const noexcept {
-    return oscilloscope_.active() || artVisualizer_.active();
+    return oscilloscope_.active() || artVisualizer_.active() || campfire_.active();
 }
 
 const PluginDefinition* App::activeBuiltInDefinition() const {
@@ -508,6 +529,7 @@ const PluginDefinition* App::activeBuiltInDefinition() const {
 void App::detachBuiltInViews() {
     oscilloscope_.detach();
     artVisualizer_.detach();
+    campfire_.detach();
     activeBuiltInPluginId_.clear();
 }
 

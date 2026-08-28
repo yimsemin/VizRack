@@ -23,8 +23,9 @@ The application intentionally has no generic VST scanner.
 | `StereoFrameRing` | Fixed-capacity SPSC audio transfer |
 | `builtin::OscilloscopeEngine` | Platform-neutral L/R waveform and circular history geometry |
 | `builtin::ArtVisualizerEngine` | Platform-neutral analysis and six-scene/six-palette geometry |
+| `builtin::CampfireEngine` | Platform-neutral beat analysis and procedural flame, ember, log and night-sky geometry |
 | `builtin::DrawList` | Minimal renderer-neutral primitive and point buffer contract |
-| `OscilloscopeView` / `ArtVisualizerView` | Win32 input, timer, menus and text overlays |
+| Built-in `*View` adapters | Win32 input, timers, menus and text overlays |
 | `GdiDrawListRenderer` / `GdiBackBuffer` | GDI+ command translation and size-stable back buffering |
 | `VstHost` | VST3 factory, processing, state and editor lifetime |
 | `plugin_catalog` | Stable IDs, matching rules, search locations, labels and official URLs |
@@ -97,11 +98,22 @@ and search locations, then validates AMD64 PE, marker and VST3 factory data.
 
 The first catalog entry remains `builtin-oscilloscope`, so a fresh portable data
 folder always starts without an external dependency. `builtin-art-visualizer`
-adds six switchable scenes and six palettes. View options are additive fields in
-the portable settings schema. The `mvmeter2` definition uses TBProAudio/mvMeter2
-factory metadata and accepts both the GPU and noGPU x64 modules. Renderer-specific
-binary markers are intentionally not required because both editions expose compatible
-factory metadata.
+adds six switchable scenes and six palettes. `builtin-campfire` adds a dedicated
+procedural flame whose natural motion continues without audio. Beat transients change
+flame height without widening its base, high frequencies emit rising embers, and stars
+share one celestial rotation axis and leave fading elliptical trails in the same
+direction. A beat schedules pulses for different subsets of stars with short delays
+instead of flashing the whole sky at once. A deterministic random timer emits one brief
+shooting star roughly once per minute. After ten seconds without an audible signal the
+fire and its surrounding glow settle to a small idle state. The scene has no horizon or
+ground plane; a compact single-layer stone ring and solid log silhouettes anchor the
+fire directly in the dark background.
+Right-click options control flame response, star speed/brightness/response and ember
+amount/intensity on a normalized 0–100 scale; those values are additive fields in the
+portable settings schema. The `mvmeter2` definition uses
+TBProAudio/mvMeter2 factory metadata and accepts both the GPU and noGPU x64 modules.
+Renderer-specific binary markers are intentionally not required because both editions
+expose compatible factory metadata.
 `mvmeter2` is a plug-in ID, not an application ID.
 
 Switching follows one transaction:
@@ -127,7 +139,7 @@ border and maximize button, then follows the view's requested size exactly.
 This prevents clipped content and unused margins while preserving a plug-in's
 own resize control.
 
-Both built-in views always fill the same clipped parent and accept any positive
+All built-in views always fill the same clipped parent and accept any positive
 host size, so they share window/menu behavior without VST3 sizing code.
 
 ## Portable state

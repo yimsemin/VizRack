@@ -24,11 +24,13 @@ struct PointRange {
 
 enum class DrawPrimitive : uint8_t {
     verticalGradient,
+    radialGradientEllipse,
     line,
     polyline,
     arc,
     fillEllipse,
     strokeEllipse,
+    fillPolygon,
     strokePolygon,
     fillRectangle,
 };
@@ -62,6 +64,8 @@ public:
 
     void addVerticalGradient(float x, float y, float width, float height,
                              Color top, Color bottom);
+    void addRadialGradientEllipse(float x, float y, float width, float height,
+                                  Color center, Color edge);
     void addLine(float x1, float y1, float x2, float y2, Color color,
                  float strokeWidth, bool roundStroke = false);
     void addPolyline(PointRange points, Color color, float strokeWidth,
@@ -71,6 +75,7 @@ public:
     void addFillEllipse(float x, float y, float width, float height, Color color);
     void addStrokeEllipse(float x, float y, float width, float height, Color color,
                           float strokeWidth);
+    void addFillPolygon(PointRange points, Color color);
     void addStrokePolygon(PointRange points, Color color, float strokeWidth,
                           bool roundStroke = true);
     void addFillRectangle(float x, float y, float width, float height, Color color);
