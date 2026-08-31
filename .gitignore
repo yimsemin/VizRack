@@ -47,6 +47,7 @@ Makefile
 # Portable runtime data and diagnostics
 /data/
 settings.json
+!.claude/settings.json
 plugin-state.bin
 plugin-state.corrupt*.bin
 *.log

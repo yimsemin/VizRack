@@ -23,7 +23,8 @@ never ambiguous.
   else is internal and is summarised as a count in the release notes, so small
   `refactor` / `docs` / `test` commits are encouraged.
 - Optional body explains the *why*, wrapped near 72 columns.
-- AI-assisted commits keep the `Co-Authored-By: Claude …` trailer.
+- Do not add AI-attribution trailers (`Co-Authored-By: Claude …`, "Generated
+  with Claude Code", or similar). The `.githooks/commit-msg` hook strips them.
 
 ## Pushing
 

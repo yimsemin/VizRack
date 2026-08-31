@@ -12,5 +12,7 @@ CMakeLists.txt text eol=lf
 *.rc text eol=lf
 *.manifest text eol=lf
 
+.githooks/** text eol=lf
+
 *.ico binary
 *.png binary
