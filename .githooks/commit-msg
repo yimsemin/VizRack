@@ -1,0 +1,23 @@
+#!/bin/sh
+# 커밋 메시지에서 AI 생성 표식과 Claude co-author 트레일러를 제거한다.
+# 권고가 아니라 하드 게이트다. commit -m / 에디터 / amend / cherry-pick / revert
+# 등 모든 경로에서 실행된다(--no-verify 로만 우회). 줄 전체가 트레일러일 때만
+# 지우고, 본문에서 이 문자열을 예시로 언급하는 줄은 건드리지 않는다.
+# 활성화: git config core.hooksPath .githooks
+msg_file="$1"
+[ -f "$msg_file" ] || exit 0
+tmp="$(mktemp)" || exit 0
+grep -vaiE \
+  -e '^[[:space:]]*co-authored-by:[[:space:]]*claude([[:space:]]|<|$)' \
+  -e '^[[:space:]]*(🤖[[:space:]]*)?generated (with|by) \[?claude( code)?\]?' \
+  "$msg_file" > "$tmp" || true
+awk '
+  { lines[NR] = $0 }
+  END {
+    last = NR
+    while (last > 0 && lines[last] ~ /^[[:space:]]*$/) last--
+    for (i = 1; i <= last; i++) print lines[i]
+  }
+' "$tmp" > "$msg_file"
+rm -f "$tmp"
+exit 0

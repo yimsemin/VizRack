@@ -73,8 +73,12 @@ Commit at each meaningful step, once `cmake --build` + `ctest` + `--smoke-test`
 pass. One logical change per commit; never fold in unrelated changes or `out/`
 artifacts. Conventional Commit subjects — imperative, English, ≤ ~72 chars:
 `feat` / `fix` / `perf` (user-facing, become the changelog) and `refactor` /
-`docs` / `test` / `build` / `chore` (internal). Keep the `Co-Authored-By: Claude`
-trailer on AI-assisted commits.
+`docs` / `test` / `build` / `chore` (internal).
+
+Do **not** add AI-attribution trailers to commit messages or PR descriptions —
+no `Co-Authored-By: Claude`, no "Generated with Claude Code" line, no equivalent.
+The `.githooks/commit-msg` hook strips them; enable it once per clone with
+`git config core.hooksPath .githooks`.
 
 Do **not** bump `project(VizRack VERSION …)`, create tags, or run
 `gh release` during normal development. Full runbook: `docs/RELEASE_PROCESS.md`,
