@@ -14,6 +14,10 @@ EXE가 공통 코어를 실제로 사용하도록 경계를 먼저 고정했습�
 - 아트 비주얼라이저의 저·중·고역 및 스테레오 반응 계산
 - 캠프파이어의 박자·주파수 반응, 10초 무음 축소, 상승 난류, 수명 기반 불티,
   공통 천구 회전축의 별 궤적과 약 1분 간격의 별똥별, 밀집된 검은 장작·돌 고리 형상
+- 3D 스펙트럼의 손수 작성 1024점 FFT, 40개 로그 밴드, 72칸 시간 히스토리 버퍼,
+  프레임 시간 기반 슬라이스 진행, 쿼터뷰 원근 면(CLASSIC CASCADE)과 흐려지지 않는
+  능선 스택(여백·가장자리 고정·대비 곡선·펜 떨림, JOY DIVISION), 회전/기울기/깊이/높이
+  0–100 옵션(50이 기준값, 스타일마다 반응 곡선이 다름)과 6팔레트
 - 여섯 장면의 도형 배치와 애니메이션 상태
 - 여섯 팔레트와 장면 이름
 - 옵션 기본값과 잘못된 값의 보정
@@ -30,6 +34,7 @@ WASAPI, Win32 창과 메뉴, GDI+, VST3, 파일 저장은 Windows 전용으로 �
 | `src/builtin/art_visualizer_engine.*` | 분석, 장면, 팔레트, 애니메이션 | Win32/GDI+, WASAPI, VST3, I/O |
 | `src/builtin/campfire_engine.*` | 박자 분석, 불꽃·장작·불티·연기·별 형상과 애니메이션 | Win32/GDI+, WASAPI, VST3, I/O |
 | `src/builtin/oscilloscope_engine.*` | 파형, 원형 히스토리, 옵션 보정 | Win32/GDI+, WASAPI, VST3, I/O |
+| `src/builtin/spectrum3d_engine.*` | FFT, 로그 밴드, 시간축 히스토리, 두 형상·팔레트 | Win32/GDI+, WASAPI, VST3, I/O |
 | `src/ui/gdi_draw_list_renderer.*` | 공통 명령을 GDI+ 호출로 변환 | 장면·DSP 공식 |
 | `src/ui/gdi_back_buffer.*` | 크기 변경 때만 다시 만드는 Win32 백 버퍼 | 장면·DSP 공식 |
 | `src/ui/*_view.*` | ring 입력, 타이머, 메뉴, 키보드, 텍스트 오버레이 | 장면 복제 |

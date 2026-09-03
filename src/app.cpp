@@ -96,7 +96,8 @@ std::string editionForStatus(const PluginDefinition& definition,
 
 App::App(HINSTANCE instance)
     : instance_(instance), vstHost_(audioRing_, logger_), oscilloscope_(audioRing_),
-      artVisualizer_(audioRing_), campfire_(audioRing_), capture_(audioRing_, logger_) {}
+      artVisualizer_(audioRing_), campfire_(audioRing_), spectrum3d_(audioRing_, 0),
+      joyDivision_(audioRing_, 1), capture_(audioRing_, logger_) {}
 
 App::~App() { shutdown(); }
 
@@ -155,6 +156,28 @@ bool App::initialize(std::string& error) {
             settings_.campfireParticleIntensity = options.particleIntensity;
             saveSettingsNow();
         });
+    spectrum3d_.configure(
+        {0, settings_.spectrum3dPalette, settings_.spectrum3dRotation,
+         settings_.spectrum3dTilt, settings_.spectrum3dDepth, settings_.spectrum3dHeight},
+        [this](const Spectrum3dOptions& options) {
+            settings_.spectrum3dPalette = options.palette;
+            settings_.spectrum3dRotation = options.rotation;
+            settings_.spectrum3dTilt = options.tilt;
+            settings_.spectrum3dDepth = options.depth;
+            settings_.spectrum3dHeight = options.heightScale;
+            saveSettingsNow();
+        });
+    joyDivision_.configure(
+        {1, settings_.joyDivisionPalette, settings_.joyDivisionRotation,
+         settings_.joyDivisionTilt, settings_.joyDivisionDepth, settings_.joyDivisionHeight},
+        [this](const Spectrum3dOptions& options) {
+            settings_.joyDivisionPalette = options.palette;
+            settings_.joyDivisionRotation = options.rotation;
+            settings_.joyDivisionTilt = options.tilt;
+            settings_.joyDivisionDepth = options.depth;
+            settings_.joyDivisionHeight = options.heightScale;
+            saveSettingsNow();
+        });
     std::wstring fixedDevice;
     try {
         fixedDevice = fromUtf8(settings_.fixedDeviceId);
@@ -197,6 +220,8 @@ bool App::initialize(std::string& error) {
         oscilloscope_.resize(width, height);
         artVisualizer_.resize(width, height);
         campfire_.resize(width, height);
+        spectrum3d_.resize(width, height);
+        joyDivision_.resize(width, height);
     });
     window_->setEditorScaleHandler([this](float scale) { vstHost_.setEditorContentScale(scale); });
 
@@ -216,6 +241,8 @@ bool App::initialize(std::string& error) {
             oscilloscope_.setSampleRate(sampleRate);
             artVisualizer_.setSampleRate(sampleRate);
             campfire_.setSampleRate(sampleRate);
+            spectrum3d_.setSampleRate(sampleRate);
+            joyDivision_.setSampleRate(sampleRate);
         },
         [this] { vstHost_.notifyDataReady(); });
     if (!captureStarted_) {
@@ -380,6 +407,10 @@ bool App::startBuiltInPlugin(const PluginDefinition& definition, std::string& er
         attached = artVisualizer_.attach(instance_, window_->pluginParent(), error);
     } else if (definition.id == "builtin-campfire") {
         attached = campfire_.attach(instance_, window_->pluginParent(), error);
+    } else if (definition.id == "builtin-spectrum3d") {
+        attached = spectrum3d_.attach(instance_, window_->pluginParent(), error);
+    } else if (definition.id == "builtin-joydivision") {
+        attached = joyDivision_.attach(instance_, window_->pluginParent(), error);
     } else {
         error = "지원하지 않는 내장 플러그인입니다: " + definition.id;
     }
@@ -388,6 +419,8 @@ bool App::startBuiltInPlugin(const PluginDefinition& definition, std::string& er
     oscilloscope_.setSampleRate(sampleRate);
     artVisualizer_.setSampleRate(sampleRate);
     campfire_.setSampleRate(sampleRate);
+    spectrum3d_.setSampleRate(sampleRate);
+    joyDivision_.setSampleRate(sampleRate);
     activeBuiltInPluginId_ = definition.id;
     window_->setPluginStatus(definition.displayName);
     pluginSelectionNeeded_ = false;
@@ -519,7 +552,8 @@ void App::logEnvironment() {
 }
 
 bool App::builtInViewActive() const noexcept {
-    return oscilloscope_.active() || artVisualizer_.active() || campfire_.active();
+    return oscilloscope_.active() || artVisualizer_.active() || campfire_.active() ||
+           spectrum3d_.active() || joyDivision_.active();
 }
 
 const PluginDefinition* App::activeBuiltInDefinition() const {
@@ -530,6 +564,8 @@ void App::detachBuiltInViews() {
     oscilloscope_.detach();
     artVisualizer_.detach();
     campfire_.detach();
+    spectrum3d_.detach();
+    joyDivision_.detach();
     activeBuiltInPluginId_.clear();
 }
 

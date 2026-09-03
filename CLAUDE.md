@@ -53,7 +53,9 @@ engines.
   15/30/60 FPS behave alike.
 
 Built-in visualizers: `oscilloscope_engine`, `art_visualizer_engine` (six shared
-scenes + palettes) and `campfire_engine`. See `docs/ARCHITECTURE.md` and
+scenes + palettes), `campfire_engine` and `spectrum3d_engine` (FFT time-depth
+cascade; one engine backs both the `builtin-spectrum3d` and `builtin-joydivision`
+catalog entries via a fixed `style`). See `docs/ARCHITECTURE.md` and
 `docs/BUILTIN_VISUALIZER_CORE.md`.
 
 ## Keep the EXE small

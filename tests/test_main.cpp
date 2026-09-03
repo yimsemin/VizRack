@@ -2,6 +2,7 @@
 #include "builtin/campfire_engine.h"
 #include "builtin/draw_list.h"
 #include "builtin/oscilloscope_engine.h"
+#include "builtin/spectrum3d_engine.h"
 #include "core/audio_ring.h"
 #include "core/channel_mapper.h"
 #include "core/logger.h"
@@ -82,6 +83,16 @@ void testSettings(const std::filesystem::path& directory) {
     original.campfireStarResponse = 80;
     original.campfireParticleAmount = 90;
     original.campfireParticleIntensity = 60;
+    original.spectrum3dPalette = 3;
+    original.spectrum3dRotation = 70;
+    original.spectrum3dTilt = 30;
+    original.spectrum3dDepth = 90;
+    original.spectrum3dHeight = 20;
+    original.joyDivisionPalette = 5;
+    original.joyDivisionRotation = 10;
+    original.joyDivisionTilt = 80;
+    original.joyDivisionDepth = 40;
+    original.joyDivisionHeight = 100;
     std::string error;
     const auto path = directory / L"settings.json";
     CHECK(vizrack::saveSettings(path, original, error));
@@ -106,6 +117,16 @@ void testSettings(const std::filesystem::path& directory) {
     CHECK(loaded.value.campfireStarResponse == 80);
     CHECK(loaded.value.campfireParticleAmount == 90);
     CHECK(loaded.value.campfireParticleIntensity == 60);
+    CHECK(loaded.value.spectrum3dPalette == 3);
+    CHECK(loaded.value.spectrum3dRotation == 70);
+    CHECK(loaded.value.spectrum3dTilt == 30);
+    CHECK(loaded.value.spectrum3dDepth == 90);
+    CHECK(loaded.value.spectrum3dHeight == 20);
+    CHECK(loaded.value.joyDivisionPalette == 5);
+    CHECK(loaded.value.joyDivisionRotation == 10);
+    CHECK(loaded.value.joyDivisionTilt == 80);
+    CHECK(loaded.value.joyDivisionDepth == 40);
+    CHECK(loaded.value.joyDivisionHeight == 100);
     {
         std::ifstream input(path, std::ios::binary);
         const std::string json((std::istreambuf_iterator<char>(input)), {});
@@ -164,6 +185,23 @@ void testPluginCatalogAndStorage(const std::filesystem::path& directory) {
         CHECK(campfire->installUrl.empty());
         CHECK(campfire->searchLocations.empty());
     }
+    const auto* spectrum3d = vizrack::findPluginDefinition("builtin-spectrum3d");
+    CHECK(spectrum3d != nullptr);
+    if (spectrum3d) {
+        CHECK(spectrum3d->kind == vizrack::PluginKind::builtIn);
+        CHECK(spectrum3d->displayName == "내장 3D 스펙트럼");
+        CHECK(spectrum3d->installUrl.empty());
+        CHECK(spectrum3d->searchLocations.empty());
+    }
+    const auto* joyDivision = vizrack::findPluginDefinition("builtin-joydivision");
+    CHECK(joyDivision != nullptr);
+    if (joyDivision) {
+        CHECK(joyDivision->kind == vizrack::PluginKind::builtIn);
+        CHECK(joyDivision->displayName == "내장 Joy Division");
+        CHECK(joyDivision->installUrl.empty());
+        CHECK(joyDivision->searchLocations.empty());
+    }
+
     const auto* definition = vizrack::findPluginDefinition("mvmeter2");
     CHECK(definition != nullptr);
     if (!definition) return;
@@ -580,6 +618,105 @@ void testCampfireCore() {
     CHECK(drawList.commands().empty());
 }
 
+void testSpectrum3dCore() {
+    using vizrack::Spectrum3dOptions;
+    using vizrack::builtin::DrawList;
+    using vizrack::builtin::DrawPrimitive;
+    using vizrack::builtin::Spectrum3dEngine;
+
+    Spectrum3dEngine engine;
+    engine.setOptions({-3, 99});
+    CHECK(engine.options().style == 0);
+    CHECK(engine.options().palette == Spectrum3dEngine::kPaletteCount - 1);
+    engine.setOptions({0, 0, -20, 250, -1, 300});
+    CHECK(engine.options().rotation == 0);
+    CHECK(engine.options().tilt == 100);
+    CHECK(engine.options().depth == 0);
+    CHECK(engine.options().heightScale == 100);
+    engine.setOptions({});
+    engine.setSampleRate(96000);
+    engine.setSampleRate(1);  // out of range, ignored
+
+    auto left = engine.inputLeft();
+    auto right = engine.inputRight();
+    for (size_t index = 0; index < left.size(); ++index) {
+        const float phase = static_cast<float>(index) * 0.05f;
+        left[index] = std::sin(phase) * 0.30f + std::sin(phase * 6.0f) * 0.15f;
+        right[index] = std::sin(phase * 1.03f) * 0.27f;
+    }
+    left[4] = std::numeric_limits<float>::quiet_NaN();
+    right[8] = std::numeric_limits<float>::infinity();
+
+    for (int frame = 0; frame < 200; ++frame) {
+        engine.update(Spectrum3dEngine::kMaxSamples + 32, 1.0f / 60.0f);
+    }
+    CHECK(engine.frameInfo().fill > 0.99f);
+
+    DrawList drawList;
+    for (int style = 0; style < Spectrum3dEngine::kStyleCount; ++style) {
+        CHECK(!Spectrum3dEngine::styleName(style).empty());
+        for (int palette = 0; palette < Spectrum3dEngine::kPaletteCount; ++palette) {
+            CHECK(!Spectrum3dEngine::palette(palette).name.empty());
+            engine.setOptions({style, palette});
+            engine.buildFrame(1920.0f, 1080.0f, drawList);
+            CHECK(!drawList.commands().empty());
+            CHECK(drawList.commands().front().primitive == DrawPrimitive::verticalGradient);
+            CHECK(drawList.commands().size() <= 400);
+            CHECK(drawList.points().size() <= Spectrum3dEngine::kMaxRenderedPoints);
+            checkDrawList(drawList);
+            const auto info = engine.frameInfo();
+            CHECK(info.style == style);
+            CHECK(info.palette == palette);
+            CHECK(std::isfinite(info.lowLevel) && info.lowLevel >= 0.0f && info.lowLevel <= 1.0f);
+            CHECK(std::isfinite(info.highLevel) && info.highLevel >= 0.0f &&
+                  info.highLevel <= 1.0f);
+            CHECK(info.styleName == Spectrum3dEngine::styleName(style));
+        }
+    }
+
+    engine.setOptions({1, 0});
+    engine.buildFrame(1600.0f, 900.0f, drawList);
+    size_t polylines = 0;
+    size_t fills = 0;
+    for (const auto& command : drawList.commands()) {
+        polylines += command.primitive == DrawPrimitive::polyline ? 1u : 0u;
+        fills += command.primitive == DrawPrimitive::fillPolygon ? 1u : 0u;
+    }
+    CHECK(polylines >= 10);
+    CHECK(fills >= 10);
+
+    const size_t commandCapacity = drawList.commandCapacity();
+    const size_t pointCapacity = drawList.pointCapacity();
+    for (int frame = 0; frame < 240; ++frame) {
+        engine.setOptions({frame % 2, frame % Spectrum3dEngine::kPaletteCount});
+        engine.update(frame % 3 == 0 ? size_t{0} : size_t{256},
+                      frame % 2 == 0 ? 1.0f / 15.0f : 1.0f / 60.0f);
+        engine.buildFrame(frame % 2 == 0 ? 640.0f : 2560.0f,
+                          frame % 2 == 0 ? 480.0f : 1440.0f, drawList);
+        CHECK(drawList.commandCapacity() == commandCapacity);
+        CHECK(drawList.pointCapacity() == pointCapacity);
+        CHECK(drawList.commands().size() <= 400);
+        CHECK(drawList.points().size() <= Spectrum3dEngine::kMaxRenderedPoints);
+        checkDrawList(drawList);
+    }
+
+    Spectrum3dEngine slow;
+    Spectrum3dEngine fast;
+    for (int frame = 0; frame < 30; ++frame) slow.update(0, 1.0f / 15.0f);
+    for (int frame = 0; frame < 120; ++frame) fast.update(0, 1.0f / 60.0f);
+    CHECK(std::abs(slow.frameInfo().fill - fast.frameInfo().fill) < 0.05f);
+
+    engine.reset();
+    CHECK(engine.frameInfo().fill == 0.0f);
+    engine.buildFrame(800.0f, 600.0f, drawList);
+    CHECK(drawList.commands().size() == 1);
+    engine.buildFrame(0.0f, 600.0f, drawList);
+    CHECK(drawList.commands().empty());
+    engine.update(0, std::numeric_limits<float>::quiet_NaN());
+    engine.buildFrame(std::numeric_limits<float>::infinity(), 600.0f, drawList);
+    CHECK(drawList.commands().empty());
+}
+
 void testOscilloscopeCore() {
     using vizrack::builtin::DrawList;
     using vizrack::builtin::OscilloscopeEngine;
@@ -693,6 +830,7 @@ int main() {
     testRing();
     testArtVisualizerCore();
     testCampfireCore();
+    testSpectrum3dCore();
     testOscilloscopeCore();
     testReconnect();
     testPluginState(directory);

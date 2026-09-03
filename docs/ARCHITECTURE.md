@@ -110,7 +110,23 @@ ground plane; a compact single-layer stone ring and solid log silhouettes anchor
 fire directly in the dark background.
 Right-click options control flame response, star speed/brightness/response and ember
 amount/intensity on a normalized 0–100 scale; those values are additive fields in the
-portable settings schema. The `mvmeter2` definition uses
+portable settings schema.
+
+`builtin-spectrum3d` and `builtin-joydivision` share one `Spectrum3dEngine`: a
+hand-written 1024-point radix-2 FFT feeds 40 log-spaced bands whose newest spectrum is
+pushed to the front of a fixed 72-slice history buffer while older slices recede. The
+slice cadence is driven by measured frame time so 15/30/60 FPS scroll alike.
+`builtin-spectrum3d` renders a quarter-view perspective **surface** — filled strips
+between consecutive time slices plus rib outlines (`CLASSIC CASCADE`).
+`builtin-joydivision` stacks hidden-line ridge curves at full strength (no depth fade)
+inside a centred plot box, with the outer band edges held flat on the baseline, a
+crest-to-trough contrast curve and a deterministic per-slice pen tremble (`JOY
+DIVISION`). Style is fixed per catalog entry. Each style reads the same right-click
+knobs — `rotation`, `tilt`, `depth`, `heightScale` (normalized 0–100, `50` is the
+reference look) and the six-palette choice — through its own response curve; each is an
+additive `spectrum3d*` / `joyDivision*` field in the settings schema.
+
+The `mvmeter2` definition uses
 TBProAudio/mvMeter2 factory metadata and accepts both the GPU and noGPU x64 modules.
 Renderer-specific binary markers are intentionally not required because both editions
 expose compatible factory metadata.

@@ -28,6 +28,16 @@ struct Settings {
     int campfireStarResponse{40};
     int campfireParticleAmount{60};
     int campfireParticleIntensity{50};
+    int spectrum3dPalette{0};
+    int spectrum3dRotation{50};
+    int spectrum3dTilt{50};
+    int spectrum3dDepth{50};
+    int spectrum3dHeight{50};
+    int joyDivisionPalette{0};
+    int joyDivisionRotation{50};
+    int joyDivisionTilt{50};
+    int joyDivisionDepth{50};
+    int joyDivisionHeight{50};
 };
 
 struct SettingsLoadResult {

@@ -171,6 +171,36 @@ SettingsLoadResult loadSettings(const std::filesystem::path& path) {
     if (auto value = readInt(json, "campfireParticleIntensity")) {
         result.value.campfireParticleIntensity = std::clamp(*value, 0, 100);
     }
+    if (auto value = readInt(json, "spectrum3dPalette")) {
+        result.value.spectrum3dPalette = std::clamp(*value, 0, 5);
+    }
+    if (auto value = readInt(json, "spectrum3dRotation")) {
+        result.value.spectrum3dRotation = std::clamp(*value, 0, 100);
+    }
+    if (auto value = readInt(json, "spectrum3dTilt")) {
+        result.value.spectrum3dTilt = std::clamp(*value, 0, 100);
+    }
+    if (auto value = readInt(json, "spectrum3dDepth")) {
+        result.value.spectrum3dDepth = std::clamp(*value, 0, 100);
+    }
+    if (auto value = readInt(json, "spectrum3dHeight")) {
+        result.value.spectrum3dHeight = std::clamp(*value, 0, 100);
+    }
+    if (auto value = readInt(json, "joyDivisionPalette")) {
+        result.value.joyDivisionPalette = std::clamp(*value, 0, 5);
+    }
+    if (auto value = readInt(json, "joyDivisionRotation")) {
+        result.value.joyDivisionRotation = std::clamp(*value, 0, 100);
+    }
+    if (auto value = readInt(json, "joyDivisionTilt")) {
+        result.value.joyDivisionTilt = std::clamp(*value, 0, 100);
+    }
+    if (auto value = readInt(json, "joyDivisionDepth")) {
+        result.value.joyDivisionDepth = std::clamp(*value, 0, 100);
+    }
+    if (auto value = readInt(json, "joyDivisionHeight")) {
+        result.value.joyDivisionHeight = std::clamp(*value, 0, 100);
+    }
     result.loaded = true;
     return result;
 }
@@ -207,7 +237,17 @@ bool saveSettings(const std::filesystem::path& path, const Settings& settings, s
            << "  \"campfireParticleAmount\": "
            << std::clamp(settings.campfireParticleAmount, 0, 100) << ",\n"
            << "  \"campfireParticleIntensity\": "
-           << std::clamp(settings.campfireParticleIntensity, 0, 100) << "\n"
+           << std::clamp(settings.campfireParticleIntensity, 0, 100) << ",\n"
+           << "  \"spectrum3dPalette\": " << std::clamp(settings.spectrum3dPalette, 0, 5) << ",\n"
+           << "  \"spectrum3dRotation\": " << std::clamp(settings.spectrum3dRotation, 0, 100) << ",\n"
+           << "  \"spectrum3dTilt\": " << std::clamp(settings.spectrum3dTilt, 0, 100) << ",\n"
+           << "  \"spectrum3dDepth\": " << std::clamp(settings.spectrum3dDepth, 0, 100) << ",\n"
+           << "  \"spectrum3dHeight\": " << std::clamp(settings.spectrum3dHeight, 0, 100) << ",\n"
+           << "  \"joyDivisionPalette\": " << std::clamp(settings.joyDivisionPalette, 0, 5) << ",\n"
+           << "  \"joyDivisionRotation\": " << std::clamp(settings.joyDivisionRotation, 0, 100) << ",\n"
+           << "  \"joyDivisionTilt\": " << std::clamp(settings.joyDivisionTilt, 0, 100) << ",\n"
+           << "  \"joyDivisionDepth\": " << std::clamp(settings.joyDivisionDepth, 0, 100) << ",\n"
+           << "  \"joyDivisionHeight\": " << std::clamp(settings.joyDivisionHeight, 0, 100) << "\n"
            << "}\n";
     const std::string contents = output.str();
     const auto bytes = std::as_bytes(std::span(contents.data(), contents.size()));

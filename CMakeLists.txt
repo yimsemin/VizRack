@@ -21,6 +21,8 @@ add_library(vizrack_builtin_core STATIC
     src/builtin/draw_list.h
     src/builtin/oscilloscope_engine.cpp
     src/builtin/oscilloscope_engine.h
+    src/builtin/spectrum3d_engine.cpp
+    src/builtin/spectrum3d_engine.h
 )
 target_include_directories(vizrack_builtin_core PUBLIC src)
 if(MSVC)
@@ -95,6 +97,8 @@ add_executable(VizRack WIN32
     src/ui/main_window.h
     src/ui/oscilloscope_view.cpp
     src/ui/oscilloscope_view.h
+    src/ui/spectrum3d_view.cpp
+    src/ui/spectrum3d_view.h
     src/vst/plugin_discovery.cpp
     src/vst/plugin_discovery.h
     src/vst/vst_host.cpp
