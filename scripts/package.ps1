@@ -35,7 +35,6 @@ if (Test-Path -LiteralPath $destination) {
 New-Item -ItemType Directory -Path $destination | Out-Null
 New-Item -ItemType Directory -Path (Join-Path $destination 'licenses') | Out-Null
 New-Item -ItemType Directory -Path (Join-Path $destination 'docs') | Out-Null
-New-Item -ItemType Directory -Path (Join-Path $destination 'docs/assets') | Out-Null
 
 Copy-Item -LiteralPath $sourceExecutable -Destination $destination
 Copy-Item -LiteralPath (Join-Path $repository 'README.md') -Destination $destination
@@ -47,8 +46,6 @@ Copy-Item -LiteralPath (Join-Path $repository 'docs/ARCHITECTURE.md') `
     -Destination (Join-Path $destination 'docs')
 Copy-Item -LiteralPath (Join-Path $repository 'docs/BUILTIN_VISUALIZER_CORE.md') `
     -Destination (Join-Path $destination 'docs')
-Copy-Item -LiteralPath (Join-Path $repository 'docs/assets/VST_Compatible_Logo_Steinberg.svg') `
-    -Destination (Join-Path $destination 'docs/assets')
 
 if (Test-Path -LiteralPath $zipPath) {
     Remove-Item -LiteralPath $zipPath -Force

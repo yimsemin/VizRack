@@ -50,10 +50,8 @@ VizRack은 **Windows 10 버전 1703 이상 또는 Windows 11이 설치된 x64 PC
 
 ## 선택형 외부 비주얼라이저
 
-<img src="docs/assets/VST_Compatible_Logo_Steinberg.svg" alt="VST Compatible" width="116">
-
-VizRack의 VST® 3 지원은 아래 두 제품의 Windows x64 버전에만 한정됩니다. 임의의
-VST 3 플러그인을 불러오는 범용 호스트가 아닙니다.
+VizRack의 VST 3 플러그인 지원은 아래 두 제품의 Windows x64 버전에만 한정됩니다.
+임의의 VST 3 플러그인을 불러오는 범용 호스트가 아닙니다.
 
 | 제품 | 지원 버전 | 공식 설치 페이지 |
 | --- | --- | --- |
@@ -125,11 +123,11 @@ powershell -ExecutionPolicy Bypass -File scripts\package.ps1
 ## 라이선스
 
 VizRack의 코드와 자체 제작 앱 아이콘은
-[MIT License](LICENSE), Copyright (c) 2026 SubProject로 공개됩니다. 빌드에 포함되는
+[MIT License](LICENSE), Copyright (c) 2026 subProject로 공개됩니다. 빌드에 포함되는
 Steinberg VST 3 SDK와 제3자 고지는 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)를
 참고하세요.
 
-공식 VST Compatible 로고와 VST 상표는 VizRack의 MIT License로 재허가되지 않으며
-Steinberg의 VST 사용 지침에 따라 사용됩니다.
+"VST" 이름은 호환성 설명을 위해서만 사용하며 VizRack의 MIT License로 재허가되지
+않습니다. VizRack은 Steinberg와 제휴하거나 승인받은 관계가 아닙니다.
 
 VST is a registered trademark of Steinberg Media Technologies GmbH.

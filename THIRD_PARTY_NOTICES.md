@@ -13,14 +13,10 @@ is licensed under the MIT License. Its license text is therefore included at
 
 VST is a registered trademark of Steinberg Media Technologies GmbH. This
 project is an independent personal host and is not affiliated with or endorsed
-by Steinberg.
-
-The official VST Compatible logo is included unmodified at
-`docs/assets/VST_Compatible_Logo_Steinberg.svg` and is used with the limited
-compatibility statement in this project's documentation under Steinberg's VST
-usage guidelines:
-<https://steinbergmedia.github.io/vst3_dev_portal/pages/VST%2B3%2BLicensing/Usage%2Bguidelines.html>.
-The logo and VST trademark are not offered under VizRack's MIT License.
+by Steinberg. The "VST" name is used here only nominatively, to describe
+plug-in format compatibility, and is not offered under VizRack's MIT License.
+No Steinberg logo or other Steinberg trademark artwork is distributed with
+this project.
 
 ## TBProAudio mvMeter2
 

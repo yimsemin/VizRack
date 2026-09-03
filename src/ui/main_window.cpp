@@ -442,7 +442,7 @@ void MainWindow::showAboutDialog() {
         L"WASAPI 공유 loopback으로 소리를 읽기만 하며 재생 경로에 개입하지 않습니다.\n\n"
         L"GitHub: " + kProjectUrl +
         L"\n"
-        L"라이선스: MIT License, Copyright (c) 2026 SubProject\n\n"
+        L"라이선스: MIT License, Copyright (c) 2026 subProject\n\n"
         L"VST is a registered trademark of Steinberg Media Technologies GmbH.";
     MessageBoxW(hwnd_, text.c_str(), L"VizRack 정보", MB_OK | MB_ICONINFORMATION);
 }
