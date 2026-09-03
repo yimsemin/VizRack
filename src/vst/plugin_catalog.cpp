@@ -17,6 +17,7 @@ const std::vector<PluginDefinition>& pluginCatalog() {
             "Built-in",
             {},
             "",
+            "",
         },
         {
             PluginKind::builtIn,
@@ -28,6 +29,7 @@ const std::vector<PluginDefinition>& pluginCatalog() {
             "",
             "6 Scenes / 6 Palettes",
             {},
+            "",
             "",
         },
         {
@@ -41,6 +43,7 @@ const std::vector<PluginDefinition>& pluginCatalog() {
             "Natural Flame / Audio Reactive",
             {},
             "",
+            "",
         },
         {
             PluginKind::builtIn,
@@ -52,6 +55,7 @@ const std::vector<PluginDefinition>& pluginCatalog() {
             "",
             "Classic Cascade / Time Depth",
             {},
+            "",
             "",
         },
         {
@@ -65,6 +69,7 @@ const std::vector<PluginDefinition>& pluginCatalog() {
             "Ridgeline Cascade",
             {},
             "",
+            "Inspired by Joy Division",
         },
         {
             PluginKind::vst3,
@@ -77,6 +82,7 @@ const std::vector<PluginDefinition>& pluginCatalog() {
             "GPU / noGPU",
             {std::filesystem::path(L"VST3") / L"TBProAudio"},
             "https://www.tbproaudio.de/products/mvmeter2",
+            "",
         },
         {
             PluginKind::vst3,
@@ -89,6 +95,7 @@ const std::vector<PluginDefinition>& pluginCatalog() {
             "Free",
             {std::filesystem::path(L"VST3") / L"AnSpec.vst3"},
             "https://www.voxengo.com/product/anspec/",
+            "",
         },
     };
     return catalog;

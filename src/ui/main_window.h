@@ -62,6 +62,7 @@ private:
     void notifySettingsChanged();
     void handleCommand(UINT command);
     void showAboutDialog();
+    void showCreditsDialog();
     void openExternalUrl(const wchar_t* url);
     void ensureVisible(RECT& rect);
     float dpiScale() const;

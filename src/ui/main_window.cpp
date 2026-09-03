@@ -26,6 +26,7 @@ constexpr UINT kCommandBorderless = 121;
 constexpr UINT kCommandExit = 130;
 constexpr UINT kCommandProjectPage = 140;
 constexpr UINT kCommandAbout = 141;
+constexpr UINT kCommandCredits = 142;
 constexpr UINT kCommandOpacityBase = 200;
 constexpr wchar_t kProjectUrl[] = L"https://github.com/yimsemin/VizRack";
 constexpr UINT kCommandDeviceBase = 1000;
@@ -197,6 +198,7 @@ void MainWindow::createMenus() {
     helpMenu_ = CreatePopupMenu();
     AppendMenuW(helpMenu_, MF_STRING, kCommandProjectPage, L"GitHub 저장소 열기");
     AppendMenuW(helpMenu_, MF_SEPARATOR, 0, nullptr);
+    AppendMenuW(helpMenu_, MF_STRING, kCommandCredits, L"크레딧");
     AppendMenuW(helpMenu_, MF_STRING, kCommandAbout, L"VizRack 정보");
 
     AppendMenuW(menuBar_, MF_POPUP, reinterpret_cast<UINT_PTR>(settingsMenu_), L"설정");
@@ -447,6 +449,19 @@ void MainWindow::showAboutDialog() {
     MessageBoxW(hwnd_, text.c_str(), L"VizRack 정보", MB_OK | MB_ICONINFORMATION);
 }
 
+void MainWindow::showCreditsDialog() {
+    std::wstring text = L"영감을 받은 비주얼라이저\n";
+    for (const auto& definition : pluginCatalog()) {
+        if (definition.inspiration.empty()) continue;
+        text += L"\n" + fromUtf8(definition.displayName) + L"\n" +
+                fromUtf8(definition.inspiration) + L"\n";
+    }
+    text +=
+        L"\n표기된 이름은 영감의 출처를 밝히기 위한 것이며, 해당 이름과 작품의 권리는 "
+        L"각 권리자에게 있고 VizRack의 MIT License에 포함되지 않습니다.";
+    MessageBoxW(hwnd_, text.c_str(), L"크레딧", MB_OK | MB_ICONINFORMATION);
+}
+
 void MainWindow::scheduleClose(unsigned milliseconds) {
     if (hwnd_) SetTimer(hwnd_, kSmokeTestTimer, milliseconds, nullptr);
 }
@@ -483,6 +498,8 @@ void MainWindow::handleCommand(UINT command) {
         openExternalUrl(kProjectUrl);
     } else if (command == kCommandAbout) {
         showAboutDialog();
+    } else if (command == kCommandCredits) {
+        showCreditsDialog();
     } else {
         const auto& catalog = pluginCatalog();
         if (command >= kCommandPluginSelectBase &&

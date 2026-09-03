@@ -422,7 +422,9 @@ bool App::startBuiltInPlugin(const PluginDefinition& definition, std::string& er
     spectrum3d_.setSampleRate(sampleRate);
     joyDivision_.setSampleRate(sampleRate);
     activeBuiltInPluginId_ = definition.id;
-    window_->setPluginStatus(definition.displayName);
+    std::string status = definition.displayName;
+    if (!definition.inspiration.empty()) status += "  —  " + definition.inspiration;
+    window_->setPluginStatus(std::move(status));
     pluginSelectionNeeded_ = false;
     logger_.info("Built-in visualization activated: id='" + definition.id + "'");
     return true;

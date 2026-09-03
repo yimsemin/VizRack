@@ -198,8 +198,12 @@ void testPluginCatalogAndStorage(const std::filesystem::path& directory) {
     if (joyDivision) {
         CHECK(joyDivision->kind == vizrack::PluginKind::builtIn);
         CHECK(joyDivision->displayName == "내장 Joy Division");
+        CHECK(joyDivision->inspiration == "Inspired by Joy Division");
         CHECK(joyDivision->installUrl.empty());
         CHECK(joyDivision->searchLocations.empty());
+    }
+    for (const auto& item : catalog) {
+        if (item.id != "builtin-joydivision") CHECK(item.inspiration.empty());
     }
 
     const auto* definition = vizrack::findPluginDefinition("mvmeter2");

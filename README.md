@@ -120,6 +120,15 @@ powershell -ExecutionPolicy Bypass -File scripts\package.ps1
 
 </details>
 
+## 크레딧
+
+일부 내장 비주얼라이저는 아래 작업에서 영감을 받았습니다.
+
+- **내장 Joy Division** — Inspired by Joy Division
+
+표기된 이름은 영감의 출처를 밝히기 위한 것이며, 해당 이름과 작품의 권리는 각
+권리자에게 있고 VizRack의 MIT License에 포함되지 않습니다.
+
 ## 라이선스
 
 VizRack의 코드와 자체 제작 앱 아이콘은

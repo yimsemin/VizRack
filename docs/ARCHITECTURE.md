@@ -92,9 +92,15 @@ a plug-in is switched or audio is reconnecting.
 `PluginDefinition` is the only plug-in-specific configuration surface. Its kind
 selects the built-in or VST3 activation path, and it contains a filesystem-safe
 immutable ID, display/vendor/class metadata,
-optional binary marker, dedicated search files/directories, edition label and
-official URL. Discovery checks only the selected definition's saved location
-and search locations, then validates AMD64 PE, marker and VST3 factory data.
+optional binary marker, dedicated search files/directories, edition label,
+official URL and an optional `inspiration` string. Discovery checks only the
+selected definition's saved location and search locations, then validates AMD64
+PE, marker and VST3 factory data.
+
+A non-empty `inspiration` ("Inspired by …") marks a homage built-in. It is shown
+after the plug-in status line on activation and listed under Help ▸ 크레딧, which
+also carries the note that those names stay with their owners and outside
+VizRack's MIT License. `builtin-joydivision` is currently the only such entry.
 
 The first catalog entry remains `builtin-oscilloscope`, so a fresh portable data
 folder always starts without an external dependency. `builtin-art-visualizer`
