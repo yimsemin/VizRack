@@ -9,6 +9,7 @@ struct Settings {
     bool followDefaultDevice{true};
     std::string fixedDeviceId;
     std::string selectedPluginId;
+    std::string uiLanguage{"auto"};  // "auto" | "en" | "ko"
     int windowX{100};
     int windowY{100};
     int windowWidth{640};

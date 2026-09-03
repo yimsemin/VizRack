@@ -67,13 +67,13 @@ std::vector<uint8_t> encodePluginState(const PluginStateData& state) {
 
 bool decodePluginState(std::span<const uint8_t> bytes, PluginStateData& state, std::string& error) {
     if (bytes.size() < kHeaderSize || !std::equal(kMagic.begin(), kMagic.end(), bytes.begin())) {
-        error = "플러그인 상태 헤더가 올바르지 않습니다.";
+        error = "Invalid plug-in state header.";
         return false;
     }
     size_t cursor = kMagic.size();
     uint32_t version{};
     if (!read(bytes, cursor, version) || version != kVersion) {
-        error = "지원하지 않는 플러그인 상태 버전입니다.";
+        error = "Unsupported plug-in state version.";
         return false;
     }
     std::copy_n(bytes.begin() + static_cast<ptrdiff_t>(cursor), 16, state.classId.begin());
@@ -84,11 +84,11 @@ bool decodePluginState(std::span<const uint8_t> bytes, PluginStateData& state, s
     if (!read(bytes, cursor, componentSize) || !read(bytes, cursor, controllerSize) ||
         !read(bytes, cursor, expectedCrc) || componentSize > kMaxStateBytes ||
         controllerSize > kMaxStateBytes || componentSize + controllerSize != bytes.size() - cursor) {
-        error = "플러그인 상태 길이가 올바르지 않습니다.";
+        error = "Invalid plug-in state length.";
         return false;
     }
     if (crc32(bytes.subspan(cursor)) != expectedCrc) {
-        error = "플러그인 상태 체크섬이 일치하지 않습니다.";
+        error = "Plug-in state checksum mismatch.";
         return false;
     }
     state.component.assign(bytes.begin() + static_cast<ptrdiff_t>(cursor),
@@ -101,19 +101,19 @@ bool decodePluginState(std::span<const uint8_t> bytes, PluginStateData& state, s
 bool savePluginStateFile(const std::filesystem::path& path, const PluginStateData& state,
                          std::string& error) {
     const auto bytes = encodePluginState(state);
-    return writeFileAtomically(path, bytes, "플러그인 상태 파일", error);
+    return writeFileAtomically(path, bytes, "plug-in state file", error);
 }
 
 bool loadPluginStateFile(const std::filesystem::path& path, PluginStateData& state,
                          std::string& error) {
     std::ifstream input(path, std::ios::binary);
     if (!input) {
-        error = "플러그인 상태 파일이 없습니다.";
+        error = "Plug-in state file is missing.";
         return false;
     }
     std::vector<uint8_t> bytes((std::istreambuf_iterator<char>(input)), {});
     if (!input.good() && !input.eof()) {
-        error = "플러그인 상태 파일을 읽지 못했습니다.";
+        error = "Could not read the plug-in state file.";
         return false;
     }
     return decodePluginState(bytes, state, error);

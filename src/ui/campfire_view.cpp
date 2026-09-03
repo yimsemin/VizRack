@@ -1,6 +1,7 @@
 #include "ui/campfire_view.h"
 
 #include "core/audio_ring.h"
+#include "core/i18n.h"
 #include "core/utf.h"
 
 #include <windowsx.h>
@@ -61,7 +62,7 @@ void CampfireView::configure(CampfireOptions options,
 bool CampfireView::attach(HINSTANCE instance, HWND parent, std::string& error) {
     if (active()) return true;
     if (!renderer_.available()) {
-        error = "내장 캠프파이어 그래픽 초기화에 실패했습니다.";
+        error = "Failed to initialize built-in campfire graphics.";
         return false;
     }
     WNDCLASSEXW windowClass{};
@@ -72,7 +73,8 @@ bool CampfireView::attach(HINSTANCE instance, HWND parent, std::string& error) {
     windowClass.hCursor = LoadCursor(nullptr, IDC_ARROW);
     windowClass.lpszClassName = kWindowClass;
     if (!RegisterClassExW(&windowClass) && GetLastError() != ERROR_CLASS_ALREADY_EXISTS) {
-        error = "내장 캠프파이어 창 등록 실패: " + formatWindowsError(GetLastError());
+        error = "Failed to register the built-in campfire window: " +
+                formatWindowsError(GetLastError());
         return false;
     }
     RECT client{};
@@ -81,12 +83,13 @@ bool CampfireView::attach(HINSTANCE instance, HWND parent, std::string& error) {
                             WS_CHILD | WS_VISIBLE | WS_TABSTOP | WS_CLIPCHILDREN | WS_CLIPSIBLINGS,
                             0, 0, client.right, client.bottom, parent, nullptr, instance, this);
     if (!hwnd_) {
-        error = "내장 캠프파이어 창 생성 실패: " + formatWindowsError(GetLastError());
+        error = "Failed to create the built-in campfire window: " +
+                formatWindowsError(GetLastError());
         return false;
     }
     lastUpdate_ = std::chrono::steady_clock::now();
     if (!SetTimer(hwnd_, kRefreshTimer, 16, nullptr)) {
-        error = "내장 캠프파이어 갱신 타이머를 시작하지 못했습니다.";
+        error = "Failed to start the built-in campfire refresh timer.";
         DestroyWindow(hwnd_);
         hwnd_ = nullptr;
         return false;
@@ -173,18 +176,18 @@ void CampfireView::showOptionsMenu(POINT point) {
     }
     const auto options = engine_.options();
     HMENU menu = CreatePopupMenu();
-    appendValueMenu(menu, L"불꽃 음악 반응", kFlameResponseCommand,
+    appendValueMenu(menu, trw(Str::CampfireMenuFlameResponse).c_str(), kFlameResponseCommand,
                     options.flameResponse);
-    appendValueMenu(menu, L"별 이동 속도", kStarSpeedCommand,
+    appendValueMenu(menu, trw(Str::CampfireMenuStarSpeed).c_str(), kStarSpeedCommand,
                     options.starSpeed);
-    appendValueMenu(menu, L"별 평소 밝기", kStarBrightnessCommand,
+    appendValueMenu(menu, trw(Str::CampfireMenuStarBrightness).c_str(), kStarBrightnessCommand,
                     options.starBrightness);
-    appendValueMenu(menu, L"별 음악 반응", kStarResponseCommand,
+    appendValueMenu(menu, trw(Str::CampfireMenuStarResponse).c_str(), kStarResponseCommand,
                     options.starResponse);
     AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
-    appendValueMenu(menu, L"불티 양", kParticleAmountCommand,
+    appendValueMenu(menu, trw(Str::CampfireMenuSparkAmount).c_str(), kParticleAmountCommand,
                     options.particleAmount);
-    appendValueMenu(menu, L"불티 강도", kParticleIntensityCommand,
+    appendValueMenu(menu, trw(Str::CampfireMenuSparkIntensity).c_str(), kParticleIntensityCommand,
                     options.particleIntensity);
 
     const UINT command = TrackPopupMenu(menu, TPM_RETURNCMD | TPM_RIGHTBUTTON,

@@ -1,6 +1,7 @@
 #include "ui/art_visualizer_view.h"
 
 #include "core/audio_ring.h"
+#include "core/i18n.h"
 #include "core/utf.h"
 
 #include <windowsx.h>
@@ -46,7 +47,7 @@ void ArtVisualizerView::configure(ArtVisualizerOptions options,
 bool ArtVisualizerView::attach(HINSTANCE instance, HWND parent, std::string& error) {
     if (active()) return true;
     if (!renderer_.available()) {
-        error = "내장 아트 비주얼라이저 그래픽 초기화에 실패했습니다.";
+        error = "Failed to initialize built-in art visualizer graphics.";
         return false;
     }
     WNDCLASSEXW windowClass{};
@@ -57,7 +58,8 @@ bool ArtVisualizerView::attach(HINSTANCE instance, HWND parent, std::string& err
     windowClass.hCursor = LoadCursor(nullptr, IDC_ARROW);
     windowClass.lpszClassName = kWindowClass;
     if (!RegisterClassExW(&windowClass) && GetLastError() != ERROR_CLASS_ALREADY_EXISTS) {
-        error = "내장 아트 비주얼라이저 창 등록 실패: " + formatWindowsError(GetLastError());
+        error = "Failed to register the built-in art visualizer window: " +
+                formatWindowsError(GetLastError());
         return false;
     }
     RECT client{};
@@ -66,12 +68,13 @@ bool ArtVisualizerView::attach(HINSTANCE instance, HWND parent, std::string& err
                             WS_CHILD | WS_VISIBLE | WS_TABSTOP | WS_CLIPCHILDREN | WS_CLIPSIBLINGS,
                             0, 0, client.right, client.bottom, parent, nullptr, instance, this);
     if (!hwnd_) {
-        error = "내장 아트 비주얼라이저 창 생성 실패: " + formatWindowsError(GetLastError());
+        error = "Failed to create the built-in art visualizer window: " +
+                formatWindowsError(GetLastError());
         return false;
     }
     lastUpdate_ = std::chrono::steady_clock::now();
     if (!SetTimer(hwnd_, kRefreshTimer, 16, nullptr)) {
-        error = "내장 아트 비주얼라이저 갱신 타이머를 시작하지 못했습니다.";
+        error = "Failed to start the built-in art visualizer refresh timer.";
         DestroyWindow(hwnd_);
         hwnd_ = nullptr;
         return false;
@@ -193,8 +196,9 @@ void ArtVisualizerView::showOptionsMenu(POINT point) {
         AppendMenuW(palettes, MF_STRING | (index == options.palette ? MF_CHECKED : 0),
                     kPaletteCommand + index, label.c_str());
     }
-    AppendMenuW(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(scenes), L"장면");
-    AppendMenuW(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(palettes), L"색상 팔레트");
+    AppendMenuW(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(scenes), trw(Str::ArtMenuScene).c_str());
+    AppendMenuW(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(palettes),
+                trw(Str::ArtMenuPalette).c_str());
     const UINT command = TrackPopupMenu(menu, TPM_RETURNCMD | TPM_RIGHTBUTTON,
                                         point.x, point.y, 0, hwnd_, nullptr);
     auto updated = options;

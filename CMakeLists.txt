@@ -51,6 +51,9 @@ add_library(vizrack_core STATIC
     src/core/audio_ring.h
     src/core/channel_mapper.cpp
     src/core/channel_mapper.h
+    src/core/i18n.cpp
+    src/core/i18n.h
+    src/core/i18n_strings.inc
     src/core/logger.cpp
     src/core/logger.h
     src/core/plugin_paths.cpp
@@ -137,7 +140,7 @@ set_target_properties(VizRack PROPERTIES
 )
 
 install(TARGETS VizRack RUNTIME DESTINATION .)
-install(FILES README.md LICENSE THIRD_PARTY_NOTICES.md DESTINATION .)
+install(FILES README.md README.ko.md LICENSE THIRD_PARTY_NOTICES.md DESTINATION .)
 install(FILES licenses/Steinberg-VST3-SDK-MIT.txt DESTINATION licenses)
 install(FILES docs/ARCHITECTURE.md docs/BUILTIN_VISUALIZER_CORE.md DESTINATION docs)
 

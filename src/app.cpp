@@ -1,5 +1,6 @@
 #include "app.h"
 
+#include "core/i18n.h"
 #include "core/plugin_storage.h"
 #include "core/utf.h"
 #include "ui/main_window.h"
@@ -72,6 +73,7 @@ void mergeMainWindowSettings(Settings& destination, const Settings& source) {
     destination.followDefaultDevice = source.followDefaultDevice;
     destination.fixedDeviceId = source.fixedDeviceId;
     destination.selectedPluginId = source.selectedPluginId;
+    destination.uiLanguage = source.uiLanguage;
     destination.windowX = source.windowX;
     destination.windowY = source.windowY;
     destination.windowWidth = source.windowWidth;
@@ -120,6 +122,9 @@ bool App::initialize(std::string& error) {
     const auto loadedSettings = loadSettings(paths_.settings);
     settings_ = loadedSettings.value;
     if (!loadedSettings.warning.empty()) logger_.warning(loadedSettings.warning);
+    setUiLanguage(resolveUiLanguage(settings_.uiLanguage));
+    logger_.info("UI language: " + std::string(uiLanguageToken(currentUiLanguage())) +
+                 " (preference '" + settings_.uiLanguage + "')");
     if (!findPluginDefinition(settings_.selectedPluginId)) {
         settings_.selectedPluginId = pluginCatalog().front().id;
     }
@@ -207,7 +212,7 @@ bool App::initialize(std::string& error) {
     };
     callbacks.onResume = [this] {
         logger_.info("Power resume detected; requesting audio reinitialization");
-        capture_.requestReconnect("절전 모드 복귀");
+        capture_.requestReconnect("power resume");
     };
     window_ = std::make_unique<MainWindow>(instance_, settings_, std::move(callbacks));
     if (!window_->create(error)) return false;
@@ -226,7 +231,7 @@ bool App::initialize(std::string& error) {
     window_->setEditorScaleHandler([this](float scale) { vstHost_.setEditorContentScale(scale); });
 
     if (!portableWritable_) {
-        window_->setPluginStatus("포터블 데이터 폴더 쓰기 불가 — 설정과 로그를 저장하지 않음");
+        window_->setPluginStatus(tr(Str::StatusPortableReadOnly));
     }
     loadInitialPlugin();
 
@@ -246,7 +251,7 @@ bool App::initialize(std::string& error) {
         },
         [this] { vstHost_.notifyDataReady(); });
     if (!captureStarted_) {
-        error = "WASAPI 캡처 스레드를 시작하지 못했습니다.";
+        error = "Failed to start the WASAPI capture thread.";
         return false;
     }
     return true;
@@ -260,18 +265,15 @@ int App::run(int commandShow) {
     }
     if (!portableWritable_) {
         MessageBoxW(window_->handle(), fromUtf8(paths_.writeError).c_str(),
-                    L"포터블 저장소 쓰기 불가", MB_OK | MB_ICONWARNING);
+                    trw(Str::DialogTitlePortableStorage).c_str(), MB_OK | MB_ICONWARNING);
     }
     if (pluginSelectionNeeded_ && !smokeTest) {
         const auto* definition = findPluginDefinition(settings_.selectedPluginId);
         const std::wstring displayName = definition ? fromUtf8(definition->displayName) : L"VST3";
-        const std::wstring message = displayName +
-            L"를 찾지 못했습니다. 먼저 Windows x64 VST3 플러그인을 설치해야 합니다.\n\n"
-            L"[예] 공식 설치 페이지 열기\n"
-            L"[아니요] 이미 설치한 .vst3 파일 직접 선택\n"
-            L"[취소] 나중에 플러그인 메뉴에서 선택";
+        const std::wstring message =
+            std::vformat(trw(Str::DialogBodyPluginRequiredFmt), std::make_wformat_args(displayName));
         const int choice = MessageBoxW(
-            window_->handle(), message.c_str(), L"지원 플러그인 필요",
+            window_->handle(), message.c_str(), trw(Str::DialogTitlePluginRequired).c_str(),
             MB_YESNOCANCEL | MB_ICONINFORMATION);
         if (choice == IDYES && definition) {
             window_->openPluginInstallPage(definition->id);
@@ -345,18 +347,19 @@ bool App::activatePlugin(const PluginDefinition& definition,
         std::string rollbackError;
         if (startPluginInstance(*previousDefinition, *previousDescriptor, rollbackError)) {
             window_->setSelectedPluginId(previousDefinition->id);
-            error = targetError + " 이전 플러그인으로 복구했습니다.";
+            error = targetError + " Recovered the previous plug-in.";
             return false;
         }
-        error = targetError + " 이전 플러그인 복구도 실패했습니다: " + rollbackError;
+        error = targetError + " Recovery of the previous plug-in also failed: " + rollbackError;
     } else if (previousBuiltIn) {
         std::string rollbackError;
         if (startBuiltInPlugin(*previousBuiltIn, rollbackError)) {
             window_->setSelectedPluginId(previousBuiltIn->id);
-            error = targetError + " 이전 내장 플러그인으로 복구했습니다.";
+            error = targetError + " Recovered the previous built-in visualizer.";
             return false;
         }
-        error = targetError + " 이전 내장 플러그인 복구도 실패했습니다: " + rollbackError;
+        error = targetError +
+                " Recovery of the previous built-in visualizer also failed: " + rollbackError;
     }
     window_->setExternalResizeEnabled(true);
     return false;
@@ -382,18 +385,19 @@ bool App::activateBuiltInPlugin(const PluginDefinition& definition, std::string&
         std::string rollbackError;
         if (startPluginInstance(*previousDefinition, *previousDescriptor, rollbackError)) {
             window_->setSelectedPluginId(previousDefinition->id);
-            error = targetError + " 이전 VST3 플러그인으로 복구했습니다.";
+            error = targetError + " Recovered the previous VST3 plug-in.";
             return false;
         }
-        error = targetError + " 이전 VST3 플러그인 복구도 실패했습니다: " + rollbackError;
+        error = targetError + " Recovery of the previous VST3 plug-in also failed: " + rollbackError;
     } else if (previousBuiltIn) {
         std::string rollbackError;
         if (startBuiltInPlugin(*previousBuiltIn, rollbackError)) {
             window_->setSelectedPluginId(previousBuiltIn->id);
-            error = targetError + " 이전 내장 플러그인으로 복구했습니다.";
+            error = targetError + " Recovered the previous built-in visualizer.";
             return false;
         }
-        error = targetError + " 이전 내장 플러그인 복구도 실패했습니다: " + rollbackError;
+        error = targetError +
+                " Recovery of the previous built-in visualizer also failed: " + rollbackError;
     }
     return false;
 }
@@ -412,7 +416,7 @@ bool App::startBuiltInPlugin(const PluginDefinition& definition, std::string& er
     } else if (definition.id == "builtin-joydivision") {
         attached = joyDivision_.attach(instance_, window_->pluginParent(), error);
     } else {
-        error = "지원하지 않는 내장 플러그인입니다: " + definition.id;
+        error = "Unsupported built-in visualizer: " + definition.id;
     }
     if (!attached) return false;
     const uint32_t sampleRate = sampleRate_.load(std::memory_order_acquire);
@@ -454,7 +458,7 @@ bool App::startPluginInstance(const PluginDefinition& definition,
         window_->onPluginRequestedSize(editorWidth, editorHeight);
     }
     if (!vstHost_.startProcessing(sampleRate_.load(std::memory_order_acquire))) {
-        error = definition.displayName + " 처리 스레드를 시작하지 못했습니다.";
+        error = "Failed to start the processing thread for " + definition.displayName + ".";
         vstHost_.unload();
         return false;
     }
@@ -472,8 +476,8 @@ void App::selectPlugin(const std::string& pluginId) {
     if (definition->kind == PluginKind::builtIn) {
         std::string error;
         if (!activateBuiltInPlugin(*definition, error)) {
-            MessageBoxW(window_->handle(), fromUtf8(error).c_str(), L"내장 플러그인 시작 실패",
-                        MB_OK | MB_ICONERROR);
+            MessageBoxW(window_->handle(), fromUtf8(error).c_str(),
+                        trw(Str::DialogTitleBuiltinStartFailed).c_str(), MB_OK | MB_ICONERROR);
             return;
         }
         commitPluginSelection(*definition);
@@ -487,13 +491,13 @@ void App::selectPlugin(const std::string& pluginId) {
     if (!inspection.compatible) {
         logger_.warning(definition->displayName + " selection failed: " + inspection.error);
         MessageBoxW(window_->handle(), fromUtf8(inspection.error).c_str(),
-                    L"지원 플러그인을 찾지 못함", MB_OK | MB_ICONERROR);
+                    trw(Str::DialogTitleSupportedPluginMissing).c_str(), MB_OK | MB_ICONERROR);
         return;
     }
     std::string error;
     if (!activatePlugin(*definition, inspection.descriptor, error)) {
-        MessageBoxW(window_->handle(), fromUtf8(error).c_str(), L"VST3 로딩 실패",
-                    MB_OK | MB_ICONERROR);
+        MessageBoxW(window_->handle(), fromUtf8(error).c_str(),
+                    trw(Str::DialogTitleVst3LoadFailed).c_str(), MB_OK | MB_ICONERROR);
         return;
     }
     commitPluginSelection(*definition, &inspection.descriptor);
@@ -506,13 +510,13 @@ void App::selectPluginPath(const std::string& pluginId, const std::filesystem::p
     if (!inspection.compatible) {
         logger_.warning("Manual plug-in selection rejected: " + inspection.error);
         MessageBoxW(window_->handle(), fromUtf8(inspection.error).c_str(),
-                    L"호환되지 않는 VST3", MB_OK | MB_ICONERROR);
+                    trw(Str::DialogTitleIncompatibleVst3).c_str(), MB_OK | MB_ICONERROR);
         return;
     }
     std::string error;
     if (!activatePlugin(*definition, inspection.descriptor, error)) {
-        MessageBoxW(window_->handle(), fromUtf8(error).c_str(), L"VST3 로딩 실패",
-                    MB_OK | MB_ICONERROR);
+        MessageBoxW(window_->handle(), fromUtf8(error).c_str(),
+                    trw(Str::DialogTitleVst3LoadFailed).c_str(), MB_OK | MB_ICONERROR);
         return;
     }
     commitPluginSelection(*definition, &inspection.descriptor);

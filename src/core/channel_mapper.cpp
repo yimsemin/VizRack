@@ -35,16 +35,16 @@ ChannelSelection selectFrontLeftRight(uint32_t channelCount, uint32_t channelMas
 
 std::string channelStatusText(uint32_t channelCount) {
     if (channelCount > 2) {
-        return "입력: " + std::to_string(channelCount) +
-               "채널 — Front Left / Front Right만 측정 중";
+        return "Input: " + std::to_string(channelCount) +
+               " channels — metering Front Left / Front Right only";
     }
     if (channelCount == 2) {
-        return "입력: 스테레오 (Left / Right)";
+        return "Input: stereo (Left / Right)";
     }
     if (channelCount == 1) {
-        return "입력: 모노 — 선택한 플러그인에는 무음으로 전달";
+        return "Input: mono — delivered to the selected plug-in as silence";
     }
-    return "입력 채널 정보 없음";
+    return "Input: no channel information";
 }
 
 } // namespace vizrack

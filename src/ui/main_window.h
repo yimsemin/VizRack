@@ -52,6 +52,7 @@ private:
     LRESULT proc(UINT message, WPARAM wParam, LPARAM lParam);
     bool registerClass(std::string& error);
     void createMenus();
+    void retranslate();
     void rebuildDeviceMenu();
     void showContextMenu(POINT point);
     void applyWindowOptions();
@@ -75,11 +76,12 @@ private:
     HMENU deviceMenu_{};
     HMENU opacityMenu_{};
     HMENU pluginMenu_{};
+    HMENU languageMenu_{};
     HMENU helpMenu_{};
     Settings settings_;
     MainWindowCallbacks callbacks_;
     CaptureStatus captureStatus_;
-    std::string pluginStatus_{"플러그인을 찾는 중"};
+    std::string pluginStatus_;
     std::string selectedPluginId_;
     std::function<void(int, int)> editorResizeHandler_;
     std::function<std::pair<int, int>(int, int)> editorConstraintHandler_;

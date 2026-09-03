@@ -110,23 +110,27 @@ SettingsLoadResult loadSettings(const std::filesystem::path& path) {
     std::ostringstream contents;
     contents << input.rdbuf();
     if (!input.good() && !input.eof()) {
-        result.warning = "설정 파일을 읽지 못해 기본값을 사용합니다.";
+        result.warning = "Could not read the settings file; using defaults.";
         return result;
     }
     const std::string json = contents.str();
     if (json.find('{') == std::string::npos || json.find('}') == std::string::npos) {
-        result.warning = "설정 파일 형식이 손상되어 기본값을 사용합니다.";
+        result.warning = "The settings file is malformed; using defaults.";
         return result;
     }
     const auto schemaVersion = readInt(json, "schemaVersion");
     if (!schemaVersion || *schemaVersion != kSettingsSchemaVersion) {
-        result.warning = "지원하지 않는 설정 파일 버전이므로 기본값을 사용합니다.";
+        result.warning = "Unsupported settings file version; using defaults.";
         return result;
     }
     if (auto value = readBool(json, "followDefaultDevice")) result.value.followDefaultDevice = *value;
     if (auto value = readString(json, "fixedDeviceId")) result.value.fixedDeviceId = *value;
     if (auto value = readString(json, "selectedPluginId"); value && !value->empty()) {
         result.value.selectedPluginId = *value;
+    }
+    if (auto value = readString(json, "uiLanguage");
+        value && (*value == "auto" || *value == "en" || *value == "ko")) {
+        result.value.uiLanguage = *value;
     }
     if (auto value = readInt(json, "windowX")) result.value.windowX = *value;
     if (auto value = readInt(json, "windowY")) result.value.windowY = *value;
@@ -212,6 +216,7 @@ bool saveSettings(const std::filesystem::path& path, const Settings& settings, s
            << "  \"followDefaultDevice\": " << (settings.followDefaultDevice ? "true" : "false") << ",\n"
            << "  \"fixedDeviceId\": \"" << escapeJson(settings.fixedDeviceId) << "\",\n"
            << "  \"selectedPluginId\": \"" << escapeJson(settings.selectedPluginId) << "\",\n"
+           << "  \"uiLanguage\": \"" << escapeJson(settings.uiLanguage) << "\",\n"
            << "  \"windowX\": " << settings.windowX << ",\n"
            << "  \"windowY\": " << settings.windowY << ",\n"
            << "  \"windowWidth\": " << settings.windowWidth << ",\n"
@@ -252,7 +257,7 @@ bool saveSettings(const std::filesystem::path& path, const Settings& settings, s
     const std::string contents = output.str();
     const auto bytes = std::as_bytes(std::span(contents.data(), contents.size()));
     return writeFileAtomically(
-        path, {reinterpret_cast<const uint8_t*>(bytes.data()), bytes.size()}, "설정 파일", error);
+        path, {reinterpret_cast<const uint8_t*>(bytes.data()), bytes.size()}, "settings file", error);
 }
 
 } // namespace vizrack

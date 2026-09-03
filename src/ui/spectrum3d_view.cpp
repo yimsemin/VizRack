@@ -1,6 +1,7 @@
 #include "ui/spectrum3d_view.h"
 
 #include "core/audio_ring.h"
+#include "core/i18n.h"
 #include "core/utf.h"
 
 #include <windowsx.h>
@@ -62,7 +63,7 @@ void Spectrum3dView::configure(Spectrum3dOptions options, OptionsChangedCallback
 bool Spectrum3dView::attach(HINSTANCE instance, HWND parent, std::string& error) {
     if (active()) return true;
     if (!renderer_.available()) {
-        error = "내장 3D 스펙트럼 그래픽 초기화에 실패했습니다.";
+        error = "Failed to initialize built-in 3D spectrum graphics.";
         return false;
     }
     WNDCLASSEXW windowClass{};
@@ -73,7 +74,8 @@ bool Spectrum3dView::attach(HINSTANCE instance, HWND parent, std::string& error)
     windowClass.hCursor = LoadCursor(nullptr, IDC_ARROW);
     windowClass.lpszClassName = windowClass_;
     if (!RegisterClassExW(&windowClass) && GetLastError() != ERROR_CLASS_ALREADY_EXISTS) {
-        error = "내장 3D 스펙트럼 창 등록 실패: " + formatWindowsError(GetLastError());
+        error = "Failed to register the built-in 3D spectrum window: " +
+                formatWindowsError(GetLastError());
         return false;
     }
     RECT client{};
@@ -82,12 +84,13 @@ bool Spectrum3dView::attach(HINSTANCE instance, HWND parent, std::string& error)
                             WS_CHILD | WS_VISIBLE | WS_TABSTOP | WS_CLIPCHILDREN | WS_CLIPSIBLINGS,
                             0, 0, client.right, client.bottom, parent, nullptr, instance, this);
     if (!hwnd_) {
-        error = "내장 3D 스펙트럼 창 생성 실패: " + formatWindowsError(GetLastError());
+        error = "Failed to create the built-in 3D spectrum window: " +
+                formatWindowsError(GetLastError());
         return false;
     }
     lastUpdate_ = std::chrono::steady_clock::now();
     if (!SetTimer(hwnd_, kRefreshTimer, 16, nullptr)) {
-        error = "내장 3D 스펙트럼 갱신 타이머를 시작하지 못했습니다.";
+        error = "Failed to start the built-in 3D spectrum refresh timer.";
         DestroyWindow(hwnd_);
         hwnd_ = nullptr;
         return false;
@@ -193,13 +196,15 @@ void Spectrum3dView::showOptionsMenu(POINT point) {
         AppendMenuW(palettes, MF_STRING | (index == options.palette ? MF_CHECKED : 0),
                     kPaletteCommand + index, label.c_str());
     }
-    AppendMenuW(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(palettes), L"색상 팔레트");
+    AppendMenuW(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(palettes),
+                trw(Str::SpectrumMenuPalette).c_str());
     if (style_ == 0) {
-        appendValueMenu(menu, L"회전 (쿼터뷰)", kRotationCommand, options.rotation);
+        appendValueMenu(menu, trw(Str::SpectrumMenuRotation).c_str(), kRotationCommand,
+                        options.rotation);
     }
-    appendValueMenu(menu, L"기울기 / 원근", kTiltCommand, options.tilt);
-    appendValueMenu(menu, L"시간 깊이", kDepthCommand, options.depth);
-    appendValueMenu(menu, L"높이", kHeightCommand, options.heightScale);
+    appendValueMenu(menu, trw(Str::SpectrumMenuTilt).c_str(), kTiltCommand, options.tilt);
+    appendValueMenu(menu, trw(Str::SpectrumMenuDepth).c_str(), kDepthCommand, options.depth);
+    appendValueMenu(menu, trw(Str::SpectrumMenuHeight).c_str(), kHeightCommand, options.heightScale);
 
     const UINT command = TrackPopupMenu(menu, TPM_RETURNCMD | TPM_RIGHTBUTTON,
                                         point.x, point.y, 0, hwnd_, nullptr);

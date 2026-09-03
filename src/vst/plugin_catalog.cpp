@@ -9,7 +9,7 @@ const std::vector<PluginDefinition>& pluginCatalog() {
         {
             PluginKind::builtIn,
             "builtin-oscilloscope",
-            "내장 오실로스코프",
+            "Built-in Oscilloscope",
             "VizRack",
             "",
             "",
@@ -22,7 +22,7 @@ const std::vector<PluginDefinition>& pluginCatalog() {
         {
             PluginKind::builtIn,
             "builtin-art-visualizer",
-            "내장 아트 비주얼라이저",
+            "Built-in Art Visualizer",
             "VizRack",
             "",
             "",
@@ -35,7 +35,7 @@ const std::vector<PluginDefinition>& pluginCatalog() {
         {
             PluginKind::builtIn,
             "builtin-campfire",
-            "내장 캠프파이어",
+            "Built-in Campfire",
             "VizRack",
             "",
             "",
@@ -48,7 +48,7 @@ const std::vector<PluginDefinition>& pluginCatalog() {
         {
             PluginKind::builtIn,
             "builtin-spectrum3d",
-            "내장 3D 스펙트럼",
+            "Built-in 3D Spectrum",
             "VizRack",
             "",
             "",
@@ -61,7 +61,7 @@ const std::vector<PluginDefinition>& pluginCatalog() {
         {
             PluginKind::builtIn,
             "builtin-joydivision",
-            "내장 Joy Division",
+            "Built-in Joy Division",
             "VizRack",
             "",
             "",

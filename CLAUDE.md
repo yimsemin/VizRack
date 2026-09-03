@@ -58,6 +58,23 @@ cascade; one engine backs both the `builtin-spectrum3d` and `builtin-joydivision
 catalog entries via a fixed `style`). See `docs/ARCHITECTURE.md` and
 `docs/BUILTIN_VISUALIZER_CORE.md`.
 
+## Localization
+
+The Windows UI ships in English (default) and Korean. Every user-facing string in
+`src/ui/`, `src/app.cpp` and `src/main.cpp` goes through `core/i18n` — add a
+`VIZRACK_STR(Id, "English", "한국어")` row to `src/core/i18n_strings.inc` and use
+`trw(Str::Id)` (or `tr` for UTF-8). Never write a raw `L"..."` user-facing literal
+in a menu, dialog, overlay or the window title. The X-macro makes a half-translated
+row a compile error; a `test_main.cpp` case checks both languages are non-empty.
+Diagnostics (logger output and `error`/status strings from `src/core`,
+`src/platform`, `src/vst`) stay English only; scene/palette names and stylized
+overlay captions stay English by design. See `docs/ARCHITECTURE.md` ▸ Localization.
+
+`README.md` is the canonical English readme. `README.ko.md` mirrors only its
+Introduction and "What you can watch" sections (the file heads say so); when you
+change those sections in `README.md`, update `README.ko.md` in the **same commit**.
+Everything else stays English-only in `README.md`.
+
 ## Keep the EXE small
 
 No UI framework, DSP framework or serialization library for things the standard

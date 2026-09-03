@@ -1,6 +1,7 @@
 #include "ui/oscilloscope_view.h"
 
 #include "core/audio_ring.h"
+#include "core/i18n.h"
 #include "core/utf.h"
 
 #include <algorithm>
@@ -50,7 +51,7 @@ void OscilloscopeView::configure(OscilloscopeOptions options,
 bool OscilloscopeView::attach(HINSTANCE instance, HWND parent, std::string& error) {
     if (active()) return true;
     if (!renderer_.available()) {
-        error = "내장 오실로스코프 그래픽 초기화에 실패했습니다.";
+        error = "Failed to initialize built-in oscilloscope graphics.";
         return false;
     }
     WNDCLASSEXW windowClass{};
@@ -61,7 +62,8 @@ bool OscilloscopeView::attach(HINSTANCE instance, HWND parent, std::string& erro
     windowClass.hCursor = LoadCursor(nullptr, IDC_ARROW);
     windowClass.lpszClassName = kWindowClass;
     if (!RegisterClassExW(&windowClass) && GetLastError() != ERROR_CLASS_ALREADY_EXISTS) {
-        error = "내장 오실로스코프 창 등록 실패: " + formatWindowsError(GetLastError());
+        error = "Failed to register the built-in oscilloscope window: " +
+                formatWindowsError(GetLastError());
         return false;
     }
     RECT client{};
@@ -70,11 +72,12 @@ bool OscilloscopeView::attach(HINSTANCE instance, HWND parent, std::string& erro
                             WS_CHILD | WS_VISIBLE | WS_TABSTOP | WS_CLIPCHILDREN | WS_CLIPSIBLINGS,
                             0, 0, client.right, client.bottom, parent, nullptr, instance, this);
     if (!hwnd_) {
-        error = "내장 오실로스코프 창 생성 실패: " + formatWindowsError(GetLastError());
+        error = "Failed to create the built-in oscilloscope window: " +
+                formatWindowsError(GetLastError());
         return false;
     }
     if (!SetTimer(hwnd_, kRefreshTimer, timerInterval(engine_.options().fps), nullptr)) {
-        error = "내장 오실로스코프 갱신 타이머를 시작하지 못했습니다.";
+        error = "Failed to start the built-in oscilloscope refresh timer.";
         DestroyWindow(hwnd_);
         hwnd_ = nullptr;
         return false;
@@ -125,14 +128,15 @@ void OscilloscopeView::drawOverlay(HDC dc, const RECT& client) const {
     SetBkMode(dc, TRANSPARENT);
     SelectObject(dc, GetStockObject(DEFAULT_GUI_FONT));
     SetTextColor(dc, RGB(145, 168, 174));
-    const std::wstring title = info.options.historyMode ? L"내장 오실로스코프 · 시간 히스토리"
-                                                        : L"내장 오실로스코프 · 순간 파형";
+    const std::wstring title =
+        trw(info.options.historyMode ? Str::ScopeTitleHistory : Str::ScopeTitleWaveform);
     TextOutW(dc, 12, 10, title.c_str(), static_cast<int>(title.size()));
     const std::wstring status = std::to_wstring(info.sampleRate) + L" Hz  |  " +
                                 std::to_wstring(info.options.fps) + L" FPS";
     SetTextAlign(dc, TA_RIGHT | TA_TOP);
     TextOutW(dc, width - 12, 10, status.c_str(), static_cast<int>(status.size()));
-    TextOutW(dc, width - 12, height - 24, L"우클릭: 표시 설정", 10);
+    const std::wstring hint = trw(Str::ScopeHintRightClick);
+    TextOutW(dc, width - 12, height - 24, hint.c_str(), static_cast<int>(hint.size()));
     SetTextAlign(dc, TA_LEFT | TA_TOP);
     SetTextColor(dc, RGB(58, 214, 174));
     TextOutW(dc, 12, std::max(32, centers[0] - 20), L"L", 1);
@@ -141,7 +145,7 @@ void OscilloscopeView::drawOverlay(HDC dc, const RECT& client) const {
     if (!info.options.historyMode && !info.hasSignalTrace) {
         RECT textRect = client;
         SetTextColor(dc, RGB(145, 168, 174));
-        DrawTextW(dc, L"시스템 소리를 재생해 보세요", -1, &textRect,
+        DrawTextW(dc, trw(Str::ScopePlaySomeAudio).c_str(), -1, &textRect,
                   DT_CENTER | DT_VCENTER | DT_SINGLELINE);
     }
 }
@@ -183,14 +187,14 @@ void OscilloscopeView::showOptionsMenu(POINT point) {
     HMENU scale = CreatePopupMenu();
     HMENU smoothing = CreatePopupMenu();
     HMENU fps = CreatePopupMenu();
-    AppendMenuW(mode, MF_STRING, kModeWaveform, L"순간 파형");
-    AppendMenuW(mode, MF_STRING, kModeHistory, L"시간 히스토리 (약 15초)");
-    AppendMenuW(scale, MF_STRING, kScaleSmall, L"작게 (50%)");
-    AppendMenuW(scale, MF_STRING, kScaleNormal, L"보통 (70%)");
-    AppendMenuW(scale, MF_STRING, kScaleLarge, L"크게 (100%)");
-    AppendMenuW(smoothing, MF_STRING, kSmoothingOff, L"끔");
-    AppendMenuW(smoothing, MF_STRING, kSmoothingLight, L"약하게");
-    AppendMenuW(smoothing, MF_STRING, kSmoothingStrong, L"강하게");
+    AppendMenuW(mode, MF_STRING, kModeWaveform, trw(Str::ScopeMenuModeWaveform).c_str());
+    AppendMenuW(mode, MF_STRING, kModeHistory, trw(Str::ScopeMenuModeHistory).c_str());
+    AppendMenuW(scale, MF_STRING, kScaleSmall, trw(Str::ScopeMenuScaleSmall).c_str());
+    AppendMenuW(scale, MF_STRING, kScaleNormal, trw(Str::ScopeMenuScaleNormal).c_str());
+    AppendMenuW(scale, MF_STRING, kScaleLarge, trw(Str::ScopeMenuScaleLarge).c_str());
+    AppendMenuW(smoothing, MF_STRING, kSmoothingOff, trw(Str::ScopeMenuSmoothingOff).c_str());
+    AppendMenuW(smoothing, MF_STRING, kSmoothingLight, trw(Str::ScopeMenuSmoothingLight).c_str());
+    AppendMenuW(smoothing, MF_STRING, kSmoothingStrong, trw(Str::ScopeMenuSmoothingStrong).c_str());
     AppendMenuW(fps, MF_STRING, kFps15, L"15 FPS");
     AppendMenuW(fps, MF_STRING, kFps30, L"30 FPS");
     AppendMenuW(fps, MF_STRING, kFps60, L"60 FPS");
@@ -199,10 +203,11 @@ void OscilloscopeView::showOptionsMenu(POINT point) {
                      (options.scalePercent == 100 ? kScaleLarge : kScaleNormal), true);
     checkMenu(smoothing, kSmoothingOff + static_cast<UINT>(options.smoothing), true);
     checkMenu(fps, options.fps == 15 ? kFps15 : (options.fps == 30 ? kFps30 : kFps60), true);
-    AppendMenuW(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(mode), L"표시 방식");
-    AppendMenuW(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(scale), L"파형 크기");
-    AppendMenuW(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(smoothing), L"선 안정화");
-    AppendMenuW(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(fps), L"프레임 속도");
+    AppendMenuW(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(mode), trw(Str::ScopeMenuDisplayMode).c_str());
+    AppendMenuW(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(scale), trw(Str::ScopeMenuWaveformSize).c_str());
+    AppendMenuW(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(smoothing),
+                trw(Str::ScopeMenuLineStability).c_str());
+    AppendMenuW(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(fps), trw(Str::ScopeMenuFrameRate).c_str());
     const UINT command = TrackPopupMenu(menu, TPM_RETURNCMD | TPM_RIGHTBUTTON,
                                         point.x, point.y, 0, hwnd_, nullptr);
     if (command == kModeWaveform || command == kModeHistory) {

@@ -5,6 +5,7 @@
 #include "builtin/spectrum3d_engine.h"
 #include "core/audio_ring.h"
 #include "core/channel_mapper.h"
+#include "core/i18n.h"
 #include "core/logger.h"
 #include "core/plugin_paths.h"
 #include "core/plugin_storage.h"
@@ -64,6 +65,7 @@ void testSettings(const std::filesystem::path& directory) {
     original.followDefaultDevice = false;
     original.fixedDeviceId = "device-{테스트}";
     original.selectedPluginId = "mvmeter2";
+    original.uiLanguage = "ko";
     original.windowX = -120;
     original.windowY = 44;
     original.windowWidth = 777;
@@ -100,6 +102,7 @@ void testSettings(const std::filesystem::path& directory) {
     CHECK(loaded.loaded);
     CHECK(loaded.value.fixedDeviceId == original.fixedDeviceId);
     CHECK(loaded.value.selectedPluginId == original.selectedPluginId);
+    CHECK(loaded.value.uiLanguage == "ko");
     CHECK(loaded.value.windowX == original.windowX);
     CHECK(loaded.value.windowWidth == original.windowWidth);
     CHECK(loaded.value.alwaysOnTop);
@@ -148,6 +151,15 @@ void testSettings(const std::filesystem::path& directory) {
     const auto unsupportedResult = vizrack::loadSettings(unsupported);
     CHECK(!unsupportedResult.loaded);
     CHECK(!unsupportedResult.warning.empty());
+
+    const auto badLanguage = directory / L"bad-language.json";
+    {
+        std::ofstream output(badLanguage, std::ios::binary);
+        output << "{\"schemaVersion\":1,\"uiLanguage\":\"xx\"}";
+    }
+    const auto badLanguageResult = vizrack::loadSettings(badLanguage);
+    CHECK(badLanguageResult.loaded);
+    CHECK(badLanguageResult.value.uiLanguage == "auto");
 }
 
 void testPluginCatalogAndStorage(const std::filesystem::path& directory) {
@@ -164,7 +176,7 @@ void testPluginCatalogAndStorage(const std::filesystem::path& directory) {
     CHECK(catalog.front().id == "builtin-oscilloscope");
     if (builtIn) {
         CHECK(builtIn->kind == vizrack::PluginKind::builtIn);
-        CHECK(builtIn->displayName == "내장 오실로스코프");
+        CHECK(builtIn->displayName == "Built-in Oscilloscope");
         CHECK(builtIn->installUrl.empty());
         CHECK(builtIn->searchLocations.empty());
     }
@@ -172,7 +184,7 @@ void testPluginCatalogAndStorage(const std::filesystem::path& directory) {
     CHECK(art != nullptr);
     if (art) {
         CHECK(art->kind == vizrack::PluginKind::builtIn);
-        CHECK(art->displayName == "내장 아트 비주얼라이저");
+        CHECK(art->displayName == "Built-in Art Visualizer");
         CHECK(art->installUrl.empty());
         CHECK(art->searchLocations.empty());
     }
@@ -180,7 +192,7 @@ void testPluginCatalogAndStorage(const std::filesystem::path& directory) {
     CHECK(campfire != nullptr);
     if (campfire) {
         CHECK(campfire->kind == vizrack::PluginKind::builtIn);
-        CHECK(campfire->displayName == "내장 캠프파이어");
+        CHECK(campfire->displayName == "Built-in Campfire");
         CHECK(campfire->editionLabel == "Natural Flame / Audio Reactive");
         CHECK(campfire->installUrl.empty());
         CHECK(campfire->searchLocations.empty());
@@ -189,7 +201,7 @@ void testPluginCatalogAndStorage(const std::filesystem::path& directory) {
     CHECK(spectrum3d != nullptr);
     if (spectrum3d) {
         CHECK(spectrum3d->kind == vizrack::PluginKind::builtIn);
-        CHECK(spectrum3d->displayName == "내장 3D 스펙트럼");
+        CHECK(spectrum3d->displayName == "Built-in 3D Spectrum");
         CHECK(spectrum3d->installUrl.empty());
         CHECK(spectrum3d->searchLocations.empty());
     }
@@ -197,7 +209,7 @@ void testPluginCatalogAndStorage(const std::filesystem::path& directory) {
     CHECK(joyDivision != nullptr);
     if (joyDivision) {
         CHECK(joyDivision->kind == vizrack::PluginKind::builtIn);
-        CHECK(joyDivision->displayName == "내장 Joy Division");
+        CHECK(joyDivision->displayName == "Built-in Joy Division");
         CHECK(joyDivision->inspiration == "Inspired by Joy Division");
         CHECK(joyDivision->installUrl.empty());
         CHECK(joyDivision->searchLocations.empty());
@@ -811,6 +823,40 @@ void testPluginState(const std::filesystem::path& directory) {
     CHECK(vizrack::loadPluginStateFile(path, decoded, error));
 }
 
+void testI18n() {
+    using vizrack::Str;
+    using vizrack::UiLanguage;
+
+    const int count = static_cast<int>(Str::count_);
+    CHECK(count > 0);
+
+    // Every string must be present and non-empty in every language, and must
+    // survive the UTF-8 -> UTF-16 conversion used for Win32. This is the guard
+    // that a newly added Str row was translated in both columns.
+    for (int index = 0; index < count; ++index) {
+        const auto id = static_cast<Str>(index);
+        vizrack::setUiLanguage(UiLanguage::english);
+        const char* english = vizrack::tr(id);
+        const std::wstring englishWide = vizrack::trw(id);
+        vizrack::setUiLanguage(UiLanguage::korean);
+        const char* korean = vizrack::tr(id);
+        const std::wstring koreanWide = vizrack::trw(id);
+        CHECK(english != nullptr && english[0] != '\0');
+        CHECK(korean != nullptr && korean[0] != '\0');
+        CHECK(!englishWide.empty());
+        CHECK(!koreanWide.empty());
+    }
+
+    CHECK(vizrack::resolveUiLanguage("en") == UiLanguage::english);
+    CHECK(vizrack::resolveUiLanguage("ko") == UiLanguage::korean);
+    static_cast<void>(vizrack::resolveUiLanguage("auto"));  // must not crash
+    CHECK(vizrack::uiLanguageToken(UiLanguage::english) == "en");
+    CHECK(vizrack::uiLanguageToken(UiLanguage::korean) == "ko");
+
+    vizrack::setUiLanguage(UiLanguage::english);
+    CHECK(vizrack::currentUiLanguage() == UiLanguage::english);
+}
+
 void testLoggerRotation(const std::filesystem::path& directory) {
     const auto logs = directory / L"logs";
     vizrack::Logger logger;
@@ -838,6 +884,7 @@ int main() {
     testOscilloscopeCore();
     testReconnect();
     testPluginState(directory);
+    testI18n();
     testLoggerRotation(directory);
     std::error_code error;
     std::filesystem::remove_all(directory, error);

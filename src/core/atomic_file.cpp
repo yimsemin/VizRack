@@ -13,7 +13,8 @@ bool writeFileAtomically(const std::filesystem::path& path, std::span<const uint
     if (!path.parent_path().empty()) {
         std::filesystem::create_directories(path.parent_path(), filesystemError);
         if (filesystemError) {
-            error = std::string(description) + " 폴더 생성 실패: " + filesystemError.message();
+            error = std::string(description) + ": could not create the folder: " +
+                    filesystemError.message();
             return false;
         }
     }
@@ -21,7 +22,7 @@ bool writeFileAtomically(const std::filesystem::path& path, std::span<const uint
     const auto temporary = path.wstring() + L".tmp";
     std::ofstream output(temporary, std::ios::binary | std::ios::trunc);
     if (!output) {
-        error = std::string(description) + " 임시 파일을 열 수 없습니다.";
+        error = std::string(description) + ": could not open the temporary file.";
         return false;
     }
     output.write(reinterpret_cast<const char*>(bytes.data()),
@@ -29,13 +30,13 @@ bool writeFileAtomically(const std::filesystem::path& path, std::span<const uint
     output.flush();
     output.close();
     if (!output) {
-        error = std::string(description) + " 기록에 실패했습니다.";
+        error = std::string(description) + ": write failed.";
         return false;
     }
     if (!MoveFileExW(temporary.c_str(), path.c_str(),
                      MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
         const std::error_code moveError(static_cast<int>(GetLastError()), std::system_category());
-        error = std::string(description) + " 교체 실패: " + moveError.message();
+        error = std::string(description) + ": atomic replace failed: " + moveError.message();
         std::filesystem::remove(temporary, filesystemError);
         return false;
     }
