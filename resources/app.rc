@@ -22,7 +22,7 @@ BEGIN
             VALUE "FileDescription", "Portable visualizer with selected audio plug-in support\0"
             VALUE "FileVersion", "0.2.0\0"
             VALUE "InternalName", "VizRack\0"
-            VALUE "LegalCopyright", "Copyright (c) 2026 SubProject\0"
+            VALUE "LegalCopyright", "Copyright (c) 2026 subProject\0"
             VALUE "OriginalFilename", "VizRack.exe\0"
             VALUE "ProductName", "VizRack\0"
             VALUE "ProductVersion", "0.2.0\0"

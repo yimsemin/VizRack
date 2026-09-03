@@ -34,12 +34,14 @@ std::string hrText(HRESULT result) {
            formatWindowsError(static_cast<unsigned long>(result)) + ")";
 }
 
+// Returns an empty string when the friendly name is unavailable; the UI layer
+// substitutes a localized "checking output device" placeholder for that case.
 std::wstring deviceName(IMMDevice* device) {
     ComPtr<IPropertyStore> properties;
-    if (FAILED(device->OpenPropertyStore(STGM_READ, &properties))) return L"알 수 없는 출력 장치";
+    if (FAILED(device->OpenPropertyStore(STGM_READ, &properties))) return {};
     PROPVARIANT value;
     PropVariantInit(&value);
-    std::wstring name = L"알 수 없는 출력 장치";
+    std::wstring name;
     if (SUCCEEDED(properties->GetValue(PKEY_Device_FriendlyName, &value)) &&
         value.vt == VT_LPWSTR && value.pwszVal) {
         name = value.pwszVal;
@@ -174,20 +176,20 @@ public:
         return E_NOINTERFACE;
     }
     HRESULT STDMETHODCALLTYPE OnDeviceStateChanged(LPCWSTR id, DWORD) override {
-        if (owner_.shouldReactToDevice(id)) owner_.signalDeviceChange("장치 상태 변경");
+        if (owner_.shouldReactToDevice(id)) owner_.signalDeviceChange("device state changed");
         return S_OK;
     }
     HRESULT STDMETHODCALLTYPE OnDeviceAdded(LPCWSTR id) override {
-        if (owner_.shouldReactToDevice(id)) owner_.signalDeviceChange("장치 연결");
+        if (owner_.shouldReactToDevice(id)) owner_.signalDeviceChange("device added");
         return S_OK;
     }
     HRESULT STDMETHODCALLTYPE OnDeviceRemoved(LPCWSTR id) override {
-        if (owner_.shouldReactToDevice(id)) owner_.signalDeviceChange("장치 분리");
+        if (owner_.shouldReactToDevice(id)) owner_.signalDeviceChange("device removed");
         return S_OK;
     }
     HRESULT STDMETHODCALLTYPE OnDefaultDeviceChanged(EDataFlow flow, ERole role, LPCWSTR) override {
         if (flow == eRender && role == eConsole && owner_.shouldReactToDefaultChange()) {
-            owner_.signalDeviceChange("기본 출력 장치 변경");
+            owner_.signalDeviceChange("default output device changed");
         }
         return S_OK;
     }
@@ -234,7 +236,7 @@ void WasapiCapture::setDeviceSelection(bool followDefault, std::wstring fixedDev
         std::scoped_lock lock(selectionMutex_);
         followDefault_ = followDefault;
         fixedDeviceId_ = std::move(fixedDeviceId);
-        reconnectReason_ = "출력 장치 선택 변경";
+        reconnectReason_ = "output device selection changed";
     }
     if (deviceChangeEvent_) SetEvent(static_cast<HANDLE>(deviceChangeEvent_));
 }
@@ -309,7 +311,7 @@ void WasapiCapture::run() {
 
     auto connect = [&]() -> bool {
         session.close();
-        publish(CaptureState::connecting, "WASAPI loopback 연결 중");
+        publish(CaptureState::connecting, "Connecting to WASAPI loopback");
         bool followDefault;
         std::wstring selectedId;
         {
@@ -324,7 +326,7 @@ void WasapiCapture::run() {
         }
         if (FAILED(hr)) {
             logger_.warning("Output device open failed: " + hrText(hr));
-            publish(CaptureState::disconnected, "출력 장치를 열 수 없습니다: " + hrText(hr));
+            publish(CaptureState::disconnected, "Could not open the output device: " + hrText(hr));
             return false;
         }
         status.deviceName = deviceName(session.device.Get());
@@ -332,37 +334,38 @@ void WasapiCapture::run() {
         hr = session.device->Activate(__uuidof(IAudioClient), CLSCTX_ALL, nullptr,
                                       reinterpret_cast<void**>(session.client.GetAddressOf()));
         if (FAILED(hr)) {
-            publish(CaptureState::disconnected, "IAudioClient 활성화 실패: " + hrText(hr));
+            publish(CaptureState::disconnected, "IAudioClient activation failed: " + hrText(hr));
             return false;
         }
         hr = session.client->GetMixFormat(&session.mixFormat);
         if (FAILED(hr)) {
-            publish(CaptureState::disconnected, "기본 mix format 조회 실패: " + hrText(hr));
+            publish(CaptureState::disconnected, "GetMixFormat failed: " + hrText(hr));
             return false;
         }
         session.parsed = parseFormat(session.mixFormat);
         session.selection = selectFrontLeftRight(session.parsed.channels, session.parsed.channelMask);
         if (session.parsed.encoding == Encoding::unsupported || !session.selection.valid) {
             publish(CaptureState::disconnected,
-                    "지원하지 않는 mix format 또는 Front L/R이 없는 장치입니다: " +
+                    "Unsupported mix format, or the device has no Front L/R: " +
                         session.parsed.name);
             return false;
         }
         session.sampleEvent = CreateEventW(nullptr, FALSE, FALSE, nullptr);
         if (!session.sampleEvent) {
-            publish(CaptureState::disconnected, "오디오 이벤트 생성 실패");
+            publish(CaptureState::disconnected, "Failed to create the audio event");
             return false;
         }
         constexpr DWORD flags = AUDCLNT_STREAMFLAGS_LOOPBACK | AUDCLNT_STREAMFLAGS_EVENTCALLBACK |
                                 AUDCLNT_STREAMFLAGS_NOPERSIST;
         hr = session.client->Initialize(AUDCLNT_SHAREMODE_SHARED, flags, 0, 0, session.mixFormat, nullptr);
         if (FAILED(hr)) {
-            publish(CaptureState::disconnected, "WASAPI shared loopback 초기화 실패: " + hrText(hr));
+            publish(CaptureState::disconnected,
+                    "WASAPI shared loopback initialization failed: " + hrText(hr));
             return false;
         }
         hr = session.client->SetEventHandle(session.sampleEvent);
         if (FAILED(hr)) {
-            publish(CaptureState::disconnected, "WASAPI 이벤트 연결 실패: " + hrText(hr));
+            publish(CaptureState::disconnected, "SetEventHandle failed: " + hrText(hr));
             return false;
         }
         hr = session.client->GetBufferSize(&session.bufferFrames);
@@ -370,12 +373,12 @@ void WasapiCapture::run() {
         converted.resize(static_cast<size_t>(session.bufferFrames) * 2);
         hr = session.client->GetService(IID_PPV_ARGS(&session.capture));
         if (FAILED(hr)) {
-            publish(CaptureState::disconnected, "IAudioCaptureClient 조회 실패: " + hrText(hr));
+            publish(CaptureState::disconnected, "GetService(IAudioCaptureClient) failed: " + hrText(hr));
             return false;
         }
         hr = session.client->Start();
         if (FAILED(hr)) {
-            publish(CaptureState::disconnected, "WASAPI 캡처 시작 실패: " + hrText(hr));
+            publish(CaptureState::disconnected, "WASAPI capture start failed: " + hrText(hr));
             return false;
         }
         status.format = {session.parsed.sampleRate, session.parsed.channels,
@@ -394,7 +397,8 @@ void WasapiCapture::run() {
     while (running_.load(std::memory_order_acquire)) {
         if (!connect()) {
             const auto delay = policy.failed();
-            publish(CaptureState::backoff, "재연결 대기 " + std::to_string(delay.count()) + " ms");
+            publish(CaptureState::backoff,
+                    "Waiting " + std::to_string(delay.count()) + " ms before reconnecting");
             HANDLE waits[] = {static_cast<HANDLE>(stopEvent_), static_cast<HANDLE>(deviceChangeEvent_)};
             const DWORD result = WaitForMultipleObjects(2, waits, FALSE, static_cast<DWORD>(delay.count()));
             if (result == WAIT_OBJECT_0) break;
@@ -462,7 +466,7 @@ void WasapiCapture::run() {
 
     session.close();
     policy.stop();
-    publish(CaptureState::stopped, "캡처 중지");
+    publish(CaptureState::stopped, "Capture stopped");
     enumerator->UnregisterEndpointNotificationCallback(notification.Get());
     notification.Reset();
     enumerator.Reset();

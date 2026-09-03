@@ -110,23 +110,27 @@ SettingsLoadResult loadSettings(const std::filesystem::path& path) {
     std::ostringstream contents;
     contents << input.rdbuf();
     if (!input.good() && !input.eof()) {
-        result.warning = "설정 파일을 읽지 못해 기본값을 사용합니다.";
+        result.warning = "Could not read the settings file; using defaults.";
         return result;
     }
     const std::string json = contents.str();
     if (json.find('{') == std::string::npos || json.find('}') == std::string::npos) {
-        result.warning = "설정 파일 형식이 손상되어 기본값을 사용합니다.";
+        result.warning = "The settings file is malformed; using defaults.";
         return result;
     }
     const auto schemaVersion = readInt(json, "schemaVersion");
     if (!schemaVersion || *schemaVersion != kSettingsSchemaVersion) {
-        result.warning = "지원하지 않는 설정 파일 버전이므로 기본값을 사용합니다.";
+        result.warning = "Unsupported settings file version; using defaults.";
         return result;
     }
     if (auto value = readBool(json, "followDefaultDevice")) result.value.followDefaultDevice = *value;
     if (auto value = readString(json, "fixedDeviceId")) result.value.fixedDeviceId = *value;
     if (auto value = readString(json, "selectedPluginId"); value && !value->empty()) {
         result.value.selectedPluginId = *value;
+    }
+    if (auto value = readString(json, "uiLanguage");
+        value && (*value == "auto" || *value == "en" || *value == "ko")) {
+        result.value.uiLanguage = *value;
     }
     if (auto value = readInt(json, "windowX")) result.value.windowX = *value;
     if (auto value = readInt(json, "windowY")) result.value.windowY = *value;
@@ -171,6 +175,36 @@ SettingsLoadResult loadSettings(const std::filesystem::path& path) {
     if (auto value = readInt(json, "campfireParticleIntensity")) {
         result.value.campfireParticleIntensity = std::clamp(*value, 0, 100);
     }
+    if (auto value = readInt(json, "spectrum3dPalette")) {
+        result.value.spectrum3dPalette = std::clamp(*value, 0, 5);
+    }
+    if (auto value = readInt(json, "spectrum3dRotation")) {
+        result.value.spectrum3dRotation = std::clamp(*value, 0, 100);
+    }
+    if (auto value = readInt(json, "spectrum3dTilt")) {
+        result.value.spectrum3dTilt = std::clamp(*value, 0, 100);
+    }
+    if (auto value = readInt(json, "spectrum3dDepth")) {
+        result.value.spectrum3dDepth = std::clamp(*value, 0, 100);
+    }
+    if (auto value = readInt(json, "spectrum3dHeight")) {
+        result.value.spectrum3dHeight = std::clamp(*value, 0, 100);
+    }
+    if (auto value = readInt(json, "joyDivisionPalette")) {
+        result.value.joyDivisionPalette = std::clamp(*value, 0, 5);
+    }
+    if (auto value = readInt(json, "joyDivisionRotation")) {
+        result.value.joyDivisionRotation = std::clamp(*value, 0, 100);
+    }
+    if (auto value = readInt(json, "joyDivisionTilt")) {
+        result.value.joyDivisionTilt = std::clamp(*value, 0, 100);
+    }
+    if (auto value = readInt(json, "joyDivisionDepth")) {
+        result.value.joyDivisionDepth = std::clamp(*value, 0, 100);
+    }
+    if (auto value = readInt(json, "joyDivisionHeight")) {
+        result.value.joyDivisionHeight = std::clamp(*value, 0, 100);
+    }
     result.loaded = true;
     return result;
 }
@@ -182,6 +216,7 @@ bool saveSettings(const std::filesystem::path& path, const Settings& settings, s
            << "  \"followDefaultDevice\": " << (settings.followDefaultDevice ? "true" : "false") << ",\n"
            << "  \"fixedDeviceId\": \"" << escapeJson(settings.fixedDeviceId) << "\",\n"
            << "  \"selectedPluginId\": \"" << escapeJson(settings.selectedPluginId) << "\",\n"
+           << "  \"uiLanguage\": \"" << escapeJson(settings.uiLanguage) << "\",\n"
            << "  \"windowX\": " << settings.windowX << ",\n"
            << "  \"windowY\": " << settings.windowY << ",\n"
            << "  \"windowWidth\": " << settings.windowWidth << ",\n"
@@ -207,12 +242,22 @@ bool saveSettings(const std::filesystem::path& path, const Settings& settings, s
            << "  \"campfireParticleAmount\": "
            << std::clamp(settings.campfireParticleAmount, 0, 100) << ",\n"
            << "  \"campfireParticleIntensity\": "
-           << std::clamp(settings.campfireParticleIntensity, 0, 100) << "\n"
+           << std::clamp(settings.campfireParticleIntensity, 0, 100) << ",\n"
+           << "  \"spectrum3dPalette\": " << std::clamp(settings.spectrum3dPalette, 0, 5) << ",\n"
+           << "  \"spectrum3dRotation\": " << std::clamp(settings.spectrum3dRotation, 0, 100) << ",\n"
+           << "  \"spectrum3dTilt\": " << std::clamp(settings.spectrum3dTilt, 0, 100) << ",\n"
+           << "  \"spectrum3dDepth\": " << std::clamp(settings.spectrum3dDepth, 0, 100) << ",\n"
+           << "  \"spectrum3dHeight\": " << std::clamp(settings.spectrum3dHeight, 0, 100) << ",\n"
+           << "  \"joyDivisionPalette\": " << std::clamp(settings.joyDivisionPalette, 0, 5) << ",\n"
+           << "  \"joyDivisionRotation\": " << std::clamp(settings.joyDivisionRotation, 0, 100) << ",\n"
+           << "  \"joyDivisionTilt\": " << std::clamp(settings.joyDivisionTilt, 0, 100) << ",\n"
+           << "  \"joyDivisionDepth\": " << std::clamp(settings.joyDivisionDepth, 0, 100) << ",\n"
+           << "  \"joyDivisionHeight\": " << std::clamp(settings.joyDivisionHeight, 0, 100) << "\n"
            << "}\n";
     const std::string contents = output.str();
     const auto bytes = std::as_bytes(std::span(contents.data(), contents.size()));
     return writeFileAtomically(
-        path, {reinterpret_cast<const uint8_t*>(bytes.data()), bytes.size()}, "설정 파일", error);
+        path, {reinterpret_cast<const uint8_t*>(bytes.data()), bytes.size()}, "settings file", error);
 }
 
 } // namespace vizrack

@@ -28,7 +28,7 @@ bool readInfo(IMMDevice* device, AudioDeviceInfo& info, std::string& error) {
     LPWSTR rawId = nullptr;
     HRESULT hr = device->GetId(&rawId);
     if (FAILED(hr)) {
-        error = "장치 ID 조회 실패: " + hrText(hr);
+        error = "Failed to query the device ID: " + hrText(hr);
         return false;
     }
     info.id = rawId;
@@ -37,7 +37,7 @@ bool readInfo(IMMDevice* device, AudioDeviceInfo& info, std::string& error) {
     ComPtr<IPropertyStore> properties;
     hr = device->OpenPropertyStore(STGM_READ, &properties);
     if (FAILED(hr)) {
-        error = "장치 속성 조회 실패: " + hrText(hr);
+        error = "Failed to open the device property store: " + hrText(hr);
         return false;
     }
     PROPVARIANT value;
@@ -56,7 +56,7 @@ bool createEnumerator(ComPtr<IMMDeviceEnumerator>& enumerator, std::string& erro
     const HRESULT hr = CoCreateInstance(__uuidof(MMDeviceEnumerator), nullptr, CLSCTX_ALL,
                                         IID_PPV_ARGS(&enumerator));
     if (FAILED(hr)) {
-        error = "MMDeviceEnumerator 생성 실패: " + hrText(hr);
+        error = "Failed to create MMDeviceEnumerator: " + hrText(hr);
         return false;
     }
     return true;
@@ -82,7 +82,7 @@ bool enumerateRenderDevices(std::vector<AudioDeviceInfo>& devices, std::string& 
     ComPtr<IMMDeviceCollection> collection;
     HRESULT hr = enumerator->EnumAudioEndpoints(eRender, DEVICE_STATE_ACTIVE, &collection);
     if (FAILED(hr)) {
-        error = "출력 장치 목록 조회 실패: " + hrText(hr);
+        error = "Failed to enumerate output devices: " + hrText(hr);
         return false;
     }
     UINT count = 0;

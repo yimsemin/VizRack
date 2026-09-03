@@ -19,9 +19,11 @@ never ambiguous.
   artifacts.
 - Conventional Commit subject: imperative mood, English, roughly ≤ 72 characters.
   Types: `feat`, `fix`, `perf`, `refactor`, `docs`, `test`, `build`, `chore`.
-- `feat`, `fix` and `perf` are user-facing and become the changelog. Everything
-  else is internal and is summarised as a count in the release notes, so small
-  `refactor` / `docs` / `test` commits are encouraged.
+- The changelog is **not** derived from commit subjects. Any commit that changes
+  what a user sees also edits `## [Unreleased]` in `CHANGELOG.md` in the same
+  commit; internal commits (`refactor` / `docs` / `test` / `build` / `chore`)
+  touch nothing there. See `docs/RELEASE_NOTES_STYLE.md` for how entries are
+  worded.
 - Optional body explains the *why*, wrapped near 72 columns.
 - Do not add AI-attribution trailers (`Co-Authored-By: Claude …`, "Generated
   with Claude Code", or similar). The `.githooks/commit-msg` hook strips them.
@@ -35,19 +37,25 @@ releases outside the release flow below.
 
 Only after the user gives explicit approval for a version:
 
-1. On `develop`, bump `project(VizRack VERSION X.Y.Z ...)` in `CMakeLists.txt`.
-2. Generate the notes from commit subjects:
+1. Make sure `## [Unreleased]` in `CHANGELOG.md` reads the way the release
+   should, including the italic one-line lead under the heading.
+2. On `develop`, bump `project(VizRack VERSION X.Y.Z ...)` in `CMakeLists.txt`.
+3. Build Release, run `ctest`, `--smoke-test`, then `scripts\package.ps1` (it
+   writes `out/package/VizRack-win-x64.zip.sha256`).
+4. Generate the notes:
 
    ```powershell
    powershell -ExecutionPolicy Bypass -File scripts\generate-release-notes.ps1
    ```
 
-   The script reads the version from `CMakeLists.txt`, takes the range from the
-   last `vX.Y.Z` tag to `HEAD`, and writes `docs/release-notes/X_Y_Z.md`. It does
-   not inspect diffs or rewrite subjects.
-3. Run the required Release build, `ctest`, `--smoke-test` and `scripts\package.ps1`.
-4. Commit the version bump and generated note on `develop` and push.
-5. Merge into `main` and tag:
+   The script reads the version from `CMakeLists.txt`, promotes `[Unreleased]` to
+   `[X.Y.Z] - <date>` in `CHANGELOG.md`, refreshes the compare links, and writes
+   `docs/release-notes/X_Y_Z.md` (that section plus a download/requirements
+   footer with the SHA-256 filled in). Read the note once and fix any wording the
+   script could not. It never invents entries.
+5. Commit the version bump, changelog and generated note on `develop`
+   (`docs: release vX.Y.Z`) and push.
+6. Merge into `main` and tag:
 
    ```powershell
    git checkout main
@@ -56,7 +64,7 @@ Only after the user gives explicit approval for a version:
    git push origin refs/heads/main refs/tags/vX.Y.Z
    ```
 
-6. Publish:
+7. Publish:
 
    ```powershell
    gh release create vX.Y.Z `
@@ -66,4 +74,4 @@ Only after the user gives explicit approval for a version:
        out/package/VizRack-win-x64.zip
    ```
 
-7. `git checkout develop` and continue. `develop` is not deleted.
+8. `git checkout develop` and continue. `develop` is not deleted.

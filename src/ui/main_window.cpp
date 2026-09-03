@@ -1,5 +1,6 @@
 #include "ui/main_window.h"
 
+#include "core/i18n.h"
 #include "core/utf.h"
 #include "platform/audio_devices.h"
 #include "resource.h"
@@ -10,6 +11,7 @@
 #include <shobjidl.h>
 
 #include <algorithm>
+#include <format>
 #include <memory>
 #include <vector>
 
@@ -26,6 +28,11 @@ constexpr UINT kCommandBorderless = 121;
 constexpr UINT kCommandExit = 130;
 constexpr UINT kCommandProjectPage = 140;
 constexpr UINT kCommandAbout = 141;
+constexpr UINT kCommandCredits = 142;
+constexpr UINT kCommandLanguageBase = 150;
+constexpr const char* kLanguageTokens[] = {"auto", "en", "ko"};
+constexpr Str kLanguageLabels[] = {Str::MenuLanguageAuto, Str::MenuLanguageEnglish,
+                                   Str::MenuLanguageKorean};
 constexpr UINT kCommandOpacityBase = 200;
 constexpr wchar_t kProjectUrl[] = L"https://github.com/yimsemin/VizRack";
 constexpr UINT kCommandDeviceBase = 1000;
@@ -47,16 +54,29 @@ std::vector<AudioDeviceInfo>& menuDevices() {
 
 std::wstring stateName(CaptureState state) {
     switch (state) {
-        case CaptureState::stopped: return L"중지";
-        case CaptureState::disconnected: return L"연결 끊김";
-        case CaptureState::connecting: return L"연결 중";
-        case CaptureState::running: return L"캡처 중";
-        case CaptureState::backoff: return L"재연결 대기";
+        case CaptureState::stopped: return trw(Str::CaptureStopped);
+        case CaptureState::disconnected: return trw(Str::CaptureDisconnected);
+        case CaptureState::connecting: return trw(Str::CaptureConnecting);
+        case CaptureState::running: return trw(Str::CaptureRunning);
+        case CaptureState::backoff: return trw(Str::CaptureBackoff);
     }
-    return L"알 수 없음";
+    return trw(Str::CaptureUnknown);
 }
 
-std::filesystem::path pickPath(HWND owner, const PluginDefinition& definition, bool folder) {
+std::wstring localizedPluginName(const PluginDefinition& definition) {
+    if (definition.id == "builtin-oscilloscope") return trw(Str::PluginNameOscilloscope);
+    if (definition.id == "builtin-art-visualizer") return trw(Str::PluginNameArtVisualizer);
+    if (definition.id == "builtin-campfire") return trw(Str::PluginNameCampfire);
+    if (definition.id == "builtin-spectrum3d") return trw(Str::PluginNameSpectrum3d);
+    if (definition.id == "builtin-joydivision") return trw(Str::PluginNameJoyDivision);
+    return fromUtf8(definition.displayName);
+}
+
+std::wstring formatW(Str id, const std::wstring& argument) {
+    return std::vformat(trw(id), std::make_wformat_args(argument));
+}
+
+std::filesystem::path pickPath(HWND owner, const std::wstring& pluginName, bool folder) {
     IFileOpenDialog* dialog = nullptr;
     if (FAILED(CoCreateInstance(CLSID_FileOpenDialog, nullptr, CLSCTX_INPROC_SERVER,
                                 IID_PPV_ARGS(&dialog)))) {
@@ -67,15 +87,17 @@ std::filesystem::path pickPath(HWND owner, const PluginDefinition& definition, b
     options |= FOS_FORCEFILESYSTEM | FOS_PATHMUSTEXIST;
     if (folder) {
         options |= FOS_PICKFOLDERS;
-        const std::wstring title = fromUtf8(definition.displayName) + L" .vst3 번들 폴더 선택";
+        const std::wstring title = formatW(Str::PickerFolderTitleFmt, pluginName);
         dialog->SetTitle(title.c_str());
     } else {
         options |= FOS_FILEMUSTEXIST;
-        const COMDLG_FILTERSPEC filters[] = {{L"VST3 모듈 (*.vst3)", L"*.vst3"},
-                                             {L"모든 파일", L"*.*"}};
+        const std::wstring vst3Filter = trw(Str::PickerFilterVst3);
+        const std::wstring allFilter = trw(Str::PickerFilterAllFiles);
+        const COMDLG_FILTERSPEC filters[] = {{vst3Filter.c_str(), L"*.vst3"},
+                                             {allFilter.c_str(), L"*.*"}};
         dialog->SetFileTypes(static_cast<UINT>(std::size(filters)), filters);
         dialog->SetDefaultExtension(L"vst3");
-        const std::wstring title = fromUtf8(definition.displayName) + L" VST3 선택";
+        const std::wstring title = formatW(Str::PickerFileTitleFmt, pluginName);
         dialog->SetTitle(title.c_str());
     }
     std::filesystem::path result;
@@ -116,7 +138,7 @@ bool MainWindow::registerClass(std::string& error) {
     windowClass.hbrBackground = static_cast<HBRUSH>(GetStockObject(BLACK_BRUSH));
     windowClass.lpszClassName = kWindowClass;
     if (!RegisterClassExW(&windowClass) && GetLastError() != ERROR_CLASS_ALREADY_EXISTS) {
-        error = "창 클래스 등록 실패: " + formatWindowsError(GetLastError());
+        error = "Failed to register the window class: " + formatWindowsError(GetLastError());
         return false;
     }
     return true;
@@ -134,14 +156,14 @@ bool MainWindow::create(std::string& error) {
                             rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top,
                             nullptr, menuBar_, instance_, this);
     if (!hwnd_) {
-        error = "주 창 생성 실패: " + formatWindowsError(GetLastError());
+        error = "Failed to create the main window: " + formatWindowsError(GetLastError());
         return false;
     }
     pluginParent_ = CreateWindowExW(0, L"STATIC", nullptr,
                                     WS_CHILD | WS_VISIBLE | WS_CLIPCHILDREN | WS_CLIPSIBLINGS,
                                     0, 0, 100, 100, hwnd_, nullptr, instance_, nullptr);
     if (!pluginParent_) {
-        error = "플러그인 호스트 영역 생성 실패: " + formatWindowsError(GetLastError());
+        error = "Failed to create the plug-in host area: " + formatWindowsError(GetLastError());
         return false;
     }
     applyWindowOptions();
@@ -160,51 +182,77 @@ void MainWindow::createMenus() {
     settingsMenu_ = CreatePopupMenu();
     deviceMenu_ = CreatePopupMenu();
     opacityMenu_ = CreatePopupMenu();
+    languageMenu_ = CreatePopupMenu();
     pluginMenu_ = CreatePopupMenu();
-    AppendMenuW(deviceMenu_, MF_STRING, kCommandFollowDefault, L"Windows 기본 출력 자동 추적");
+    AppendMenuW(deviceMenu_, MF_STRING, kCommandFollowDefault, trw(Str::MenuFollowDefault).c_str());
     AppendMenuW(deviceMenu_, MF_SEPARATOR, 0, nullptr);
-    AppendMenuW(settingsMenu_, MF_POPUP, reinterpret_cast<UINT_PTR>(deviceMenu_), L"출력 장치");
+    AppendMenuW(settingsMenu_, MF_POPUP, reinterpret_cast<UINT_PTR>(deviceMenu_),
+                trw(Str::MenuOutputDevice).c_str());
     AppendMenuW(settingsMenu_, MF_SEPARATOR, 0, nullptr);
-    AppendMenuW(settingsMenu_, MF_STRING, kCommandAlwaysOnTop, L"항상 위");
-    AppendMenuW(settingsMenu_, MF_STRING, kCommandBorderless, L"창 테두리 숨김");
+    AppendMenuW(settingsMenu_, MF_STRING, kCommandAlwaysOnTop, trw(Str::MenuAlwaysOnTop).c_str());
+    AppendMenuW(settingsMenu_, MF_STRING, kCommandBorderless, trw(Str::MenuBorderless).c_str());
     for (size_t index = 0; index < std::size(kOpacityValues); ++index) {
         const std::wstring label = std::to_wstring(kOpacityValues[index]) + L"%";
         AppendMenuW(opacityMenu_, MF_STRING, kCommandOpacityBase + index, label.c_str());
     }
-    AppendMenuW(settingsMenu_, MF_POPUP, reinterpret_cast<UINT_PTR>(opacityMenu_), L"투명도");
+    AppendMenuW(settingsMenu_, MF_POPUP, reinterpret_cast<UINT_PTR>(opacityMenu_),
+                trw(Str::MenuOpacity).c_str());
+    for (size_t index = 0; index < std::size(kLanguageTokens); ++index) {
+        const bool active = settings_.uiLanguage == kLanguageTokens[index];
+        AppendMenuW(languageMenu_, MF_STRING | (active ? MF_CHECKED : MF_UNCHECKED),
+                    kCommandLanguageBase + index, trw(kLanguageLabels[index]).c_str());
+    }
+    AppendMenuW(settingsMenu_, MF_POPUP, reinterpret_cast<UINT_PTR>(languageMenu_),
+                trw(Str::MenuLanguage).c_str());
     AppendMenuW(settingsMenu_, MF_SEPARATOR, 0, nullptr);
-    AppendMenuW(settingsMenu_, MF_STRING, kCommandExit, L"종료");
+    AppendMenuW(settingsMenu_, MF_STRING, kCommandExit, trw(Str::MenuExit).c_str());
 
     const auto& catalog = pluginCatalog();
     for (size_t index = 0; index < catalog.size(); ++index) {
         const auto& definition = catalog[index];
         HMENU entryMenu = CreatePopupMenu();
         AppendMenuW(entryMenu, MF_STRING, kCommandPluginSelectBase + index,
-                    definition.kind == PluginKind::builtIn ? L"사용" : L"자동 검색하여 사용");
+                    trw(definition.kind == PluginKind::builtIn ? Str::MenuPluginUse
+                                                              : Str::MenuPluginUseAutoDetect)
+                        .c_str());
         if (definition.kind == PluginKind::vst3) {
             AppendMenuW(entryMenu, MF_SEPARATOR, 0, nullptr);
             AppendMenuW(entryMenu, MF_STRING, kCommandPluginFileBase + index,
-                        L"VST3 파일 선택...");
+                        trw(Str::MenuPluginPickFile).c_str());
             AppendMenuW(entryMenu, MF_STRING, kCommandPluginFolderBase + index,
-                        L"VST3 번들 폴더 선택...");
+                        trw(Str::MenuPluginPickFolder).c_str());
             AppendMenuW(entryMenu, MF_SEPARATOR, 0, nullptr);
             AppendMenuW(entryMenu, MF_STRING, kCommandPluginWebsiteBase + index,
-                        L"공식 설치 페이지 열기...");
+                        trw(Str::MenuPluginInstallPage).c_str());
         }
         AppendMenuW(pluginMenu_, MF_POPUP, reinterpret_cast<UINT_PTR>(entryMenu),
-                    fromUtf8(definition.displayName).c_str());
+                    localizedPluginName(definition).c_str());
     }
     helpMenu_ = CreatePopupMenu();
-    AppendMenuW(helpMenu_, MF_STRING, kCommandProjectPage, L"GitHub 저장소 열기");
+    AppendMenuW(helpMenu_, MF_STRING, kCommandProjectPage, trw(Str::MenuHelpGithub).c_str());
     AppendMenuW(helpMenu_, MF_SEPARATOR, 0, nullptr);
-    AppendMenuW(helpMenu_, MF_STRING, kCommandAbout, L"VizRack 정보");
+    AppendMenuW(helpMenu_, MF_STRING, kCommandCredits, trw(Str::MenuCredits).c_str());
+    AppendMenuW(helpMenu_, MF_STRING, kCommandAbout, trw(Str::MenuAbout).c_str());
 
-    AppendMenuW(menuBar_, MF_POPUP, reinterpret_cast<UINT_PTR>(settingsMenu_), L"설정");
+    AppendMenuW(menuBar_, MF_POPUP, reinterpret_cast<UINT_PTR>(settingsMenu_),
+                trw(Str::MenuSettings).c_str());
     AppendMenuW(menuBar_, MF_POPUP, reinterpret_cast<UINT_PTR>(pluginMenu_),
-                L"플러그인: 찾는 중");
-    AppendMenuW(menuBar_, MF_POPUP, reinterpret_cast<UINT_PTR>(helpMenu_), L"도움말");
+                formatW(Str::MenuPluginBarFmt, trw(Str::PluginStatusSearching)).c_str());
+    AppendMenuW(menuBar_, MF_POPUP, reinterpret_cast<UINT_PTR>(helpMenu_), trw(Str::MenuHelp).c_str());
     rebuildDeviceMenu();
     setSelectedPluginId(selectedPluginId_);
+    if (!pluginStatus_.empty()) setPluginStatus(pluginStatus_);
+}
+
+void MainWindow::retranslate() {
+    HMENU previous = menuBar_;
+    menuBar_ = nullptr;
+    createMenus();  // builds a fresh menuBar_ and its submenus
+    if (hwnd_) {
+        applyWindowOptions();  // SetMenu(new menuBar_) + DrawMenuBar
+        updateWindowTitle();
+    }
+    if (previous) DestroyMenu(previous);
 }
 
 void MainWindow::rebuildDeviceMenu() {
@@ -217,7 +265,7 @@ void MainWindow::rebuildDeviceMenu() {
                   MF_BYCOMMAND | (settings_.followDefaultDevice ? MF_CHECKED : MF_UNCHECKED));
     for (size_t index = 0; index < devices.size(); ++index) {
         std::wstring label = devices[index].name;
-        if (devices[index].isDefault) label += L" (기본)";
+        if (devices[index].isDefault) label += trw(Str::DeviceDefaultSuffix);
         AppendMenuW(deviceMenu_, MF_STRING, kCommandDeviceBase + index, label.c_str());
         if (!settings_.followDefaultDevice && fromUtf8(settings_.fixedDeviceId) == devices[index].id) {
             CheckMenuItem(deviceMenu_, kCommandDeviceBase + static_cast<UINT>(index),
@@ -284,13 +332,13 @@ void MainWindow::updateLayout() {
 void MainWindow::updateWindowTitle() {
     if (!hwnd_) return;
     const std::wstring output = captureStatus_.deviceName.empty()
-                                    ? L"출력 장치 확인 중"
+                                    ? trw(Str::TitleCheckingDevice)
                                     : captureStatus_.deviceName;
-    std::wstring title = L"VizRack — " + output;
+    std::wstring title = trw(Str::AppName) + L" — " + output;
     if (captureStatus_.state != CaptureState::running) {
         title += L" — " + stateName(captureStatus_.state);
     }
-    if (captureStatus_.format.channels > 2) title += L" — Front L/R 측정";
+    if (captureStatus_.format.channels > 2) title += L" — " + trw(Str::TitleFrontLrMetering);
     SetWindowTextW(hwnd_, title.c_str());
 }
 
@@ -342,7 +390,7 @@ void MainWindow::notifySettingsChanged() {
 void MainWindow::setPluginStatus(std::string status) {
     pluginStatus_ = std::move(status);
     if (!menuBar_ || !pluginMenu_) return;
-    const std::wstring label = L"플러그인: " + fromUtf8(pluginStatus_);
+    const std::wstring label = formatW(Str::MenuPluginBarFmt, fromUtf8(pluginStatus_));
     ModifyMenuW(menuBar_, 1, MF_BYPOSITION | MF_POPUP,
                 reinterpret_cast<UINT_PTR>(pluginMenu_), label.c_str());
     if (hwnd_) DrawMenuBar(hwnd_);
@@ -409,7 +457,7 @@ void MainWindow::onPluginRequestedSize(int width, int height) {
 void MainWindow::openPluginPicker(const std::string& pluginId, bool folder) {
     const auto* definition = findPluginDefinition(pluginId);
     if (!definition || definition->kind != PluginKind::vst3) return;
-    const auto path = pickPath(hwnd_, *definition, folder);
+    const auto path = pickPath(hwnd_, localizedPluginName(*definition), folder);
     if (!path.empty() && callbacks_.onPluginPathSelected) {
         callbacks_.onPluginPathSelected(pluginId, path);
     }
@@ -421,8 +469,8 @@ void MainWindow::openPluginInstallPage(const std::string& pluginId) {
     const auto result = reinterpret_cast<INT_PTR>(ShellExecuteW(
         hwnd_, L"open", fromUtf8(definition->installUrl).c_str(), nullptr, nullptr, SW_SHOWNORMAL));
     if (result <= 32) {
-        MessageBoxW(hwnd_, L"공식 설치 페이지를 열지 못했습니다.", L"브라우저 열기 실패",
-                    MB_OK | MB_ICONERROR);
+        MessageBoxW(hwnd_, trw(Str::MsgInstallPageOpenFailed).c_str(),
+                    trw(Str::DialogTitleBrowserFailed).c_str(), MB_OK | MB_ICONERROR);
     }
 }
 
@@ -430,21 +478,29 @@ void MainWindow::openExternalUrl(const wchar_t* url) {
     const auto result = reinterpret_cast<INT_PTR>(
         ShellExecuteW(hwnd_, L"open", url, nullptr, nullptr, SW_SHOWNORMAL));
     if (result <= 32) {
-        MessageBoxW(hwnd_, L"기본 브라우저를 열지 못했습니다.", L"VizRack", MB_OK | MB_ICONERROR);
+        MessageBoxW(hwnd_, trw(Str::MsgDefaultBrowserOpenFailed).c_str(), trw(Str::AppName).c_str(),
+                    MB_OK | MB_ICONERROR);
     }
 }
 
 void MainWindow::showAboutDialog() {
     const std::wstring text =
-        L"VizRack " + fromUtf8(VIZRACK_VERSION) +
-        L"\n\n"
-        L"Windows에서 재생 중인 음악에 반응하는 가벼운 포터블 비주얼라이저입니다.\n"
-        L"WASAPI 공유 loopback으로 소리를 읽기만 하며 재생 경로에 개입하지 않습니다.\n\n"
-        L"GitHub: " + kProjectUrl +
-        L"\n"
-        L"라이선스: MIT License, Copyright (c) 2026 SubProject\n\n"
+        trw(Str::AppName) + L" " + fromUtf8(VIZRACK_VERSION) + L"\n\n" +
+        trw(Str::AboutDescription) +
+        L"\n\nGitHub: " + kProjectUrl +
+        L"\nMIT License, Copyright (c) 2026 subProject\n\n"
         L"VST is a registered trademark of Steinberg Media Technologies GmbH.";
-    MessageBoxW(hwnd_, text.c_str(), L"VizRack 정보", MB_OK | MB_ICONINFORMATION);
+    MessageBoxW(hwnd_, text.c_str(), trw(Str::MenuAbout).c_str(), MB_OK | MB_ICONINFORMATION);
+}
+
+void MainWindow::showCreditsDialog() {
+    std::wstring text = trw(Str::CreditsIntro) + L"\n";
+    for (const auto& definition : pluginCatalog()) {
+        if (definition.inspiration.empty()) continue;
+        text += L"\n" + localizedPluginName(definition) + L"\n" +
+                fromUtf8(definition.inspiration) + L"\n";
+    }
+    MessageBoxW(hwnd_, text.c_str(), trw(Str::MenuCredits).c_str(), MB_OK | MB_ICONINFORMATION);
 }
 
 void MainWindow::scheduleClose(unsigned milliseconds) {
@@ -483,6 +539,17 @@ void MainWindow::handleCommand(UINT command) {
         openExternalUrl(kProjectUrl);
     } else if (command == kCommandAbout) {
         showAboutDialog();
+    } else if (command == kCommandCredits) {
+        showCreditsDialog();
+    } else if (command >= kCommandLanguageBase &&
+               command < kCommandLanguageBase + std::size(kLanguageTokens)) {
+        const char* token = kLanguageTokens[command - kCommandLanguageBase];
+        if (settings_.uiLanguage != token) {
+            settings_.uiLanguage = token;
+            setUiLanguage(resolveUiLanguage(settings_.uiLanguage));
+            retranslate();
+            notifySettingsChanged();
+        }
     } else {
         const auto& catalog = pluginCatalog();
         if (command >= kCommandPluginSelectBase &&

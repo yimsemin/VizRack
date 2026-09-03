@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 4.2)
 
-project(VizRack VERSION 0.2.0 LANGUAGES CXX)
+project(VizRack VERSION 0.3.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -21,6 +21,8 @@ add_library(vizrack_builtin_core STATIC
     src/builtin/draw_list.h
     src/builtin/oscilloscope_engine.cpp
     src/builtin/oscilloscope_engine.h
+    src/builtin/spectrum3d_engine.cpp
+    src/builtin/spectrum3d_engine.h
 )
 target_include_directories(vizrack_builtin_core PUBLIC src)
 if(MSVC)
@@ -49,6 +51,9 @@ add_library(vizrack_core STATIC
     src/core/audio_ring.h
     src/core/channel_mapper.cpp
     src/core/channel_mapper.h
+    src/core/i18n.cpp
+    src/core/i18n.h
+    src/core/i18n_strings.inc
     src/core/logger.cpp
     src/core/logger.h
     src/core/plugin_paths.cpp
@@ -95,6 +100,8 @@ add_executable(VizRack WIN32
     src/ui/main_window.h
     src/ui/oscilloscope_view.cpp
     src/ui/oscilloscope_view.h
+    src/ui/spectrum3d_view.cpp
+    src/ui/spectrum3d_view.h
     src/vst/plugin_discovery.cpp
     src/vst/plugin_discovery.h
     src/vst/vst_host.cpp
@@ -133,10 +140,9 @@ set_target_properties(VizRack PROPERTIES
 )
 
 install(TARGETS VizRack RUNTIME DESTINATION .)
-install(FILES README.md LICENSE THIRD_PARTY_NOTICES.md DESTINATION .)
+install(FILES README.md README.ko.md LICENSE THIRD_PARTY_NOTICES.md DESTINATION .)
 install(FILES licenses/Steinberg-VST3-SDK-MIT.txt DESTINATION licenses)
 install(FILES docs/ARCHITECTURE.md docs/BUILTIN_VISUALIZER_CORE.md DESTINATION docs)
-install(FILES docs/assets/VST_Compatible_Logo_Steinberg.svg DESTINATION docs/assets)
 
 if(VIZRACK_BUILD_TESTS)
     enable_testing()

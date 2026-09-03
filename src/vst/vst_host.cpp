@@ -122,17 +122,17 @@ struct VstHost::Impl final : Steinberg::Vst::IComponentHandler, Steinberg::IPlug
 
     bool configureBusses(std::string& error) {
         if (!processor || !component) {
-            error = "VST3 processor/component가 없습니다.";
+            error = "The VST3 processor/component is missing.";
             return false;
         }
         if (processor->canProcessSampleSize(kSample32) != kResultTrue) {
-            error = "플러그인이 32-bit float 처리를 지원하지 않습니다.";
+            error = "The plug-in does not support 32-bit float processing.";
             return false;
         }
         const int32 inputCount = component->getBusCount(kAudio, kInput);
         const int32 outputCount = component->getBusCount(kAudio, kOutput);
         if (inputCount < 1) {
-            error = "플러그인에 오디오 입력 버스가 없습니다.";
+            error = "The plug-in has no audio input bus.";
             return false;
         }
         std::vector<SpeakerArrangement> inputs(static_cast<size_t>(inputCount), SpeakerArr::kEmpty);
@@ -157,7 +157,7 @@ struct VstHost::Impl final : Steinberg::Vst::IComponentHandler, Steinberg::IPlug
         BusInfo inputInfo{};
         if (!succeeded(component->getBusInfo(kAudio, kInput, 0, inputInfo)) ||
             inputInfo.channelCount < 2) {
-            error = "플러그인의 주 입력 버스를 스테레오로 구성하지 못했습니다.";
+            error = "Could not configure the plug-in's main input bus as stereo.";
             return false;
         }
         return true;
@@ -169,7 +169,7 @@ struct VstHost::Impl final : Steinberg::Vst::IComponentHandler, Steinberg::IPlug
         PluginStateData state;
         std::string error;
         if (!loadPluginStateFile(path, state, error) || state.classId != descriptor.classId) {
-            if (error.empty()) error = "상태의 class ID가 현재 플러그인과 다릅니다.";
+            if (error.empty()) error = "The saved state's class ID differs from the current plug-in.";
             logger.warning("Plugin state ignored: " + error);
             quarantineCorruptState(path);
             return;
@@ -177,7 +177,7 @@ struct VstHost::Impl final : Steinberg::Vst::IComponentHandler, Steinberg::IPlug
         if (!state.component.empty()) {
             MemoryStream componentStream(state.component.data(), static_cast<TSize>(state.component.size()));
             if (!succeeded(component->setState(&componentStream))) {
-                error = "component setState 실패";
+                error = "component setState failed";
             } else {
                 componentStream.seek(0, IBStream::kIBSeekSet, nullptr);
                 if (controller) {
@@ -191,7 +191,7 @@ struct VstHost::Impl final : Steinberg::Vst::IComponentHandler, Steinberg::IPlug
         }
         if (error.empty() && controller && !state.controller.empty()) {
             MemoryStream controllerStream(state.controller.data(), static_cast<TSize>(state.controller.size()));
-            if (!succeeded(controller->setState(&controllerStream))) error = "controller setState 실패";
+            if (!succeeded(controller->setState(&controllerStream))) error = "controller setState failed";
         }
         if (!error.empty()) {
             logger.warning("Plugin state restore failed: " + error);
@@ -373,7 +373,7 @@ VstLoadResult VstHost::load(const PluginDescriptor& descriptor,
     std::string error;
     impl_->module = VST3::Hosting::Module::create(toUtf8(descriptor.modulePath.wstring()), error);
     if (!impl_->module) {
-        result.message = "VST3 모듈을 열 수 없습니다: " + error;
+        result.message = "Could not open the VST3 module: " + error;
         return result;
     }
     auto factory = impl_->module->getFactory();
@@ -385,7 +385,7 @@ VstLoadResult VstHost::load(const PluginDescriptor& descriptor,
         break;
     }
     if (!impl_->provider || !impl_->provider->initialize()) {
-        result.message = "VST3 component/controller 초기화에 실패했습니다.";
+        result.message = "VST3 component/controller initialization failed.";
         unload();
         return result;
     }
@@ -393,7 +393,7 @@ VstLoadResult VstHost::load(const PluginDescriptor& descriptor,
     impl_->controller = impl_->provider->getControllerPtr();
     impl_->processor = impl_->component;
     if (!impl_->component || !impl_->controller || !impl_->processor) {
-        result.message = "플러그인이 필요한 component, controller 또는 audio processor를 제공하지 않습니다.";
+        result.message = "The plug-in does not provide the required component, controller or audio processor.";
         unload();
         return result;
     }
@@ -406,7 +406,7 @@ VstLoadResult VstHost::load(const PluginDescriptor& descriptor,
     impl_->restoreState(statePath);
     impl_->view = Steinberg::owned(impl_->controller->createView(Steinberg::Vst::ViewType::kEditor));
     if (!impl_->view) {
-        result.message = "플러그인이 공식 VST3 편집기 GUI를 제공하지 않습니다.";
+        result.message = "The plug-in does not provide an official VST3 editor GUI.";
         unload();
         return result;
     }
@@ -464,11 +464,11 @@ void VstHost::notifyDataReady() { impl_->wake.notify_one(); }
 
 bool VstHost::attachEditor(HWND parent, EditorResizeCallback resizeCallback, std::string& error) {
     if (!impl_->view || !parent) {
-        error = "연결할 VST3 편집기가 없습니다.";
+        error = "There is no VST3 editor to attach.";
         return false;
     }
     if (impl_->view->isPlatformTypeSupported(Steinberg::kPlatformTypeHWND) != Steinberg::kResultTrue) {
-        error = "VST3 GUI가 Win32 HWND 임베딩을 지원하지 않습니다.";
+        error = "The VST3 GUI does not support Win32 HWND embedding.";
         return false;
     }
     impl_->editorParent = parent;
@@ -477,7 +477,7 @@ bool VstHost::attachEditor(HWND parent, EditorResizeCallback resizeCallback, std
     if (impl_->view->attached(parent, Steinberg::kPlatformTypeHWND) != Steinberg::kResultTrue) {
         impl_->view->setFrame(nullptr);
         impl_->editorParent = nullptr;
-        error = "VST3 GUI를 호스트 창에 연결하지 못했습니다.";
+        error = "Could not attach the VST3 GUI to the host window.";
         return false;
     }
     return true;
@@ -527,7 +527,7 @@ std::pair<int, int> VstHost::editorSize() const {
 
 bool VstHost::saveState(const std::filesystem::path& path, std::string& error) {
     if (!impl_->component || !impl_->controller) {
-        error = "저장할 플러그인 인스턴스가 없습니다.";
+        error = "There is no plug-in instance to save.";
         return false;
     }
     PluginStateData state;
@@ -535,7 +535,7 @@ bool VstHost::saveState(const std::filesystem::path& path, std::string& error) {
     Steinberg::MemoryStream componentStream;
     const auto componentResult = impl_->component->getState(&componentStream);
     if (!succeeded(componentResult)) {
-        error = "VST3 component state 조회 실패: " + resultText(componentResult);
+        error = "Failed to read the VST3 component state: " + resultText(componentResult);
         return false;
     }
     state.component = streamBytes(componentStream);

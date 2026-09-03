@@ -108,24 +108,24 @@ PluginInspection inspectSupportedPlugin(const PluginDefinition& definition,
                                         const std::filesystem::path& modulePath) {
     PluginInspection result;
     if (!isVst3CandidatePath(modulePath)) {
-        result.error = "선택한 경로는 존재하는 .vst3 모듈 또는 번들이 아닙니다.";
+        result.error = "The chosen path is not an existing .vst3 module or bundle.";
         return result;
     }
     const auto binary = resolveVst3Binary(modulePath);
     if (binary.empty() || !isAmd64Pe(binary)) {
-        result.error = "선택한 VST3에 x64 Windows 바이너리가 없습니다.";
+        result.error = "The chosen VST3 has no x64 Windows binary.";
         return result;
     }
     if (!containsBinaryMarker(binary, definition.binaryMarker)) {
-        result.error = definition.displayName + "의 필수 바이너리 표식 '" +
-                       definition.binaryMarker + "'을 찾지 못했습니다.";
+        result.error = "Could not find the required binary marker '" + definition.binaryMarker +
+                       "' for " + definition.displayName + ".";
         return result;
     }
 
     std::string moduleError;
     auto module = VST3::Hosting::Module::create(toUtf8(modulePath.wstring()), moduleError);
     if (!module) {
-        result.error = "VST3 모듈 로딩 실패: " + moduleError;
+        result.error = "VST3 module load failed: " + moduleError;
         return result;
     }
     const auto factory = module->getFactory();
@@ -150,8 +150,8 @@ PluginInspection inspectSupportedPlugin(const PluginDefinition& definition,
         result.compatible = true;
         return result;
     }
-    result.error = "VST3 factory에서 화이트리스트의 " + definition.displayName +
-                   " 오디오 효과 클래스를 찾지 못했습니다.";
+    result.error = "The VST3 factory has no whitelisted " + definition.displayName +
+                   " audio effect class.";
     return result;
 }
 
@@ -166,7 +166,7 @@ PluginInspection findSupportedPlugin(const PluginDefinition& definition,
         }
     }
     PluginInspection last;
-    last.error = "호환되는 " + definition.displayName + " VST3를 찾지 못했습니다.";
+    last.error = "Could not find a compatible " + definition.displayName + " VST3.";
     for (const auto& location : defaultSearchLocations(definition)) {
         std::vector<std::filesystem::path> candidates;
         if (isVst3CandidatePath(location)) {

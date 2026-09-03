@@ -745,13 +745,18 @@ void CampfireEngine::buildFrame(float width, float height, DrawList& output) {
     const float extent = std::min(width, height);
     const float centerX = width * 0.5f;
     const float baseY = height * 0.76f;
+    // The stone ring spans baseY + 0.012..0.090 * extent (back rim to front rim).
+    // Anchor the flames and embers to the fuel bed near the middle of that ring
+    // instead of the back rim, so the fire sits in the pit and the front stones
+    // still overlap its base.
+    const float flameBaseY = baseY + extent * 0.05f;
     const float flameHeight = extent * 0.39f;
     drawBackground(output, width, height, centerX, baseY, extent);
-    drawSmoke(output, centerX, baseY, flameHeight * fireScale_, extent);
+    drawSmoke(output, centerX, flameBaseY, flameHeight * fireScale_, extent);
     drawLogs(output, centerX, baseY, extent);
-    drawFlames(output, centerX, baseY, flameHeight, extent);
+    drawFlames(output, centerX, flameBaseY, flameHeight, extent);
     drawForegroundLogs(output, centerX, baseY, extent);
-    drawEmbers(output, centerX, baseY, flameHeight, extent);
+    drawEmbers(output, centerX, flameBaseY, flameHeight, extent);
 }
 
 CampfireFrameInfo CampfireEngine::frameInfo() const noexcept {

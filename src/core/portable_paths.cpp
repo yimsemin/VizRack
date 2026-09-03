@@ -41,7 +41,7 @@ void PortablePaths::prepare() {
     std::error_code error;
     std::filesystem::create_directories(logs, error);
     if (error) {
-        writeError = "포터블 데이터 폴더를 만들 수 없습니다: " + error.message();
+        writeError = "Could not create the portable data folder: " + error.message();
         return;
     }
 
@@ -49,12 +49,12 @@ void PortablePaths::prepare() {
     {
         std::ofstream stream(probe, std::ios::binary | std::ios::trunc);
         if (!stream) {
-            writeError = "실행 폴더에 쓰기 권한이 없습니다. 설정과 로그를 저장하지 않습니다.";
+            writeError = "The executable folder is not writable. Settings and logs will not be saved.";
             return;
         }
         stream << "probe";
         if (!stream.good()) {
-            writeError = "실행 폴더 쓰기 검사에 실패했습니다.";
+            writeError = "The executable folder write probe failed.";
             return;
         }
     }

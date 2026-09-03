@@ -1,107 +1,119 @@
-﻿# VizRack
+<!-- The Introduction and "What you can watch" sections are mirrored in
+     README.ko.md. When you change them here, update README.ko.md in the same
+     commit. Everything else is English-only on purpose. -->
 
-**음악은 그대로 흐르고, 화면만 조금 더 살아납니다.**
+# VizRack
 
-VizRack은 Windows에서 재생 중인 음악에 맞춰 움직이는 화면을 띄우는 가벼운 포터블
-비주얼라이저입니다. 책상 한쪽이나 보조 모니터에 작은 창으로 올려두고, 음악을
-들으면서 잠시 멍하니 바라볼 무언가가 필요할 때 사용해 보세요.
+**English · [한국어](README.ko.md)**
 
-별도 오디오 드라이버나 외부 플러그인 없이 바로 시작할 수 있습니다. 사용 중인 음악
-플레이어와 Windows의 재생 경로는 건드리지 않으므로 VizRack을 닫아도 음악은 그대로
-이어집니다.
+**The music keeps playing; only the screen comes a little more alive.**
 
-## 무엇을 볼 수 있나요?
+VizRack is a lightweight portable visualizer that puts a window on screen which
+moves along with whatever music is playing on Windows. Park it in a small window
+on the corner of your desk or a second monitor, for when you want something to
+stare at while you listen.
 
-- **아트 비주얼라이저** — 음악의 저·중·고역과 스테레오 움직임에 반응하는 6개 장면과
-  6개 팔레트
-- **오실로스코프** — 좌우 채널 파형과 최근 약 15초의 음량 흐름
-- **선택형 외부 비주얼라이저** — mvMeter2와 AnSpec을 설치해 원하는 계측 화면으로 전환
-- **감상에 맞춘 창 설정** — 항상 위, 테두리 숨김, 투명도와 15/30/60 FPS 조절
+It works right away — no separate audio driver, no external plug-in required.
+Your music player and the Windows playback path are left untouched, so the music
+keeps going even after you close VizRack.
 
-## 바로 시작하기
+## What you can watch
 
-VizRack은 **Windows 10 버전 1703 이상 또는 Windows 11이 설치된 x64 PC**에서
-실행됩니다.
+- **Art visualizer** — six scenes and six palettes that react to the low / mid /
+  high bands and the stereo movement of the music
+- **Oscilloscope** — left/right channel waveforms and the last ~15 seconds of the
+  level history
+- **Optional external visualizers** — install mvMeter2 or AnSpec to switch to the
+  metering screen you prefer
+- **Window settings for listening** — always on top, hidden border, opacity and a
+  15 / 30 / 60 FPS control
 
-1. `VizRack-win-x64.zip`을 원하는 로컬 폴더에 완전히 압축 해제합니다.
-2. 압축을 푼 폴더에서 `VizRack.exe`를 실행합니다.
-3. 평소처럼 음악이나 영상을 재생합니다.
-4. `플러그인 > 내장 아트 비주얼라이저 > 사용`을 선택하고 화면을 클릭해 장면을
-   바꿔 보세요.
+## Getting started
 
-설정을 저장하려면 ZIP 안에서 직접 실행하거나 `C:\Program Files` 같은 쓰기 제한
-폴더에 두지 마세요.
+VizRack runs on an **x64 PC with Windows 10 version 1703 or newer, or Windows
+11**.
 
-코드 서명이 없어 Microsoft Defender SmartScreen 경고가 나타날 수 있습니다. 파일의
-출처를 신뢰할 수 있을 때만 `추가 정보 > 실행`을 선택하세요.
+1. Extract `VizRack-win-x64.zip` completely into a local folder of your choice.
+2. Run `VizRack.exe` from the extracted folder.
+3. Play music or video as usual.
+4. Choose `Plug-in > Built-in Art Visualizer > Use` and click the screen to
+   change scenes.
 
-## 자주 쓰는 조작
+To keep your settings, do not run it from inside the ZIP or place it in a
+write-restricted folder such as `C:\Program Files`.
 
-| 동작 | 결과 |
+There is no code signing, so Microsoft Defender SmartScreen may show a warning.
+Choose `More info > Run anyway` only when you trust where the file came from.
+
+## Common controls
+
+| Action | Result |
 | --- | --- |
-| 화면 클릭 또는 `Space` | 다음 아트 장면 |
-| 화살표 또는 숫자 `1`~`6` | 장면 선택 |
-| `C` | 다음 팔레트 |
-| 오른쪽 클릭 | 현재 화면과 창 설정 |
-| `F10` | 테두리를 숨긴 상태에서 메뉴 열기 |
+| Click the screen or `Space` | Next art scene |
+| Arrow keys or number `1`–`6` | Select a scene |
+| `C` | Next palette |
+| Right-click | Current screen and window settings |
+| `F10` | Open the menu while the border is hidden |
 
-`설정` 메뉴에서 항상 위, 테두리 숨김, 투명도와 출력 장치를 바꿀 수 있습니다.
-기본값은 Windows의 기본 출력 장치를 자동으로 따라갑니다.
+The `Settings` menu changes always-on-top, hidden border, opacity, the output
+device and the UI language. By default VizRack follows the Windows default
+output device automatically.
 
-## 선택형 외부 비주얼라이저
+## Optional external visualizers
 
-<img src="docs/assets/VST_Compatible_Logo_Steinberg.svg" alt="VST Compatible" width="116">
+VizRack's VST 3 plug-in support is limited to the Windows x64 builds of the two
+products below. It is not a general-purpose host that loads arbitrary VST 3
+plug-ins.
 
-VizRack의 VST® 3 지원은 아래 두 제품의 Windows x64 버전에만 한정됩니다. 임의의
-VST 3 플러그인을 불러오는 범용 호스트가 아닙니다.
-
-| 제품 | 지원 버전 | 공식 설치 페이지 |
+| Product | Supported build | Official install page |
 | --- | --- | --- |
-| mvMeter2 | x64 VST 3, GPU 또는 noGPU | [TBProAudio](https://www.tbproaudio.de/products/mvmeter2) |
+| mvMeter2 | x64 VST 3, GPU or noGPU | [TBProAudio](https://www.tbproaudio.de/products/mvmeter2) |
 | AnSpec | Windows x64 VST 3 | [Voxengo](https://www.voxengo.com/product/anspec/) |
 
-필요한 제품을 설치한 뒤 `플러그인 > 제품 이름 > 자동 검색하여 사용`을 선택하세요.
-찾지 못하면 같은 메뉴에서 VST 3 파일이나 번들 폴더를 직접 지정할 수 있습니다.
-외부 플러그인은 VizRack 배포본에 포함되지 않습니다.
+After installing the product you need, choose
+`Plug-in > product name > Auto-detect and use`. If it is not found, you can point
+VizRack at the VST 3 file or bundle folder directly from the same menu. External
+plug-ins are not bundled with VizRack.
 
-## 문제가 생겼을 때
+## When something goes wrong
 
-| 문제 | 확인할 내용 |
+| Problem | What to check |
 | --- | --- |
-| 화면이 음악에 반응하지 않음 | 음악이 실제로 재생 중인지 확인한 뒤 `설정 > 출력 장치`에서 올바른 장치를 선택합니다. |
-| 설정이 저장되지 않음 | VizRack을 쓰기 가능한 로컬 폴더에 완전히 압축 해제해 실행합니다. |
-| 외부 화면을 찾지 못함 | 플러그인의 Windows **64-bit VST 3** 버전을 설치했는지 확인하고 자동 검색 또는 직접 선택을 사용합니다. |
-| mvMeter2 GPU 화면이 열리지 않음 | 그래픽 드라이버를 업데이트하거나 공식 noGPU 버전을 사용합니다. |
-| 처음 상태로 되돌리고 싶음 | VizRack을 종료한 뒤 실행 파일 옆의 `data` 폴더 이름을 바꾸고 다시 실행합니다. |
+| The screen does not react to the music | Confirm the music is actually playing, then pick the right device under `Settings > Output device`. |
+| Settings are not saved | Extract VizRack completely into a writable local folder and run it from there. |
+| An external screen is not found | Confirm you installed the Windows **64-bit VST 3** build of the plug-in, then use auto-detect or pick it manually. |
+| The mvMeter2 GPU screen does not open | Update your graphics driver or use the official noGPU build. |
+| You want to start from a clean state | Quit VizRack, rename the `data` folder next to the executable, and start again. |
 
-문제가 계속되면 `data\logs\vizrack.log`를 확인하세요. 충돌 시에는
-`data\crash-*.dmp`도 함께 생성될 수 있습니다.
+If the problem persists, check `data\logs\vizrack.log`. A crash may also leave a
+`data\crash-*.dmp` file next to it.
 
-## 포터블 저장과 오디오 처리
+## Portable storage and audio handling
 
-설정, 플러그인 위치와 로그는 모두 `VizRack.exe` 옆의 `data` 폴더에 저장됩니다.
-AppData와 레지스트리는 사용하지 않으므로 폴더 전체를 옮기거나 삭제하기 쉽습니다.
+Settings, plug-in locations and logs are all stored in the `data` folder next to
+`VizRack.exe`. No AppData, no registry — so the whole folder is easy to move or
+delete.
 
-VizRack은 Windows가 재생 중인 소리를 읽기만 하며 오디오 샘플을 저장하거나 로그에
-기록하지 않습니다.
+VizRack only reads the sound Windows is playing; it never stores audio samples or
+writes them to the log.
 
 <details>
-<summary>지원 범위와 제한</summary>
+<summary>Scope and limitations</summary>
 
-- 내장 아트 비주얼라이저는 감상용이며 정밀 계측 도구가 아닙니다.
-- 다채널 출력에서는 Front Left/Front Right 채널을 사용합니다.
-- 32비트, ARM64 네이티브, VST 2, AAX, ASIO와 WASAPI Exclusive는 지원하지 않습니다.
-- DAW transport, MIDI, automation, 오디오 재출력 기능은 제공하지 않습니다.
-- 가상 오디오 장치와 외부 플러그인의 동작은 환경에 따라 달라질 수 있습니다.
+- The built-in art visualizer is for enjoyment, not a precision metering tool.
+- On multichannel output it uses the Front Left / Front Right channels.
+- 32-bit, native ARM64, VST 2, AAX, ASIO and WASAPI Exclusive are not supported.
+- There is no DAW transport, MIDI, automation or audio re-output.
+- Virtual audio devices and external plug-ins may behave differently per setup.
 
 </details>
 
 <details>
-<summary>개발 및 패키징</summary>
+<summary>Building and packaging</summary>
 
-Visual Studio Build Tools 2026의 **Desktop development with C++** 워크로드,
-Windows SDK, CMake 4.2 이상과 Git 또는 로컬 Steinberg VST 3 SDK checkout이
-필요합니다. Developer PowerShell에서 다음 명령을 실행합니다.
+You need the **Desktop development with C++** workload of Visual Studio Build
+Tools 2026, the Windows SDK, CMake 4.2 or newer and Git, plus a local Steinberg
+VST 3 SDK checkout. From a Developer PowerShell:
 
 ```powershell
 cmake --preset vs2026-x64
@@ -110,26 +122,36 @@ ctest --preset release
 out\build\vs2026-x64\Release\VizRack.exe --smoke-test
 ```
 
-포터블 ZIP은 다음 명령으로 만듭니다.
+Build the portable ZIP with:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\package.ps1
 ```
 
-내장 비주얼라이저의 플랫폼 경계와 변경 규칙은
-[`docs/BUILTIN_VISUALIZER_CORE.md`](docs/BUILTIN_VISUALIZER_CORE.md), 전체 구조는
-[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)를 참고하세요.
+The platform boundary and change rules for the built-in visualizers are in
+[`docs/BUILTIN_VISUALIZER_CORE.md`](docs/BUILTIN_VISUALIZER_CORE.md); the overall
+structure, including how localization works, is in
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 </details>
 
-## 라이선스
+## Credits
 
-VizRack의 코드와 자체 제작 앱 아이콘은
-[MIT License](LICENSE), Copyright (c) 2026 SubProject로 공개됩니다. 빌드에 포함되는
-Steinberg VST 3 SDK와 제3자 고지는 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)를
-참고하세요.
+Some built-in visualizers take after the work below.
 
-공식 VST Compatible 로고와 VST 상표는 VizRack의 MIT License로 재허가되지 않으며
-Steinberg의 VST 사용 지침에 따라 사용됩니다.
+- **Built-in Joy Division** — Inspired by Joy Division
+
+These names credit the source of inspiration only. The names and works stay with
+their owners and are not covered by VizRack's MIT License.
+
+## License
+
+VizRack's code and its own app icon are released under the
+[MIT License](LICENSE), Copyright (c) 2026 subProject. For the Steinberg VST 3
+SDK included in the build and other third-party notices, see
+[`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
+
+The name "VST" is used only to describe compatibility and is not relicensed under
+VizRack's MIT License. VizRack is not affiliated with or endorsed by Steinberg.
 
 VST is a registered trademark of Steinberg Media Technologies GmbH.

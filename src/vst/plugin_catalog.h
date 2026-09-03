@@ -20,6 +20,7 @@ struct PluginDefinition {
     std::string editionLabel;
     std::vector<std::filesystem::path> searchLocations;
     std::string installUrl;
+    std::string inspiration; // "Inspired by ..." credit for homage built-ins; empty otherwise
 };
 
 const std::vector<PluginDefinition>& pluginCatalog();

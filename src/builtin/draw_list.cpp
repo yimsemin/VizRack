@@ -6,10 +6,11 @@
 namespace vizrack::builtin {
 
 DrawList::DrawList() {
-    // Pulse Matrix is currently the largest scene (roughly 1,000 commands). Reserving once
-    // keeps steady-state rendering free from frame-by-frame heap growth.
+    // Pulse Matrix needs the most commands (~1,000); the Joy Division cascade needs the most
+    // points (interpolated ridges across the depth buffer). Reserving once keeps steady-state
+    // rendering free from frame-by-frame heap growth.
     commands_.reserve(1200);
-    points_.reserve(5000);
+    points_.reserve(7500);
 }
 
 void DrawList::reset() noexcept {

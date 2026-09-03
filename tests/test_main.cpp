@@ -2,8 +2,10 @@
 #include "builtin/campfire_engine.h"
 #include "builtin/draw_list.h"
 #include "builtin/oscilloscope_engine.h"
+#include "builtin/spectrum3d_engine.h"
 #include "core/audio_ring.h"
 #include "core/channel_mapper.h"
+#include "core/i18n.h"
 #include "core/logger.h"
 #include "core/plugin_paths.h"
 #include "core/plugin_storage.h"
@@ -63,6 +65,7 @@ void testSettings(const std::filesystem::path& directory) {
     original.followDefaultDevice = false;
     original.fixedDeviceId = "device-{테스트}";
     original.selectedPluginId = "mvmeter2";
+    original.uiLanguage = "ko";
     original.windowX = -120;
     original.windowY = 44;
     original.windowWidth = 777;
@@ -82,6 +85,16 @@ void testSettings(const std::filesystem::path& directory) {
     original.campfireStarResponse = 80;
     original.campfireParticleAmount = 90;
     original.campfireParticleIntensity = 60;
+    original.spectrum3dPalette = 3;
+    original.spectrum3dRotation = 70;
+    original.spectrum3dTilt = 30;
+    original.spectrum3dDepth = 90;
+    original.spectrum3dHeight = 20;
+    original.joyDivisionPalette = 5;
+    original.joyDivisionRotation = 10;
+    original.joyDivisionTilt = 80;
+    original.joyDivisionDepth = 40;
+    original.joyDivisionHeight = 100;
     std::string error;
     const auto path = directory / L"settings.json";
     CHECK(vizrack::saveSettings(path, original, error));
@@ -89,6 +102,7 @@ void testSettings(const std::filesystem::path& directory) {
     CHECK(loaded.loaded);
     CHECK(loaded.value.fixedDeviceId == original.fixedDeviceId);
     CHECK(loaded.value.selectedPluginId == original.selectedPluginId);
+    CHECK(loaded.value.uiLanguage == "ko");
     CHECK(loaded.value.windowX == original.windowX);
     CHECK(loaded.value.windowWidth == original.windowWidth);
     CHECK(loaded.value.alwaysOnTop);
@@ -106,6 +120,16 @@ void testSettings(const std::filesystem::path& directory) {
     CHECK(loaded.value.campfireStarResponse == 80);
     CHECK(loaded.value.campfireParticleAmount == 90);
     CHECK(loaded.value.campfireParticleIntensity == 60);
+    CHECK(loaded.value.spectrum3dPalette == 3);
+    CHECK(loaded.value.spectrum3dRotation == 70);
+    CHECK(loaded.value.spectrum3dTilt == 30);
+    CHECK(loaded.value.spectrum3dDepth == 90);
+    CHECK(loaded.value.spectrum3dHeight == 20);
+    CHECK(loaded.value.joyDivisionPalette == 5);
+    CHECK(loaded.value.joyDivisionRotation == 10);
+    CHECK(loaded.value.joyDivisionTilt == 80);
+    CHECK(loaded.value.joyDivisionDepth == 40);
+    CHECK(loaded.value.joyDivisionHeight == 100);
     {
         std::ifstream input(path, std::ios::binary);
         const std::string json((std::istreambuf_iterator<char>(input)), {});
@@ -127,6 +151,15 @@ void testSettings(const std::filesystem::path& directory) {
     const auto unsupportedResult = vizrack::loadSettings(unsupported);
     CHECK(!unsupportedResult.loaded);
     CHECK(!unsupportedResult.warning.empty());
+
+    const auto badLanguage = directory / L"bad-language.json";
+    {
+        std::ofstream output(badLanguage, std::ios::binary);
+        output << "{\"schemaVersion\":1,\"uiLanguage\":\"xx\"}";
+    }
+    const auto badLanguageResult = vizrack::loadSettings(badLanguage);
+    CHECK(badLanguageResult.loaded);
+    CHECK(badLanguageResult.value.uiLanguage == "auto");
 }
 
 void testPluginCatalogAndStorage(const std::filesystem::path& directory) {
@@ -143,7 +176,7 @@ void testPluginCatalogAndStorage(const std::filesystem::path& directory) {
     CHECK(catalog.front().id == "builtin-oscilloscope");
     if (builtIn) {
         CHECK(builtIn->kind == vizrack::PluginKind::builtIn);
-        CHECK(builtIn->displayName == "내장 오실로스코프");
+        CHECK(builtIn->displayName == "Built-in Oscilloscope");
         CHECK(builtIn->installUrl.empty());
         CHECK(builtIn->searchLocations.empty());
     }
@@ -151,7 +184,7 @@ void testPluginCatalogAndStorage(const std::filesystem::path& directory) {
     CHECK(art != nullptr);
     if (art) {
         CHECK(art->kind == vizrack::PluginKind::builtIn);
-        CHECK(art->displayName == "내장 아트 비주얼라이저");
+        CHECK(art->displayName == "Built-in Art Visualizer");
         CHECK(art->installUrl.empty());
         CHECK(art->searchLocations.empty());
     }
@@ -159,11 +192,32 @@ void testPluginCatalogAndStorage(const std::filesystem::path& directory) {
     CHECK(campfire != nullptr);
     if (campfire) {
         CHECK(campfire->kind == vizrack::PluginKind::builtIn);
-        CHECK(campfire->displayName == "내장 캠프파이어");
+        CHECK(campfire->displayName == "Built-in Campfire");
         CHECK(campfire->editionLabel == "Natural Flame / Audio Reactive");
         CHECK(campfire->installUrl.empty());
         CHECK(campfire->searchLocations.empty());
     }
+    const auto* spectrum3d = vizrack::findPluginDefinition("builtin-spectrum3d");
+    CHECK(spectrum3d != nullptr);
+    if (spectrum3d) {
+        CHECK(spectrum3d->kind == vizrack::PluginKind::builtIn);
+        CHECK(spectrum3d->displayName == "Built-in 3D Spectrum");
+        CHECK(spectrum3d->installUrl.empty());
+        CHECK(spectrum3d->searchLocations.empty());
+    }
+    const auto* joyDivision = vizrack::findPluginDefinition("builtin-joydivision");
+    CHECK(joyDivision != nullptr);
+    if (joyDivision) {
+        CHECK(joyDivision->kind == vizrack::PluginKind::builtIn);
+        CHECK(joyDivision->displayName == "Built-in Joy Division");
+        CHECK(joyDivision->inspiration == "Inspired by Joy Division");
+        CHECK(joyDivision->installUrl.empty());
+        CHECK(joyDivision->searchLocations.empty());
+    }
+    for (const auto& item : catalog) {
+        if (item.id != "builtin-joydivision") CHECK(item.inspiration.empty());
+    }
+
     const auto* definition = vizrack::findPluginDefinition("mvmeter2");
     CHECK(definition != nullptr);
     if (!definition) return;
@@ -580,6 +634,105 @@ void testCampfireCore() {
     CHECK(drawList.commands().empty());
 }
 
+void testSpectrum3dCore() {
+    using vizrack::Spectrum3dOptions;
+    using vizrack::builtin::DrawList;
+    using vizrack::builtin::DrawPrimitive;
+    using vizrack::builtin::Spectrum3dEngine;
+
+    Spectrum3dEngine engine;
+    engine.setOptions({-3, 99});
+    CHECK(engine.options().style == 0);
+    CHECK(engine.options().palette == Spectrum3dEngine::kPaletteCount - 1);
+    engine.setOptions({0, 0, -20, 250, -1, 300});
+    CHECK(engine.options().rotation == 0);
+    CHECK(engine.options().tilt == 100);
+    CHECK(engine.options().depth == 0);
+    CHECK(engine.options().heightScale == 100);
+    engine.setOptions({});
+    engine.setSampleRate(96000);
+    engine.setSampleRate(1);  // out of range, ignored
+
+    auto left = engine.inputLeft();
+    auto right = engine.inputRight();
+    for (size_t index = 0; index < left.size(); ++index) {
+        const float phase = static_cast<float>(index) * 0.05f;
+        left[index] = std::sin(phase) * 0.30f + std::sin(phase * 6.0f) * 0.15f;
+        right[index] = std::sin(phase * 1.03f) * 0.27f;
+    }
+    left[4] = std::numeric_limits<float>::quiet_NaN();
+    right[8] = std::numeric_limits<float>::infinity();
+
+    for (int frame = 0; frame < 200; ++frame) {
+        engine.update(Spectrum3dEngine::kMaxSamples + 32, 1.0f / 60.0f);
+    }
+    CHECK(engine.frameInfo().fill > 0.99f);
+
+    DrawList drawList;
+    for (int style = 0; style < Spectrum3dEngine::kStyleCount; ++style) {
+        CHECK(!Spectrum3dEngine::styleName(style).empty());
+        for (int palette = 0; palette < Spectrum3dEngine::kPaletteCount; ++palette) {
+            CHECK(!Spectrum3dEngine::palette(palette).name.empty());
+            engine.setOptions({style, palette});
+            engine.buildFrame(1920.0f, 1080.0f, drawList);
+            CHECK(!drawList.commands().empty());
+            CHECK(drawList.commands().front().primitive == DrawPrimitive::verticalGradient);
+            CHECK(drawList.commands().size() <= 400);
+            CHECK(drawList.points().size() <= Spectrum3dEngine::kMaxRenderedPoints);
+            checkDrawList(drawList);
+            const auto info = engine.frameInfo();
+            CHECK(info.style == style);
+            CHECK(info.palette == palette);
+            CHECK(std::isfinite(info.lowLevel) && info.lowLevel >= 0.0f && info.lowLevel <= 1.0f);
+            CHECK(std::isfinite(info.highLevel) && info.highLevel >= 0.0f &&
+                  info.highLevel <= 1.0f);
+            CHECK(info.styleName == Spectrum3dEngine::styleName(style));
+        }
+    }
+
+    engine.setOptions({1, 0});
+    engine.buildFrame(1600.0f, 900.0f, drawList);
+    size_t polylines = 0;
+    size_t fills = 0;
+    for (const auto& command : drawList.commands()) {
+        polylines += command.primitive == DrawPrimitive::polyline ? 1u : 0u;
+        fills += command.primitive == DrawPrimitive::fillPolygon ? 1u : 0u;
+    }
+    CHECK(polylines >= 10);
+    CHECK(fills >= 10);
+
+    const size_t commandCapacity = drawList.commandCapacity();
+    const size_t pointCapacity = drawList.pointCapacity();
+    for (int frame = 0; frame < 240; ++frame) {
+        engine.setOptions({frame % 2, frame % Spectrum3dEngine::kPaletteCount});
+        engine.update(frame % 3 == 0 ? size_t{0} : size_t{256},
+                      frame % 2 == 0 ? 1.0f / 15.0f : 1.0f / 60.0f);
+        engine.buildFrame(frame % 2 == 0 ? 640.0f : 2560.0f,
+                          frame % 2 == 0 ? 480.0f : 1440.0f, drawList);
+        CHECK(drawList.commandCapacity() == commandCapacity);
+        CHECK(drawList.pointCapacity() == pointCapacity);
+        CHECK(drawList.commands().size() <= 400);
+        CHECK(drawList.points().size() <= Spectrum3dEngine::kMaxRenderedPoints);
+        checkDrawList(drawList);
+    }
+
+    Spectrum3dEngine slow;
+    Spectrum3dEngine fast;
+    for (int frame = 0; frame < 30; ++frame) slow.update(0, 1.0f / 15.0f);
+    for (int frame = 0; frame < 120; ++frame) fast.update(0, 1.0f / 60.0f);
+    CHECK(std::abs(slow.frameInfo().fill - fast.frameInfo().fill) < 0.05f);
+
+    engine.reset();
+    CHECK(engine.frameInfo().fill == 0.0f);
+    engine.buildFrame(800.0f, 600.0f, drawList);
+    CHECK(drawList.commands().size() == 1);
+    engine.buildFrame(0.0f, 600.0f, drawList);
+    CHECK(drawList.commands().empty());
+    engine.update(0, std::numeric_limits<float>::quiet_NaN());
+    engine.buildFrame(std::numeric_limits<float>::infinity(), 600.0f, drawList);
+    CHECK(drawList.commands().empty());
+}
+
 void testOscilloscopeCore() {
     using vizrack::builtin::DrawList;
     using vizrack::builtin::OscilloscopeEngine;
@@ -670,6 +823,40 @@ void testPluginState(const std::filesystem::path& directory) {
     CHECK(vizrack::loadPluginStateFile(path, decoded, error));
 }
 
+void testI18n() {
+    using vizrack::Str;
+    using vizrack::UiLanguage;
+
+    const int count = static_cast<int>(Str::count_);
+    CHECK(count > 0);
+
+    // Every string must be present and non-empty in every language, and must
+    // survive the UTF-8 -> UTF-16 conversion used for Win32. This is the guard
+    // that a newly added Str row was translated in both columns.
+    for (int index = 0; index < count; ++index) {
+        const auto id = static_cast<Str>(index);
+        vizrack::setUiLanguage(UiLanguage::english);
+        const char* english = vizrack::tr(id);
+        const std::wstring englishWide = vizrack::trw(id);
+        vizrack::setUiLanguage(UiLanguage::korean);
+        const char* korean = vizrack::tr(id);
+        const std::wstring koreanWide = vizrack::trw(id);
+        CHECK(english != nullptr && english[0] != '\0');
+        CHECK(korean != nullptr && korean[0] != '\0');
+        CHECK(!englishWide.empty());
+        CHECK(!koreanWide.empty());
+    }
+
+    CHECK(vizrack::resolveUiLanguage("en") == UiLanguage::english);
+    CHECK(vizrack::resolveUiLanguage("ko") == UiLanguage::korean);
+    static_cast<void>(vizrack::resolveUiLanguage("auto"));  // must not crash
+    CHECK(vizrack::uiLanguageToken(UiLanguage::english) == "en");
+    CHECK(vizrack::uiLanguageToken(UiLanguage::korean) == "ko");
+
+    vizrack::setUiLanguage(UiLanguage::english);
+    CHECK(vizrack::currentUiLanguage() == UiLanguage::english);
+}
+
 void testLoggerRotation(const std::filesystem::path& directory) {
     const auto logs = directory / L"logs";
     vizrack::Logger logger;
@@ -693,9 +880,11 @@ int main() {
     testRing();
     testArtVisualizerCore();
     testCampfireCore();
+    testSpectrum3dCore();
     testOscilloscopeCore();
     testReconnect();
     testPluginState(directory);
+    testI18n();
     testLoggerRotation(directory);
     std::error_code error;
     std::filesystem::remove_all(directory, error);

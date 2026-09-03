@@ -29,6 +29,7 @@ The application intentionally has no generic VST scanner.
 | `GdiDrawListRenderer` / `GdiBackBuffer` | GDI+ command translation and size-stable back buffering |
 | `VstHost` | VST3 factory, processing, state and editor lifetime |
 | `plugin_catalog` | Stable IDs, matching rules, search locations, labels and official URLs |
+| `core/i18n` | UI string catalog (English/Korean) and language resolution |
 | `plugin_discovery` | Definition-scoped enumeration and compatibility validation |
 | `plugin_storage` | Per-ID location and state paths |
 | `atomic_file` | Shared write-through replacement for persistent files |
@@ -75,6 +76,33 @@ to JavaScript. The web product and adapter are not implemented yet. Detailed own
 performance constraints and change rules are in
 [`BUILTIN_VISUALIZER_CORE.md`](BUILTIN_VISUALIZER_CORE.md).
 
+## Localization
+
+The UI ships in English (the neutral default) and Korean. `App::initialize`
+resolves `Settings::uiLanguage` (`auto` / `en` / `ko`) through
+`resolveUiLanguage()` — `auto` reads the first OS preferred UI language and falls
+back to English — and calls `setUiLanguage()` before the window is built.
+Settings ▸ Language switches it live and rebuilds the menu bar.
+
+Every user-facing string in `src/ui`, `src/app.cpp` and `src/main.cpp` comes from
+`core/i18n`: `tr(Str)` for UTF-8, `trw(Str)` for the wide strings Win32 needs.
+The catalog is the X-macro list in `core/i18n_strings.inc` — one
+`VIZRACK_STR(Id, "English", "한국어")` row per string, expanded into the `Str`
+enum and both language tables, so a row that is missing a language fails to
+compile. A `test_main.cpp` case additionally checks every `Str` is non-empty in
+both languages. **Rules:**
+
+- No raw `L"..."` user-facing literal in a menu, dialog, overlay or window
+  title — add a `Str` row and use `trw()`.
+- Format placeholders are `std::format` style (`{}`); compose with
+  `std::vformat` so translations can reorder arguments.
+- Scene and palette names, stylized overlay captions
+  (`RIGHT CLICK: OPTIONS`) and the `inspiration` credit strings stay English-only
+  by design.
+- Diagnostics — logger output, `error` / status strings returned from
+  `src/core`, `src/platform` and `src/vst` — are English only. The UI localizes
+  the MessageBox **title** for those and shows the English detail beneath it.
+
 ## Audio capture and recovery
 
 `IAudioClient` uses shared loopback, event callbacks and `NOPERSIST`. Endpoint
@@ -92,9 +120,15 @@ a plug-in is switched or audio is reconnecting.
 `PluginDefinition` is the only plug-in-specific configuration surface. Its kind
 selects the built-in or VST3 activation path, and it contains a filesystem-safe
 immutable ID, display/vendor/class metadata,
-optional binary marker, dedicated search files/directories, edition label and
-official URL. Discovery checks only the selected definition's saved location
-and search locations, then validates AMD64 PE, marker and VST3 factory data.
+optional binary marker, dedicated search files/directories, edition label,
+official URL and an optional `inspiration` string. Discovery checks only the
+selected definition's saved location and search locations, then validates AMD64
+PE, marker and VST3 factory data.
+
+A non-empty `inspiration` ("Inspired by …") marks a homage built-in. It is shown
+after the plug-in status line on activation and listed under Help ▸ Credits, which
+also carries the note that those names stay with their owners and outside
+VizRack's MIT License. `builtin-joydivision` is currently the only such entry.
 
 The first catalog entry remains `builtin-oscilloscope`, so a fresh portable data
 folder always starts without an external dependency. `builtin-art-visualizer`
@@ -110,7 +144,23 @@ ground plane; a compact single-layer stone ring and solid log silhouettes anchor
 fire directly in the dark background.
 Right-click options control flame response, star speed/brightness/response and ember
 amount/intensity on a normalized 0–100 scale; those values are additive fields in the
-portable settings schema. The `mvmeter2` definition uses
+portable settings schema.
+
+`builtin-spectrum3d` and `builtin-joydivision` share one `Spectrum3dEngine`: a
+hand-written 1024-point radix-2 FFT feeds 40 log-spaced bands whose newest spectrum is
+pushed to the front of a fixed 72-slice history buffer while older slices recede. The
+slice cadence is driven by measured frame time so 15/30/60 FPS scroll alike.
+`builtin-spectrum3d` renders a quarter-view perspective **surface** — filled strips
+between consecutive time slices plus rib outlines (`CLASSIC CASCADE`).
+`builtin-joydivision` stacks hidden-line ridge curves at full strength (no depth fade)
+inside a centred plot box, with the outer band edges held flat on the baseline, a
+crest-to-trough contrast curve and a deterministic per-slice pen tremble (`JOY
+DIVISION`). Style is fixed per catalog entry. Each style reads the same right-click
+knobs — `rotation`, `tilt`, `depth`, `heightScale` (normalized 0–100, `50` is the
+reference look) and the six-palette choice — through its own response curve; each is an
+additive `spectrum3d*` / `joyDivision*` field in the settings schema.
+
+The `mvmeter2` definition uses
 TBProAudio/mvMeter2 factory metadata and accepts both the GPU and noGPU x64 modules.
 Renderer-specific binary markers are intentionally not required because both editions
 expose compatible factory metadata.

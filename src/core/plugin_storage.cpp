@@ -28,7 +28,7 @@ std::string loadPluginLocation(const std::filesystem::path& path, std::string& w
     if (!input) return {};
     std::string value((std::istreambuf_iterator<char>(input)), {});
     if ((!input.good() && !input.eof()) || value.size() > 32768) {
-        warning = "플러그인 위치 파일을 읽지 못했습니다: " + toUtf8(path.wstring());
+        warning = "Could not read the plug-in location file: " + toUtf8(path.wstring());
         return {};
     }
     while (!value.empty() && (value.back() == '\r' || value.back() == '\n')) value.pop_back();
@@ -41,7 +41,7 @@ bool savePluginLocation(const std::filesystem::path& path,
     const auto bytes = std::as_bytes(std::span(value.data(), value.size()));
     return writeFileAtomically(
         path, {reinterpret_cast<const uint8_t*>(bytes.data()), bytes.size()},
-        "플러그인 위치 파일", error);
+        "plug-in location file", error);
 }
 
 } // namespace vizrack
