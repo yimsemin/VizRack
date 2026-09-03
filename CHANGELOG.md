@@ -11,24 +11,25 @@ ZIP attached. How these notes are written and cut: `docs/RELEASE_NOTES_STYLE.md`
 
 ## [Unreleased]
 
-_Homage visualizers that name who inspired them, and a rack of 3D spectrum cascades._
+## [0.3.0] - 2026-09-03
+
+_A bilingual interface, a rack of 3D spectrum cascades, and visualizers that name what inspired them._
 
 ### Added
 
-- **Homage credits.** Built-in visualizers that take after a designer, artist or
-  era now show an "Inspired by …" line when they start, and are collected on a
-  new Help ▸ Credits screen and in the README. The names and works stay with
-  their owners, outside VizRack's MIT license.
+- **English and Korean interface.** Every menu, dialog, overlay and the window
+  title is now translated. Settings ▸ Language switches between Automatic,
+  English and 한국어 without a restart; Automatic follows the Windows display
+  language and falls back to English. The choice is remembered between runs.
 - **3D spectrum cascade.** Two new built-ins render the spectrum over time as a
   surface that recedes into the distance: _Classic Cascade_, a shaded
   Winamp-style spectrogram, and _Joy Division_ (Inspired by Joy Division), the
   same history drawn as sharp white ridges on black. Both use a quarter-view
   projection with edge-pinned motion and expose tuning knobs in the settings menu.
-
-### Changed
-
-- The classic cascade draws as a shaded surface rather than stacked lines, and
-  the Joy Division ridges are sharper and no longer fade with depth.
+- **Homage credits.** Built-in visualizers that take after a designer, artist or
+  era now show an "Inspired by …" line when they start, and are collected on a
+  new Help ▸ Credits screen and in the README. The names and works stay with
+  their owners, outside VizRack's MIT license.
 
 ### Fixed
 
@@ -61,6 +62,7 @@ _First public release._
   (Windows x64 VST3) as the picture instead of a built-in. Their audio output is
   discarded; VizRack only ever monitors.
 
-[Unreleased]: https://github.com/yimsemin/VizRack/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/yimsemin/VizRack/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/yimsemin/VizRack/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/yimsemin/VizRack/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/yimsemin/VizRack/releases/tag/v0.1.0
