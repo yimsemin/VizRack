@@ -74,8 +74,13 @@ library and Win32 already cover. Settings are hand-written JSON in
 Commit at each meaningful step, once `cmake --build` + `ctest` + `--smoke-test`
 pass. One logical change per commit; never fold in unrelated changes or `out/`
 artifacts. Conventional Commit subjects — imperative, English, ≤ ~72 chars:
-`feat` / `fix` / `perf` (user-facing, become the changelog) and `refactor` /
-`docs` / `test` / `build` / `chore` (internal).
+`feat` / `fix` / `perf` (user-facing) and `refactor` / `docs` / `test` /
+`build` / `chore` (internal).
+
+If a commit changes what a user sees, that same commit updates the
+`## [Unreleased]` section of `CHANGELOG.md` — the changelog is curated by hand,
+not generated from commit subjects. Wording rules and the release flow:
+`docs/RELEASE_NOTES_STYLE.md`.
 
 Do **not** add AI-attribution trailers to commit messages or PR descriptions —
 no `Co-Authored-By: Claude`, no "Generated with Claude Code" line, no equivalent.

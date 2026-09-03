@@ -52,6 +52,12 @@ if (Test-Path -LiteralPath $zipPath) {
 }
 Compress-Archive -Path (Join-Path $destination '*') -DestinationPath $zipPath -CompressionLevel Optimal
 
+$hash = (Get-FileHash -LiteralPath $zipPath -Algorithm SHA256).Hash.ToLower()
+$shaPath = "$zipPath.sha256"
+[IO.File]::WriteAllText($shaPath, "$hash  VizRack-win-x64.zip`n", [Text.UTF8Encoding]::new($false))
+
 Write-Host "Portable folder: $destination"
 Write-Host "Portable ZIP:    $zipPath"
+Write-Host "SHA-256:         $hash"
+Write-Host "SHA-256 file:    $shaPath"
 Write-Host 'No third-party plug-in binary or runtime data was included.'
