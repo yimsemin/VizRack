@@ -84,9 +84,28 @@ library and Win32 already cover. Settings are hand-written JSON in
 ## Branching and commits
 
 - `main` — released code only, tagged `vX.Y.Z`; never commit directly.
-- `develop` — the default working branch; long-lived, **pushed to `origin` after
-  every step**.
-- `topic/<slug>` — optional short-lived branch off `develop` for risky work.
+- `develop` — the integration branch; long-lived, pushed to `origin` after every
+  merge. No feature work directly on `develop` — only `--no-ff` merges and
+  release-prep commits land here (see `docs/RELEASE_PROCESS.md`).
+- `<type>/<slug>` — one branch per unit of work, cut from an up-to-date
+  `develop`. `<type>` is the Conventional Commit type the branch's main commit
+  carries (`feat`, `fix`, `perf`, `refactor`, `docs`, …); `<slug>` is 2–4
+  kebab-case words (`feat/joydivision-color-knob`). Short-lived; deleted once
+  merged.
+
+Parallel branches each get their own git worktree so builds and `out/` never
+collide (`git worktree add ../vizrack-wt/<slug> -b <type>/<slug> develop`); remove
+it once the branch merges. A branch never merges another branch — it stays a clean
+delta against `develop`, rebased onto `origin/develop` whenever `develop` moves.
+If two in-flight branches both need the same contract file (`src/builtin/` public
+headers, `draw_list.*`, catalog registration, `src/core/i18n_strings.inc`), land
+one and rebase the other — sequence them, don't parallelize the conflict.
+
+Merging a finished branch: `git fetch`, rebase onto `origin/develop`, resolve
+conflicts (a `CHANGELOG.md` `## [Unreleased]` clash is expected — keep every
+side's bullets), re-run `cmake --build` + `ctest` + `--smoke-test` on the rebased
+tip, then `git merge --no-ff` into `develop`, push, and delete the branch and its
+worktree. Full procedure: `docs/RELEASE_PROCESS.md`.
 
 Commit at each meaningful step, once `cmake --build` + `ctest` + `--smoke-test`
 pass. One logical change per commit; never fold in unrelated changes or `out/`
