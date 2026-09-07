@@ -1,6 +1,7 @@
-<!-- The Introduction and "What you can watch" sections are mirrored in
-     README.ko.md. When you change them here, update README.ko.md in the same
-     commit. Everything else is English-only on purpose. -->
+<!-- README.ko.md mirrors the user-facing core of this file: the Introduction,
+     "What you can watch", "Getting started", "Common controls", and "Portable
+     storage and audio handling". When you change one of those sections here,
+     update README.ko.md in the same commit. Everything else is English-only. -->
 
 # VizRack
 

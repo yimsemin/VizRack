@@ -7,17 +7,17 @@ takes minutes — not an archaeology session — to cut. One source of truth
 ## The one source of truth
 
 `CHANGELOG.md` at the repo root, [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
-format. Everything user-facing is recorded there under `## [Unreleased]` **in the
-same commit that makes the change** — not at release time. If a commit changes
-what a user sees, it also edits `CHANGELOG.md`; if it doesn't, it doesn't.
+format. User-facing changes are recorded there under `## [Unreleased]` in the
+commit that makes them (see `docs/RELEASE_PROCESS.md` ▸ Commits). This document is
+only about *how those entries read*.
 
-At release time the script promotes `[Unreleased]` to `[X.Y.Z] - YYYY-MM-DD`,
-opens a fresh empty `[Unreleased]`, and writes `docs/release-notes/X_Y_Z.md`
-(that version's section plus a fixed three-line footer: download line, one line
-with the OS floor / signing note / SHA-256, and the full-changelog link). That
-file is the exact body of the GitHub Release. It has **no top-level heading** —
-GitHub renders "VizRack vX.Y.Z" as the release title already, so the body starts
-with the italic lead line.
+At release time `scripts/generate-release-notes.ps1` promotes `[Unreleased]` to
+`[X.Y.Z] - YYYY-MM-DD`, opens a fresh empty `[Unreleased]`, and writes
+`docs/release-notes/X_Y_Z.md` (that version's section plus a fixed three-line
+footer: download line, one line with the OS floor / signing note / SHA-256, and
+the full-changelog link). That file is the exact body of the GitHub Release. It
+has **no top-level heading** — GitHub renders "VizRack vX.Y.Z" as the release
+title already, so the body starts with the italic lead line.
 
 There is no "Requires" section: system requirements do not change release to
 release and belong in the README. The footer keeps only what a release page
@@ -108,16 +108,8 @@ Not marketing.
 - `setOptions` normalizes any now-invalid persisted value, so a settings change
   never needs a migration note — just describe the new behaviour.
 
-## Cutting a release (summary)
+## Cutting a release
 
-Full runbook: `docs/RELEASE_PROCESS.md`. In short, after the user approves a
-version:
-
-1. Make sure `[Unreleased]` in `CHANGELOG.md` reads the way the release should.
-   Add the italic lead line if it's missing.
-2. Bump `project(VizRack VERSION …)` in `CMakeLists.txt`.
-3. `scripts\package.ps1` — builds the ZIP and writes `VizRack-win-x64.zip.sha256`.
-4. `scripts\generate-release-notes.ps1` — promotes the changelog section, writes
-   `docs/release-notes/X_Y_Z.md` with the SHA-256 and compare link filled in.
-   Read it once; fix any wording the script couldn't.
-5. Commit (`docs: release vX.Y.Z`), merge to `main`, tag, `gh release create`.
+The runbook is in `docs/RELEASE_PROCESS.md` ▸ Cutting a release. This document
+stops at making sure `[Unreleased]` reads the way the release should — italic lead
+line present, every entry in the right section, worded as above.
