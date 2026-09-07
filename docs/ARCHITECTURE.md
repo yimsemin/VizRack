@@ -63,45 +63,32 @@ their decay behavior; the built-in view needs no additional worker thread.
 
 ## Built-in portability boundary
 
-`src/builtin` is a standard C++20 target with no Windows, graphics-API, VST3, I/O or
-application-lifetime dependency. It owns the behavior that must remain identical in a
-future browser build: sample analysis, histories, animation, scenes, palettes, option
-normalization and geometry. The Win32 views only feed samples and render the resulting
-`DrawList`; scene formulas must not be duplicated in an adapter.
-
-The top-level build declares `vizrack_builtin_core` before native dependencies and can
-configure that target alone on non-Windows platforms. A future web build should compile
-this target to WebAssembly and add a Canvas renderer rather than porting the scene code
-to JavaScript. The web product and adapter are not implemented yet. Detailed ownership,
-performance constraints and change rules are in
-[`BUILTIN_VISUALIZER_CORE.md`](BUILTIN_VISUALIZER_CORE.md).
+`src/builtin` is a standard C++20 target with no Windows, graphics-API, VST3, I/O
+or application-lifetime dependency. It owns the behaviour a future browser build
+must keep identical — analysis, histories, animation, scenes, palettes, option
+normalization, geometry — and the Win32 views only feed it samples and render the
+resulting `DrawList`. Ownership table, performance constraints and the
+change procedure: [`BUILTIN_VISUALIZER_CORE.md`](BUILTIN_VISUALIZER_CORE.md).
 
 ## Localization
 
 The UI ships in English (the neutral default) and Korean. `App::initialize`
-resolves `Settings::uiLanguage` (`auto` / `en` / `ko`) through
-`resolveUiLanguage()` — `auto` reads the first OS preferred UI language and falls
-back to English — and calls `setUiLanguage()` before the window is built.
-Settings ▸ Language switches it live and rebuilds the menu bar.
+resolves `Settings::uiLanguage` (`auto` / `en` / `ko`) through `resolveUiLanguage()`
+— `auto` reads the first OS preferred UI language, falling back to English — and
+calls `setUiLanguage()` before the window is built. Settings ▸ Language switches
+it live and rebuilds the menu bar.
 
-Every user-facing string in `src/ui`, `src/app.cpp` and `src/main.cpp` comes from
-`core/i18n`: `tr(Str)` for UTF-8, `trw(Str)` for the wide strings Win32 needs.
-The catalog is the X-macro list in `core/i18n_strings.inc` — one
-`VIZRACK_STR(Id, "English", "한국어")` row per string, expanded into the `Str`
-enum and both language tables, so a row that is missing a language fails to
-compile. A `test_main.cpp` case additionally checks every `Str` is non-empty in
-both languages. **Rules:**
+Every user-facing string comes from `core/i18n`: `tr(Str)` for UTF-8, `trw(Str)`
+for the wide strings Win32 needs. The catalog is the X-macro list in
+`core/i18n_strings.inc` — one `VIZRACK_STR(Id, "English", "한국어")` row per string,
+expanded into the `Str` enum and both language tables, so a half-translated row
+fails to compile; a `test_main.cpp` case checks every `Str` is non-empty in both
+languages. Format placeholders are `std::format`-style (`{}`) composed with
+`std::vformat`, so a translation can reorder arguments. A diagnostic is
+English-only: the UI localizes just the MessageBox title and shows the English
+detail beneath it.
 
-- No raw `L"..."` user-facing literal in a menu, dialog, overlay or window
-  title — add a `Str` row and use `trw()`.
-- Format placeholders are `std::format` style (`{}`); compose with
-  `std::vformat` so translations can reorder arguments.
-- Scene and palette names, stylized overlay captions
-  (`RIGHT CLICK: OPTIONS`) and the `inspiration` credit strings stay English-only
-  by design.
-- Diagnostics — logger output, `error` / status strings returned from
-  `src/core`, `src/platform` and `src/vst` — are English only. The UI localizes
-  the MessageBox **title** for those and shows the English detail beneath it.
+The string rules to follow when adding UI text are in `CLAUDE.md` ▸ Localization.
 
 ## Audio capture and recovery
 

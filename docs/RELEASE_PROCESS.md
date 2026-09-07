@@ -60,8 +60,6 @@ Several branches can be in flight at once. Keep them independent:
   touch nothing there. See `docs/RELEASE_NOTES_STYLE.md` for how entries are
   worded.
 - Optional body explains the *why*, wrapped near 72 columns.
-- Do not add AI-attribution trailers (`Co-Authored-By: Claude …`, "Generated
-  with Claude Code", or similar). The `.githooks/commit-msg` hook strips them.
 
 ## Pushing
 
