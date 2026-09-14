@@ -11,6 +11,30 @@ ZIP attached. How these notes are written and cut: `docs/RELEASE_NOTES_STYLE.md`
 
 ## [Unreleased]
 
+### Added
+
+- **Star Guitar (prototype).** A new built-in visualizer, `Built-in Star Guitar`
+  (Inspired by The Chemical Brothers / Michel Gondry's "Star Guitar"): a
+  horizontally-scrolling, blocky pixel-art landscape of telephone poles,
+  trees, building silhouettes, a water tower, trackside signal markers and
+  a sparse sky of birds/planes/stars, in four parallax layers (far/mid/
+  near/sky) that scroll at different speeds and spawn scenery independently,
+  so several objects at different depths can be on screen at once. Audio is
+  split into four bands (low/mid/presence/air — see
+  `docs/STAR_GUITAR_FREQUENCY_BANDS.md`): a low-band kick onset ("쿵") spawns
+  a lingering water tower or building in the far layer and the mid layer's
+  pole/tree pulse; a presence-band onset ("짝", snare/clap-like) flashes a
+  bright signal marker; an air-band onset (hi-hat/cymbal-like) flashes a
+  marker in the near layer and is the only thing allowed to spawn sky
+  objects, kept rare by a long minimum spacing. Nothing spawns while the
+  signal is silent, including the mid layer's beat-phase fill-in. Right-click
+  exposes a **Rhythm detection** option: Reactive (spawns directly on
+  confirmed onsets, no tempo estimate) or Predictive (also estimates the
+  song's tempo from recent kick onsets and fills in the mid layer's pulse on
+  the predicted beat between hits; falls back to reactive until a lock is
+  acquired). This is an early prototype to evaluate feel and quality, not a
+  finished feature.
+
 ## [0.3.0] - 2026-09-03
 
 _A bilingual interface, a rack of 3D spectrum cascades, and visualizers that name what inspired them._

@@ -9,6 +9,7 @@
 #include "ui/campfire_view.h"
 #include "ui/oscilloscope_view.h"
 #include "ui/spectrum3d_view.h"
+#include "ui/star_guitar_view.h"
 #include "vst/vst_host.h"
 
 #include <atomic>
@@ -61,6 +62,7 @@ private:
     CampfireView campfire_;
     Spectrum3dView spectrum3d_;
     Spectrum3dView joyDivision_;
+    StarGuitarView starGuitar_;
     WasapiCapture capture_;
     std::unique_ptr<MainWindow> window_;
     std::atomic<uint32_t> sampleRate_{48000};

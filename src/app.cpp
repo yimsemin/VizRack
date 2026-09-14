@@ -99,7 +99,7 @@ std::string editionForStatus(const PluginDefinition& definition,
 App::App(HINSTANCE instance)
     : instance_(instance), vstHost_(audioRing_, logger_), oscilloscope_(audioRing_),
       artVisualizer_(audioRing_), campfire_(audioRing_), spectrum3d_(audioRing_, 0),
-      joyDivision_(audioRing_, 1), capture_(audioRing_, logger_) {}
+      joyDivision_(audioRing_, 1), starGuitar_(audioRing_), capture_(audioRing_, logger_) {}
 
 App::~App() { shutdown(); }
 
@@ -159,6 +159,14 @@ bool App::initialize(std::string& error) {
             settings_.campfireStarResponse = options.starResponse;
             settings_.campfireParticleAmount = options.particleAmount;
             settings_.campfireParticleIntensity = options.particleIntensity;
+            saveSettingsNow();
+        });
+    starGuitar_.configure(
+        {settings_.starGuitarAlgorithmMode == 1 ? StarGuitarAlgorithmMode::predictive
+                                                 : StarGuitarAlgorithmMode::reactive},
+        [this](const StarGuitarOptions& options) {
+            settings_.starGuitarAlgorithmMode =
+                options.algorithmMode == StarGuitarAlgorithmMode::predictive ? 1 : 0;
             saveSettingsNow();
         });
     spectrum3d_.configure(
@@ -227,6 +235,7 @@ bool App::initialize(std::string& error) {
         campfire_.resize(width, height);
         spectrum3d_.resize(width, height);
         joyDivision_.resize(width, height);
+        starGuitar_.resize(width, height);
     });
     window_->setEditorScaleHandler([this](float scale) { vstHost_.setEditorContentScale(scale); });
 
@@ -248,6 +257,7 @@ bool App::initialize(std::string& error) {
             campfire_.setSampleRate(sampleRate);
             spectrum3d_.setSampleRate(sampleRate);
             joyDivision_.setSampleRate(sampleRate);
+            starGuitar_.setSampleRate(sampleRate);
         },
         [this] { vstHost_.notifyDataReady(); });
     if (!captureStarted_) {
@@ -415,6 +425,8 @@ bool App::startBuiltInPlugin(const PluginDefinition& definition, std::string& er
         attached = spectrum3d_.attach(instance_, window_->pluginParent(), error);
     } else if (definition.id == "builtin-joydivision") {
         attached = joyDivision_.attach(instance_, window_->pluginParent(), error);
+    } else if (definition.id == "builtin-starguitar") {
+        attached = starGuitar_.attach(instance_, window_->pluginParent(), error);
     } else {
         error = "Unsupported built-in visualizer: " + definition.id;
     }
@@ -425,6 +437,7 @@ bool App::startBuiltInPlugin(const PluginDefinition& definition, std::string& er
     campfire_.setSampleRate(sampleRate);
     spectrum3d_.setSampleRate(sampleRate);
     joyDivision_.setSampleRate(sampleRate);
+    starGuitar_.setSampleRate(sampleRate);
     activeBuiltInPluginId_ = definition.id;
     std::string status = definition.displayName;
     if (!definition.inspiration.empty()) status += "  —  " + definition.inspiration;
@@ -559,7 +572,7 @@ void App::logEnvironment() {
 
 bool App::builtInViewActive() const noexcept {
     return oscilloscope_.active() || artVisualizer_.active() || campfire_.active() ||
-           spectrum3d_.active() || joyDivision_.active();
+           spectrum3d_.active() || joyDivision_.active() || starGuitar_.active();
 }
 
 const PluginDefinition* App::activeBuiltInDefinition() const {
@@ -572,6 +585,7 @@ void App::detachBuiltInViews() {
     campfire_.detach();
     spectrum3d_.detach();
     joyDivision_.detach();
+    starGuitar_.detach();
     activeBuiltInPluginId_.clear();
 }
 

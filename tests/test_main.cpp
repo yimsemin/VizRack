@@ -3,6 +3,7 @@
 #include "builtin/draw_list.h"
 #include "builtin/oscilloscope_engine.h"
 #include "builtin/spectrum3d_engine.h"
+#include "builtin/star_guitar_engine.h"
 #include "core/audio_ring.h"
 #include "core/channel_mapper.h"
 #include "core/i18n.h"
@@ -214,8 +215,20 @@ void testPluginCatalogAndStorage(const std::filesystem::path& directory) {
         CHECK(joyDivision->installUrl.empty());
         CHECK(joyDivision->searchLocations.empty());
     }
+    const auto* starGuitar = vizrack::findPluginDefinition("builtin-starguitar");
+    CHECK(starGuitar != nullptr);
+    if (starGuitar) {
+        CHECK(starGuitar->kind == vizrack::PluginKind::builtIn);
+        CHECK(starGuitar->displayName == "Built-in Star Guitar");
+        CHECK(starGuitar->inspiration ==
+              "Inspired by The Chemical Brothers / Michel Gondry's \"Star Guitar\"");
+        CHECK(starGuitar->installUrl.empty());
+        CHECK(starGuitar->searchLocations.empty());
+    }
     for (const auto& item : catalog) {
-        if (item.id != "builtin-joydivision") CHECK(item.inspiration.empty());
+        if (item.id != "builtin-joydivision" && item.id != "builtin-starguitar") {
+            CHECK(item.inspiration.empty());
+        }
     }
 
     const auto* definition = vizrack::findPluginDefinition("mvmeter2");
@@ -631,6 +644,115 @@ void testCampfireCore() {
     CHECK(drawList.commands().empty());
 }
 
+void testStarGuitarCore() {
+    using vizrack::StarGuitarOptions;
+    using vizrack::builtin::DrawList;
+    using vizrack::builtin::DrawPrimitive;
+    using vizrack::builtin::StarGuitarEngine;
+
+    StarGuitarEngine engine;
+    engine.setOptions(StarGuitarOptions{});
+    CHECK(engine.options().algorithmMode == vizrack::StarGuitarAlgorithmMode::reactive);
+    engine.setOptions({vizrack::StarGuitarAlgorithmMode::predictive});
+    CHECK(engine.options().algorithmMode == vizrack::StarGuitarAlgorithmMode::predictive);
+    // An invalid enum value (e.g. corrupted settings) must normalize back to
+    // the default rather than being stored or interpreted.
+    engine.setOptions({static_cast<vizrack::StarGuitarAlgorithmMode>(99)});
+    CHECK(engine.options().algorithmMode == vizrack::StarGuitarAlgorithmMode::reactive);
+    engine.setSampleRate(96000);
+    engine.setSampleRate(1);  // out of range, ignored
+
+    auto left = engine.inputLeft();
+    auto right = engine.inputRight();
+    for (size_t index = 0; index < left.size(); ++index) {
+        const float phase = static_cast<float>(index) * 0.019f;
+        left[index] = std::sin(phase) * 0.4f;
+        right[index] = std::cos(phase * 0.87f) * 0.35f;
+    }
+    left[9] = std::numeric_limits<float>::quiet_NaN();
+    right[23] = std::numeric_limits<float>::infinity();
+    engine.update(StarGuitarEngine::kMaxSamples + 32, 1.0f / 60.0f);
+
+    DrawList drawList;
+    engine.buildFrame(1920.0f, 1080.0f, drawList);
+    CHECK(!drawList.commands().empty());
+    CHECK(drawList.commands().front().primitive == DrawPrimitive::verticalGradient);
+    bool hasGroundRectangle = false;
+    bool hasSilhouetteBlock = false;
+    for (const auto& command : drawList.commands()) {
+        hasGroundRectangle =
+            hasGroundRectangle || command.primitive == DrawPrimitive::fillRectangle;
+        hasSilhouetteBlock =
+            hasSilhouetteBlock || command.primitive == DrawPrimitive::fillRectangle ||
+            command.primitive == DrawPrimitive::fillPolygon;
+    }
+    CHECK(hasGroundRectangle);
+    CHECK(hasSilhouetteBlock);
+    checkDrawList(drawList);
+
+    // Multiple parallax layers must be able to hold active objects at once
+    // (not one shared fixed-interval grid): drive a few more loud frames so
+    // the far (low-onset), mid (sustained-mid) and near (high-onset) layers
+    // all get a chance to spawn, then confirm more than one silhouette
+    // primitive is on screen simultaneously across varied depths (unit
+    // sizes differ per layer, so distinct rectangle widths are a proxy for
+    // "more than one layer populated").
+    for (int warmup = 0; warmup < 6; ++warmup) {
+        engine.update(left.size(), 1.0f / 60.0f);
+    }
+    DrawList multiLayer;
+    engine.buildFrame(1920.0f, 1080.0f, multiLayer);
+    checkDrawList(multiLayer);
+    size_t silhouetteCount = 0;
+    for (const auto& command : multiLayer.commands()) {
+        if (command.primitive == DrawPrimitive::fillRectangle ||
+            command.primitive == DrawPrimitive::fillPolygon) {
+            ++silhouetteCount;
+        }
+    }
+    CHECK(silhouetteCount > 4);
+
+    // Reset returns the engine to its construction-time state: rebuilding a
+    // frame right away must not carry over any scroll position or slots.
+    DrawList beforeReset;
+    DrawList afterConstruction;
+    engine.buildFrame(1280.0f, 720.0f, beforeReset);
+    engine.reset();
+    StarGuitarEngine fresh;
+    fresh.buildFrame(1280.0f, 720.0f, afterConstruction);
+    CHECK(drawList.commands().size() <= 4000);
+    CHECK(drawList.points().size() <= 2000);
+
+    // No steady-state per-frame heap growth across many frames and several
+    // window sizes, mirroring the other builtin engines' regression coverage.
+    DrawList stress;
+    engine.buildFrame(2560.0f, 1440.0f, stress);
+    const size_t commandCapacity = stress.commandCapacity();
+    const size_t pointCapacity = stress.pointCapacity();
+    for (int frame = 0; frame < 240; ++frame) {
+        // Alternate silence with loud input so onset-triggered spawns keep
+        // hitting every layer's fixed capacity (round-robin reuse) rather
+        // than only exercising the quiet/ambient fallback path.
+        if (frame % 4 == 0) {
+            engine.update(left.size(), frame % 2 == 0 ? 1.0f / 15.0f : 1.0f / 60.0f);
+        } else {
+            engine.update(0, frame % 2 == 0 ? 1.0f / 15.0f : 1.0f / 60.0f);
+        }
+        engine.buildFrame(frame % 3 == 0 ? 640.0f : 2560.0f,
+                          frame % 3 == 0 ? 480.0f : 1440.0f, stress);
+        CHECK(stress.commandCapacity() == commandCapacity);
+        CHECK(stress.pointCapacity() == pointCapacity);
+        checkDrawList(stress);
+    }
+
+    // Degenerate sizes must not draw anything.
+    engine.buildFrame(0.0f, 480.0f, stress);
+    CHECK(stress.commands().empty());
+    engine.update(0, std::numeric_limits<float>::quiet_NaN());
+    engine.buildFrame(std::numeric_limits<float>::infinity(), 480.0f, stress);
+    CHECK(stress.commands().empty());
+}
+
 void testSpectrum3dCore() {
     using vizrack::Spectrum3dOptions;
     using vizrack::builtin::DrawList;
@@ -877,6 +999,7 @@ int main() {
     testRing();
     testArtVisualizerCore();
     testCampfireCore();
+    testStarGuitarCore();
     testSpectrum3dCore();
     testOscilloscopeCore();
     testReconnect();

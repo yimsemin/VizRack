@@ -64,6 +64,7 @@ VIZRACK_STR(PluginNameArtVisualizer, "Built-in Art Visualizer", "내장 아트 �
 VIZRACK_STR(PluginNameCampfire,      "Built-in Campfire", "내장 캠프파이어")
 VIZRACK_STR(PluginNameSpectrum3d,    "Built-in 3D Spectrum", "내장 3D 스펙트럼")
 VIZRACK_STR(PluginNameJoyDivision,   "Built-in Joy Division", "내장 Joy Division")
+VIZRACK_STR(PluginNameStarGuitar,    "Built-in Star Guitar", "내장 Star Guitar")
 
 // ── VST3 file picker ────────────────────────────────────────────────────────
 VIZRACK_STR(PickerFolderTitleFmt,  "Select the {} .vst3 bundle folder", "{} .vst3 번들 폴더 선택")
@@ -135,6 +136,11 @@ VIZRACK_STR(CampfireMenuStarBrightness, "Star base brightness", "별 평소 밝�
 VIZRACK_STR(CampfireMenuStarResponse,   "Star audio reaction", "별 음악 반응")
 VIZRACK_STR(CampfireMenuSparkAmount,    "Spark amount", "불티 양")
 VIZRACK_STR(CampfireMenuSparkIntensity, "Spark intensity", "불티 강도")
+
+// ── Star Guitar view ───────────────────────────────────────────────────────
+VIZRACK_STR(StarGuitarMenuAlgorithm,          "Rhythm detection", "리듬 인식 방식")
+VIZRACK_STR(StarGuitarAlgorithmReactive,      "Reactive", "실시간 반응")
+VIZRACK_STR(StarGuitarAlgorithmPredictive,    "Predictive (beat estimate)", "예측 (박자 추정)")
 
 // ── Art visualizer view ────────────────────────────────────────────────────
 VIZRACK_STR(ArtMenuScene,   "Scene", "장면")
