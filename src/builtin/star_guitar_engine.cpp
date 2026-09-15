@@ -15,10 +15,19 @@ constexpr float kPi = std::numbers::pi_v<float>;
 // size.
 constexpr float kReferenceWidth = 1920.0f;
 constexpr float kUnitReference = 10.0f; // reference px per "unit" used by the draw helpers
-// How long an accented instance's spawn-moment flash lasts, in real seconds
-// (independent of layer scroll speed, so it reads consistently whether the
-// object is a slow far-layer building or a fast near-layer flash).
-constexpr float kAccentFlashSeconds = 0.16f;
+// How long an accented instance's grow-in lasts, in real seconds (independent
+// of layer scroll speed, so it reads consistently across layers).
+constexpr float kGrowInSeconds = 0.22f;
+
+// Eased 0..1 growth curve: a quick rise that slightly overshoots past 1 then
+// settles back, so the object's arrival reads as a snappy "struck" motion
+// (like a needle jumping up) rather than a slow, mushy fade-in.
+float growEase(float t) noexcept {
+    t = std::clamp(t, 0.0f, 1.0f);
+    const float overshoot = 1.70158f;
+    const float shifted = t - 1.0f;
+    return 1.0f + shifted * shifted * ((overshoot + 1.0f) * shifted + overshoot);
+}
 
 float finiteSample(float value) noexcept {
     return std::isfinite(value) ? value : 0.0f;
@@ -549,9 +558,9 @@ void StarGuitarEngine::drawGround(DrawList& output, float width, float height,
 }
 
 void StarGuitarEngine::drawPole(DrawList& output, float baseX, float groundY,
-                                float unit) const {
+                                float unit, float heightScale) const {
     const float poleWidth = unit * 0.9f;
-    const float poleHeight = unit * 11.0f;
+    const float poleHeight = unit * 11.0f * heightScale;
     const Color body = color(0x0a0e16);
     output.addFillRectangle(baseX - poleWidth * 0.5f, groundY - poleHeight, poleWidth,
                             poleHeight, body);
@@ -567,16 +576,16 @@ void StarGuitarEngine::drawPole(DrawList& output, float baseX, float groundY,
 }
 
 void StarGuitarEngine::drawTree(DrawList& output, float baseX, float groundY, float unit,
-                                uint32_t seed) const {
+                                uint32_t seed, float heightScale) const {
     const float trunkWidth = unit * 0.8f;
-    const float trunkHeight = unit * 2.6f;
+    const float trunkHeight = unit * 2.6f * heightScale;
     const Color trunk = color(0x120e0a);
     output.addFillRectangle(baseX - trunkWidth * 0.5f, groundY - trunkHeight, trunkWidth,
                             trunkHeight, trunk);
 
     // A stepped, blocky canopy: three shrinking tiers instead of a smooth
     // circle, keeping the silhouette axis-aligned like the rest of the scene.
-    const float canopyHeight = unit * (4.5f + hash01(seed) * 2.0f);
+    const float canopyHeight = unit * (4.5f + hash01(seed) * 2.0f) * heightScale;
     const float canopyWidth = unit * (4.0f + hash01(seed ^ 0x27d4eb2fu) * 2.2f);
     const Color canopy = color(0x0e1c12);
     constexpr int tiers = 3;
@@ -593,11 +602,11 @@ void StarGuitarEngine::drawTree(DrawList& output, float baseX, float groundY, fl
 
 void StarGuitarEngine::drawBuilding(DrawList& output, float baseX, float groundY,
                                     float unit, StarGuitarObjectType variant,
-                                    uint32_t seed) const {
+                                    uint32_t seed, float heightScale) const {
     const float heightUnits = 8.0f + hash01(seed) * 10.0f;
     const float widthUnits = 5.0f + hash01(seed ^ 0x51ed270bu) * 3.0f;
     const float bodyWidth = unit * widthUnits;
-    const float bodyHeight = unit * heightUnits;
+    const float bodyHeight = unit * heightUnits * heightScale;
     const Color body = color(0x0c1017);
     const Color window = color(0x1d3a52, 200);
     output.addFillRectangle(baseX - bodyWidth * 0.5f, groundY - bodyHeight, bodyWidth,
@@ -643,9 +652,11 @@ void StarGuitarEngine::drawBuilding(DrawList& output, float baseX, float groundY
 }
 
 void StarGuitarEngine::drawWaterTower(DrawList& output, float baseX, float groundY,
-                                      float unit, uint32_t seed) {
+                                      float unit, uint32_t seed, float heightScale) {
     const Color body = color(0x0d1218);
-    const float legHeight = unit * 6.0f;
+    // Only the legs grow -- the tank rides up on top of them at its full
+    // size, which reads as the whole tower rising out of the ground.
+    const float legHeight = unit * 6.0f * heightScale;
     const float tankHalfWidth = unit * 3.4f;
     const float tankHeight = unit * 3.4f;
     const float tankY = groundY - legHeight - tankHeight;
@@ -731,20 +742,6 @@ void StarGuitarEngine::drawStar(DrawList& output, float baseX, float baseY,
                             armThickness, armLength, glow);
 }
 
-void StarGuitarEngine::drawAccentFlash(DrawList& output, float baseX, float baseY, float unit,
-                                       float ageFraction) const {
-    // A quick, bright "shockwave" ring anchored at the object's ground point
-    // (works for every object type without per-type placement logic): it
-    // expands slightly and fades out over the flash window, so the moment an
-    // accented object appears reads as a struck note rather than scenery
-    // that simply materialized.
-    const float alpha = 1.0f - ageFraction;
-    const float radius = unit * (2.2f + ageFraction * 2.6f);
-    output.addRadialGradientEllipse(baseX - radius, baseY - radius * 0.6f, radius * 2.0f,
-                                    radius * 1.2f, color(0xfff3d6, static_cast<uint8_t>(190.0f * alpha * alpha)),
-                                    color(0xfff3d6, 0));
-}
-
 void StarGuitarEngine::buildFrame(float width, float height, DrawList& output) {
     output.reset();
     if (!std::isfinite(width) || !std::isfinite(height) || width <= 0.0f || height <= 0.0f) {
@@ -796,26 +793,31 @@ void StarGuitarEngine::buildFrame(float width, float height, DrawList& output) {
                 continue;
             }
 
+            // Accented instances (real onset hits) grow up from ground level
+            // over their first fraction of a second instead of appearing at
+            // full height immediately -- the rise itself is the beat cue.
+            // Ambient/interval fallback spawns appear at full height right
+            // away since they aren't tied to a real hit worth calling out.
+            const float heightScale = instance.accented
+                                          ? growEase(instance.age / kGrowInSeconds)
+                                          : 1.0f;
             switch (instance.type) {
                 case StarGuitarObjectType::pole:
-                    drawPole(output, screenX, groundY, unit);
+                    drawPole(output, screenX, groundY, unit, heightScale);
                     break;
                 case StarGuitarObjectType::tree:
-                    drawTree(output, screenX, groundY, unit, instance.seed);
+                    drawTree(output, screenX, groundY, unit, instance.seed, heightScale);
                     break;
                 case StarGuitarObjectType::waterTower:
-                    drawWaterTower(output, screenX, groundY, unit, instance.seed);
+                    drawWaterTower(output, screenX, groundY, unit, instance.seed, heightScale);
                     break;
                 case StarGuitarObjectType::signalMarker:
                     drawSignalMarker(output, screenX, groundY, unit);
                     break;
                 default:
-                    drawBuilding(output, screenX, groundY, unit, instance.type, instance.seed);
+                    drawBuilding(output, screenX, groundY, unit, instance.type, instance.seed,
+                                heightScale);
                     break;
-            }
-            if (instance.accented && instance.age < kAccentFlashSeconds) {
-                drawAccentFlash(output, screenX, groundY, unit,
-                                instance.age / kAccentFlashSeconds);
             }
         }
     }
