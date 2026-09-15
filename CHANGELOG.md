@@ -11,6 +11,19 @@ ZIP attached. How these notes are written and cut: `docs/RELEASE_NOTES_STYLE.md`
 
 ## [Unreleased]
 
+### Added
+
+- **Rhythm Ripple.** A new built-in visualizer: rain falling on a still, dark
+  puddle in time with the music. A broadband onset detector drops one
+  expanding-ring raindrop-ripple at a fully random spot the instant a beat is
+  accepted — several can land in close succession during a busy passage, and
+  a sensitivity option controls how easily a beat is detected. A second,
+  independent long-note sensitivity (0 turns it off) grows a drifting "long
+  note" ripple whenever a hit's level keeps holding instead of decaying like
+  an ordinary beat — it travels a smooth constant-speed arc, marks only its
+  start and end with a ripple (never re-bursting while held), lasts up to 5
+  seconds, and several can be held at once.
+
 ## [0.4.0] - 2026-09-15
 
 _A rhythmic pixel-art landscape that reacts to the music's frequency

@@ -3,6 +3,7 @@
 #include "builtin/draw_list.h"
 #include "builtin/oscilloscope_engine.h"
 #include "builtin/spectrum3d_engine.h"
+#include "builtin/rhythm_ripple_engine.h"
 #include "builtin/star_guitar_engine.h"
 #include "core/audio_ring.h"
 #include "core/channel_mapper.h"
@@ -224,6 +225,15 @@ void testPluginCatalogAndStorage(const std::filesystem::path& directory) {
               "Inspired by The Chemical Brothers / Michel Gondry's \"Star Guitar\"");
         CHECK(starGuitar->installUrl.empty());
         CHECK(starGuitar->searchLocations.empty());
+    }
+    const auto* rhythmRipple = vizrack::findPluginDefinition("builtin-rhythmripple");
+    CHECK(rhythmRipple != nullptr);
+    if (rhythmRipple) {
+        CHECK(rhythmRipple->kind == vizrack::PluginKind::builtIn);
+        CHECK(rhythmRipple->displayName == "Built-in Rhythm Ripple");
+        CHECK(rhythmRipple->inspiration.empty());
+        CHECK(rhythmRipple->installUrl.empty());
+        CHECK(rhythmRipple->searchLocations.empty());
     }
     for (const auto& item : catalog) {
         if (item.id != "builtin-joydivision" && item.id != "builtin-starguitar") {
@@ -762,6 +772,131 @@ void testStarGuitarCore() {
     CHECK(stress.commands().empty());
 }
 
+void testRhythmRippleCore() {
+    using vizrack::RhythmRippleOptions;
+    using vizrack::builtin::DrawList;
+    using vizrack::builtin::DrawPrimitive;
+    using vizrack::builtin::RhythmRippleEngine;
+
+    RhythmRippleEngine engine;
+    engine.setOptions(RhythmRippleOptions{});
+
+    // Both sensitivities must clamp to 0-100 independently rather than being
+    // stored out of range.
+    RhythmRippleOptions outOfRange{};
+    outOfRange.sensitivity = -30;
+    outOfRange.longNoteSensitivity = -30;
+    engine.setOptions(outOfRange);
+    CHECK(engine.options().sensitivity == 0);
+    CHECK(engine.options().longNoteSensitivity == 0);
+    outOfRange.sensitivity = 250;
+    outOfRange.longNoteSensitivity = 250;
+    engine.setOptions(outOfRange);
+    CHECK(engine.options().sensitivity == 100);
+    CHECK(engine.options().longNoteSensitivity == 100);
+    engine.setOptions(RhythmRippleOptions{});
+
+    engine.setSampleRate(96000);
+    engine.setSampleRate(1);  // out of range, ignored
+
+    auto left = engine.inputLeft();
+    auto right = engine.inputRight();
+    left[9] = std::numeric_limits<float>::quiet_NaN();
+    right[23] = std::numeric_limits<float>::infinity();
+
+    DrawList drawList;
+    // Feed a repeating "beat" pattern: a loud burst of samples followed by
+    // several quiet frames, simulating a steady kick roughly every ~8 frames
+    // at 60fps (~0.13s), exercising the raw onset detector and cooldown.
+    for (int frame = 0; frame < 400; ++frame) {
+        const bool beat = (frame % 8) == 0;
+        if (beat) {
+            for (size_t index = 0; index < left.size(); ++index) {
+                const float phase = static_cast<float>(index) * 0.35f;
+                left[index] = std::sin(phase) * 0.9f;
+                right[index] = std::cos(phase * 0.91f) * 0.85f;
+            }
+            engine.update(left.size(), 1.0f / 60.0f);
+        } else {
+            engine.update(0, 1.0f / 60.0f);
+        }
+        engine.buildFrame(1920.0f, 1080.0f, drawList);
+        checkDrawList(drawList);
+    }
+    // The background wash must always be present once sizes are valid.
+    CHECK(!drawList.commands().empty());
+    CHECK(drawList.commands().front().primitive == DrawPrimitive::verticalGradient);
+
+    // A silent stretch must not spawn ripples nor crash.
+    for (int frame = 0; frame < 120; ++frame) {
+        engine.update(0, 1.0f / 60.0f);
+        engine.buildFrame(1280.0f, 720.0f, drawList);
+        checkDrawList(drawList);
+    }
+
+    // Long notes are opt-in via longNoteSensitivity > 0: a sustained loud
+    // passage should grow one or more drifting held notes (in addition to
+    // any raindrops) once enabled, and dropping sensitivity back to 0
+    // mid-hold must end them all cleanly rather than leaving stale state or
+    // crashing.
+    RhythmRippleOptions longNotes{};
+    longNotes.longNoteSensitivity = 80;
+    engine.setOptions(longNotes);
+    for (int frame = 0; frame < 90; ++frame) {
+        for (size_t index = 0; index < left.size(); ++index) {
+            const float phase = static_cast<float>(index) * 0.22f;
+            left[index] = std::sin(phase) * 0.6f;
+            right[index] = std::sin(phase * 1.05f) * 0.6f;
+        }
+        engine.update(left.size(), 1.0f / 60.0f);
+        engine.buildFrame(1600.0f, 900.0f, drawList);
+        checkDrawList(drawList);
+    }
+    longNotes.longNoteSensitivity = 0;
+    engine.setOptions(longNotes);
+    for (int frame = 0; frame < 30; ++frame) {
+        engine.update(0, 1.0f / 60.0f);
+        engine.buildFrame(1600.0f, 900.0f, drawList);
+        checkDrawList(drawList);
+    }
+    engine.setOptions(RhythmRippleOptions{});
+
+    // Reset returns the engine to its construction-time state.
+    engine.reset();
+    RhythmRippleEngine fresh;
+    DrawList afterReset;
+    DrawList afterConstruction;
+    engine.buildFrame(1280.0f, 720.0f, afterReset);
+    fresh.buildFrame(1280.0f, 720.0f, afterConstruction);
+    CHECK(afterReset.commands().size() == afterConstruction.commands().size());
+
+    // No steady-state per-frame heap growth across many frames and several
+    // window sizes, mirroring the other builtin engines' regression coverage.
+    DrawList stress;
+    engine.buildFrame(2560.0f, 1440.0f, stress);
+    const size_t commandCapacity = stress.commandCapacity();
+    const size_t pointCapacity = stress.pointCapacity();
+    for (int frame = 0; frame < 240; ++frame) {
+        if (frame % 5 == 0) {
+            engine.update(left.size(), frame % 2 == 0 ? 1.0f / 15.0f : 1.0f / 60.0f);
+        } else {
+            engine.update(0, frame % 2 == 0 ? 1.0f / 15.0f : 1.0f / 60.0f);
+        }
+        engine.buildFrame(frame % 3 == 0 ? 640.0f : 2560.0f,
+                          frame % 3 == 0 ? 480.0f : 1440.0f, stress);
+        CHECK(stress.commandCapacity() == commandCapacity);
+        CHECK(stress.pointCapacity() == pointCapacity);
+        checkDrawList(stress);
+    }
+
+    // Degenerate sizes must not draw anything.
+    engine.buildFrame(0.0f, 480.0f, stress);
+    CHECK(stress.commands().empty());
+    engine.update(0, std::numeric_limits<float>::quiet_NaN());
+    engine.buildFrame(std::numeric_limits<float>::infinity(), 480.0f, stress);
+    CHECK(stress.commands().empty());
+}
+
 void testSpectrum3dCore() {
     using vizrack::Spectrum3dOptions;
     using vizrack::builtin::DrawList;
@@ -1009,6 +1144,7 @@ int main() {
     testArtVisualizerCore();
     testCampfireCore();
     testStarGuitarCore();
+    testRhythmRippleCore();
     testSpectrum3dCore();
     testOscilloscopeCore();
     testReconnect();

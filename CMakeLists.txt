@@ -21,6 +21,8 @@ add_library(vizrack_builtin_core STATIC
     src/builtin/draw_list.h
     src/builtin/oscilloscope_engine.cpp
     src/builtin/oscilloscope_engine.h
+    src/builtin/rhythm_ripple_engine.cpp
+    src/builtin/rhythm_ripple_engine.h
     src/builtin/spectrum3d_engine.cpp
     src/builtin/spectrum3d_engine.h
     src/builtin/star_guitar_engine.cpp
@@ -102,6 +104,8 @@ add_executable(VizRack WIN32
     src/ui/main_window.h
     src/ui/oscilloscope_view.cpp
     src/ui/oscilloscope_view.h
+    src/ui/rhythm_ripple_view.cpp
+    src/ui/rhythm_ripple_view.h
     src/ui/spectrum3d_view.cpp
     src/ui/spectrum3d_view.h
     src/ui/star_guitar_view.cpp
