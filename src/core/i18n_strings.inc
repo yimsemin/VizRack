@@ -138,9 +138,10 @@ VIZRACK_STR(CampfireMenuSparkAmount,    "Spark amount", "불티 양")
 VIZRACK_STR(CampfireMenuSparkIntensity, "Spark intensity", "불티 강도")
 
 // ── Star Guitar view ───────────────────────────────────────────────────────
-VIZRACK_STR(StarGuitarMenuAlgorithm,          "Rhythm detection", "리듬 인식 방식")
-VIZRACK_STR(StarGuitarAlgorithmReactive,      "Reactive", "실시간 반응")
-VIZRACK_STR(StarGuitarAlgorithmPredictive,    "Predictive (beat estimate)", "예측 (박자 추정)")
+VIZRACK_STR(StarGuitarMenuLowSensitivity,     "Low sensitivity (<300Hz)", "저역 민감도 (<300Hz)")
+VIZRACK_STR(StarGuitarMenuMidSensitivity,     "Mid sensitivity (300Hz-4kHz)", "중역 민감도 (300Hz~4kHz)")
+VIZRACK_STR(StarGuitarMenuTrebleSensitivity,  "Treble sensitivity (4-8kHz)", "고역 민감도 (4~8kHz)")
+VIZRACK_STR(StarGuitarMenuAirSensitivity,     "Air sensitivity (>8kHz)", "에어 민감도 (>8kHz)")
 
 // ── Art visualizer view ────────────────────────────────────────────────────
 VIZRACK_STR(ArtMenuScene,   "Scene", "장면")

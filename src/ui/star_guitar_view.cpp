@@ -15,8 +15,10 @@ namespace {
 
 constexpr wchar_t kWindowClass[] = L"VizRack.StarGuitar";
 constexpr UINT_PTR kRefreshTimer = 0x5347;
-constexpr UINT kAlgorithmReactiveCommand = 900;
-constexpr UINT kAlgorithmPredictiveCommand = 901;
+constexpr UINT kLowSensitivityCommand = 920;
+constexpr UINT kMidSensitivityCommand = 940;
+constexpr UINT kTrebleSensitivityCommand = 960;
+constexpr UINT kAirSensitivityCommand = 980;
 
 float elapsedSeconds(std::chrono::steady_clock::time_point& previous) {
     const auto now = std::chrono::steady_clock::now();
@@ -27,6 +29,16 @@ float elapsedSeconds(std::chrono::steady_clock::time_point& previous) {
     const float elapsed = std::chrono::duration<float>(now - previous).count();
     previous = now;
     return std::clamp(elapsed, 1.0f / 240.0f, 1.0f / 15.0f);
+}
+
+void appendValueMenu(HMENU parent, const wchar_t* label, UINT commandBase, int currentValue) {
+    HMENU values = CreatePopupMenu();
+    for (int value = 0; value <= 100; value += 10) {
+        const std::wstring valueLabel = std::to_wstring(value);
+        AppendMenuW(values, MF_STRING | (value == currentValue ? MF_CHECKED : 0),
+                    commandBase + static_cast<UINT>(value / 10), valueLabel.c_str());
+    }
+    AppendMenuW(parent, MF_POPUP, reinterpret_cast<UINT_PTR>(values), label);
 }
 
 } // namespace
@@ -121,7 +133,7 @@ void StarGuitarView::drawOverlay(HDC dc, float width, float height) const {
     Gdiplus::SolidBrush bright(Gdiplus::Color(175, 210, 226, 244));
     Gdiplus::SolidBrush dim(Gdiplus::Color(105, 150, 172, 198));
     graphics.DrawString(L"STAR GUITAR", -1, &title, {18.0f, 14.0f}, &bright);
-    graphics.DrawString(L"PROTOTYPE  /  RHYTHM SEQUENCER LANDSCAPE", -1, &smallFont,
+    graphics.DrawString(L"RHYTHM SEQUENCER LANDSCAPE", -1, &smallFont,
                         {18.0f, height - 27.0f}, &dim);
     Gdiplus::StringFormat right;
     right.SetAlignment(Gdiplus::StringAlignmentFar);
@@ -166,26 +178,27 @@ void StarGuitarView::showOptionsMenu(POINT point) {
     }
     const auto options = engine_.options();
     HMENU menu = CreatePopupMenu();
-    HMENU algorithm = CreatePopupMenu();
-    const bool reactive = options.algorithmMode == StarGuitarAlgorithmMode::reactive;
-    AppendMenuW(algorithm, MF_STRING | (reactive ? MF_CHECKED : 0), kAlgorithmReactiveCommand,
-                trw(Str::StarGuitarAlgorithmReactive).c_str());
-    AppendMenuW(algorithm, MF_STRING | (!reactive ? MF_CHECKED : 0), kAlgorithmPredictiveCommand,
-                trw(Str::StarGuitarAlgorithmPredictive).c_str());
-    AppendMenuW(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(algorithm),
-                trw(Str::StarGuitarMenuAlgorithm).c_str());
+    appendValueMenu(menu, trw(Str::StarGuitarMenuLowSensitivity).c_str(), kLowSensitivityCommand,
+                    options.lowSensitivity);
+    appendValueMenu(menu, trw(Str::StarGuitarMenuMidSensitivity).c_str(), kMidSensitivityCommand,
+                    options.midSensitivity);
+    appendValueMenu(menu, trw(Str::StarGuitarMenuTrebleSensitivity).c_str(),
+                    kTrebleSensitivityCommand, options.trebleSensitivity);
+    appendValueMenu(menu, trw(Str::StarGuitarMenuAirSensitivity).c_str(), kAirSensitivityCommand,
+                    options.airSensitivity);
 
     const UINT command = TrackPopupMenu(menu, TPM_RETURNCMD | TPM_RIGHTBUTTON, point.x, point.y,
                                         0, hwnd_, nullptr);
     auto updated = options;
-    bool changed = false;
-    if (command == kAlgorithmReactiveCommand) {
-        updated.algorithmMode = StarGuitarAlgorithmMode::reactive;
-        changed = true;
-    } else if (command == kAlgorithmPredictiveCommand) {
-        updated.algorithmMode = StarGuitarAlgorithmMode::predictive;
-        changed = true;
-    }
+    const auto applyValue = [command](UINT base, int& destination) {
+        if (command < base || command > base + 10) return false;
+        destination = static_cast<int>(command - base) * 10;
+        return true;
+    };
+    bool changed = applyValue(kLowSensitivityCommand, updated.lowSensitivity);
+    changed = applyValue(kMidSensitivityCommand, updated.midSensitivity) || changed;
+    changed = applyValue(kTrebleSensitivityCommand, updated.trebleSensitivity) || changed;
+    changed = applyValue(kAirSensitivityCommand, updated.airSensitivity) || changed;
     DestroyMenu(menu);
     if (changed) {
         engine_.setOptions(updated);

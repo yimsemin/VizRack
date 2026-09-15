@@ -15,9 +15,9 @@ namespace vizrack {
 
 class StereoFrameRing;
 
-// Prototype-only view for the "Star Guitar" homage: a thin Win32 adapter
-// mirroring CampfireView's shape. The only tunable option right now is the
-// rhythm-detection mode (reactive vs. predictive); see StarGuitarAlgorithmMode.
+// View for the "Star Guitar" homage: a thin Win32 adapter mirroring
+// CampfireView's shape. Tunable options are the four per-band peak-
+// detection sensitivities; see StarGuitarOptions.
 class StarGuitarView {
 public:
     using OptionsChangedCallback = std::function<void(const StarGuitarOptions&)>;

@@ -175,8 +175,17 @@ SettingsLoadResult loadSettings(const std::filesystem::path& path) {
     if (auto value = readInt(json, "campfireParticleIntensity")) {
         result.value.campfireParticleIntensity = std::clamp(*value, 0, 100);
     }
-    if (auto value = readInt(json, "starGuitarAlgorithmMode")) {
-        result.value.starGuitarAlgorithmMode = std::clamp(*value, 0, 1);
+    if (auto value = readInt(json, "starGuitarLowSensitivity")) {
+        result.value.starGuitarLowSensitivity = std::clamp(*value, 0, 100);
+    }
+    if (auto value = readInt(json, "starGuitarMidSensitivity")) {
+        result.value.starGuitarMidSensitivity = std::clamp(*value, 0, 100);
+    }
+    if (auto value = readInt(json, "starGuitarTrebleSensitivity")) {
+        result.value.starGuitarTrebleSensitivity = std::clamp(*value, 0, 100);
+    }
+    if (auto value = readInt(json, "starGuitarAirSensitivity")) {
+        result.value.starGuitarAirSensitivity = std::clamp(*value, 0, 100);
     }
     if (auto value = readInt(json, "spectrum3dPalette")) {
         result.value.spectrum3dPalette = std::clamp(*value, 0, 5);
@@ -246,8 +255,14 @@ bool saveSettings(const std::filesystem::path& path, const Settings& settings, s
            << std::clamp(settings.campfireParticleAmount, 0, 100) << ",\n"
            << "  \"campfireParticleIntensity\": "
            << std::clamp(settings.campfireParticleIntensity, 0, 100) << ",\n"
-           << "  \"starGuitarAlgorithmMode\": "
-           << std::clamp(settings.starGuitarAlgorithmMode, 0, 1) << ",\n"
+           << "  \"starGuitarLowSensitivity\": "
+           << std::clamp(settings.starGuitarLowSensitivity, 0, 100) << ",\n"
+           << "  \"starGuitarMidSensitivity\": "
+           << std::clamp(settings.starGuitarMidSensitivity, 0, 100) << ",\n"
+           << "  \"starGuitarTrebleSensitivity\": "
+           << std::clamp(settings.starGuitarTrebleSensitivity, 0, 100) << ",\n"
+           << "  \"starGuitarAirSensitivity\": "
+           << std::clamp(settings.starGuitarAirSensitivity, 0, 100) << ",\n"
            << "  \"spectrum3dPalette\": " << std::clamp(settings.spectrum3dPalette, 0, 5) << ",\n"
            << "  \"spectrum3dRotation\": " << std::clamp(settings.spectrum3dRotation, 0, 100) << ",\n"
            << "  \"spectrum3dTilt\": " << std::clamp(settings.spectrum3dTilt, 0, 100) << ",\n"

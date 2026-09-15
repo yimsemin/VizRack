@@ -25,6 +25,66 @@ constexpr float kGrowInSeconds = 0.22f;
 // typical real hit, so it reads as background rather than competing with one.
 constexpr float kAmbientSizeScale = 0.6f;
 
+// Eight sub-band cutoffs (Hz), low to high -- see
+// docs/STAR_GUITAR_FREQUENCY_BANDS.md. Band i is the residual between
+// filter i-1 and filter i (band 0 is everything below the first cutoff;
+// the last band is everything above the last cutoff).
+constexpr std::array<float, StarGuitarEngine::kBandCount - 1> kBandCutoffsHz{
+    80.0f, 300.0f, 1000.0f, 4000.0f, 6000.0f, 8000.0f, 12000.0f};
+// Per-band RMS-to-0..1 gain: higher bands carry less raw energy in a typical
+// mix, so they get progressively more gain to land in a comparable range.
+constexpr std::array<float, StarGuitarEngine::kBandCount> kBandGain{
+    3.6f, 4.6f, 5.0f, 5.4f, 5.8f, 6.2f, 7.4f, 8.8f};
+// Per-band minimum spacing between peaks: higher bands can legitimately
+// retrigger faster (a hi-hat pattern is quicker than a kick pattern).
+constexpr std::array<float, StarGuitarEngine::kBandCount> kBandCooldownSeconds{
+    0.32f, 0.26f, 0.22f, 0.20f, 0.18f, 0.16f, 0.13f, 0.10f};
+// Per-band noise floor: a peak below this absolute level is ignored even if
+// its relative rise would otherwise qualify (avoids firing on near-silence).
+constexpr std::array<float, StarGuitarEngine::kBandCount> kBandFloor{
+    0.10f, 0.09f, 0.08f, 0.07f, 0.06f, 0.06f, 0.05f, 0.05f};
+
+// Eight sub-bands group into four coarse controls (see
+// docs/STAR_GUITAR_FREQUENCY_BANDS.md): low = bands {0,1}, mid = {2,3},
+// treble = {4,5}, air = {6,7}. Each pair shares one sensitivity setting and
+// spawns into one depth layer.
+constexpr size_t kBandLow0 = 0, kBandLow1 = 1;
+constexpr size_t kBandMid0 = 2, kBandMid1 = 3;
+constexpr size_t kBandTreble0 = 4, kBandTreble1 = 5;
+constexpr size_t kBandAir0 = 6, kBandAir1 = 7;
+
+// The raw (uncalibrated) 0-100 -> threshold curve: 0 is very insensitive
+// (1.10, a huge relative jump needed), 100 is very sensitive (0.15, a small
+// jump is enough).
+float rawThresholdFromSensitivity(int sensitivity) noexcept {
+    const float t = std::clamp(static_cast<float>(sensitivity), 0.0f, 100.0f) / 100.0f;
+    return 1.10f + (0.15f - 1.10f) * t;
+}
+
+// Values found good by ear during tuning, one per coarse band group (low,
+// mid, treble, air), on the *raw* 0-100 scale above. thresholdFromSensitivity
+// below recentres each group's curve so its own UI slider's midpoint (50)
+// lands exactly on this value, while keeping the endpoints (0 and 100) at
+// the same raw insensitive/sensitive extremes -- i.e. a two-segment
+// piecewise-linear remap, not a shift of the whole range.
+constexpr std::array<int, 4> kBandReferenceSensitivity{70, 80, 90, 80}; // low, mid, treble, air
+
+// Maps a sensitivity setting (0-100, see StarGuitarOptions) to the relative-
+// rise threshold detectPeak() requires, recentred per `groupIndex` (0=low,
+// 1=mid, 2=treble, 3=air) so that setting 50 reproduces the reference value
+// above under the raw curve.
+float thresholdFromSensitivity(int sensitivity, size_t groupIndex) noexcept {
+    const int reference = kBandReferenceSensitivity[groupIndex];
+    const float low = rawThresholdFromSensitivity(0);
+    const float mid = rawThresholdFromSensitivity(reference);
+    const float high = rawThresholdFromSensitivity(100);
+    const float clamped = std::clamp(static_cast<float>(sensitivity), 0.0f, 100.0f);
+    if (clamped <= 50.0f) {
+        return low + (mid - low) * (clamped / 50.0f);
+    }
+    return mid + (high - mid) * ((clamped - 50.0f) / 50.0f);
+}
+
 // Eased 0..1 growth curve: a quick rise that slightly overshoots past 1 then
 // settles back, so an object's arrival reads as a snappy "struck" motion
 // (like a needle jumping up) rather than a slow, mushy fade-in.
@@ -64,10 +124,10 @@ float hash01(uint32_t value) noexcept {
     return static_cast<float>(value & 0x00ffffffu) / 16777215.0f;
 }
 
-// Maps a band's raw 0..1 magnitude at the moment it peaked to the visual size
-// scale an object spawned from it should grow to. Every peak-driven spawn in
-// the engine goes through this one mapping, so "how hard was the hit" reads
-// consistently as "how big is the object" everywhere.
+// Maps a peak's raw 0..1 magnitude to the visual size scale an object
+// spawned from it should grow to. Every peak-driven spawn in the engine goes
+// through this one mapping, so "how hard was the hit" reads consistently as
+// "how big is the object" everywhere.
 float sizeFromMagnitude(float magnitude) noexcept {
     return 0.65f + clampUnit(magnitude) * 1.15f;
 }
@@ -77,30 +137,29 @@ float sizeFromMagnitude(float magnitude) noexcept {
 StarGuitarEngine::StarGuitarEngine() {
     scratch_.reserve(16);
 
-    // Far: small, sparse -- water towers and buildings loom and linger.
-    layers_[kFarLayer].speed = 110.0f;
+    // Far (slowest/smallest, driven by the treble group 4-8kHz): distant
+    // silhouettes that loom and linger the longest.
+    layers_[kFarLayer].speed = 90.0f;
     layers_[kFarLayer].depthScale = 0.55f;
     layers_[kFarLayer].baseIntervalSeconds = 2.6f;
     layers_[kFarLayer].jitterSeconds = 1.2f;
 
-    // Mid: telephone-pole / tree cadence, jittered rather than metronomic,
-    // plus a presence-band marker so a second rhythmic voice (e.g. a snare
-    // alongside a kick) is visually distinguishable from the kick-driven far
-    // layer instead of blending into it.
+    // Mid (driven by the mid group 300Hz-4kHz): the steady middle-distance
+    // cadence.
     layers_[kMidLayer].speed = 190.0f;
     layers_[kMidLayer].depthScale = 0.85f;
     layers_[kMidLayer].baseIntervalSeconds = 1.6f;
     layers_[kMidLayer].jitterSeconds = 0.9f;
 
-    // Near: fast, large-relative, brief -- cymbal-like transients flash by.
-    layers_[kNearLayer].speed = 430.0f;
-    layers_[kNearLayer].depthScale = 1.35f;
+    // Near (fastest/largest, driven by the low group <300Hz -- the "쿵"):
+    // big, close, brief.
+    layers_[kNearLayer].speed = 340.0f;
+    layers_[kNearLayer].depthScale = 1.25f;
     layers_[kNearLayer].baseIntervalSeconds = 1.8f;
     layers_[kNearLayer].jitterSeconds = 1.2f;
 
-    // Sky: same air band as the near layer's cymbal marker, but weighted
-    // toward stars so it reads as a light, frequent twinkle rather than a
-    // rare flourish -- see spawnSky().
+    // Sky (driven by the air group 8kHz+): no ambient fallback -- it should
+    // only ever appear on an actual air-band peak.
     layers_[kSkyLayer].speed = 55.0f;
     layers_[kSkyLayer].depthScale = 0.5f;
 
@@ -110,10 +169,10 @@ StarGuitarEngine::StarGuitarEngine() {
 }
 
 void StarGuitarEngine::setOptions(StarGuitarOptions options) noexcept {
-    if (options.algorithmMode != StarGuitarAlgorithmMode::reactive &&
-        options.algorithmMode != StarGuitarAlgorithmMode::predictive) {
-        options.algorithmMode = StarGuitarAlgorithmMode::reactive;
-    }
+    options.lowSensitivity = std::clamp(options.lowSensitivity, 0, 100);
+    options.midSensitivity = std::clamp(options.midSensitivity, 0, 100);
+    options.trebleSensitivity = std::clamp(options.trebleSensitivity, 0, 100);
+    options.airSensitivity = std::clamp(options.airSensitivity, 0, 100);
     options_ = options;
 }
 
@@ -129,61 +188,30 @@ void StarGuitarEngine::update(size_t sampleCount, float frameSeconds) noexcept {
                                   : 1.0f / 60.0f;
     const float frameScale = safeSeconds * 60.0f;
 
-    lowPeakCooldown_ = std::max(0.0f, lowPeakCooldown_ - safeSeconds);
-    presencePeakCooldown_ = std::max(0.0f, presencePeakCooldown_ - safeSeconds);
-    airPeakCooldown_ = std::max(0.0f, airPeakCooldown_ - safeSeconds);
+    for (auto& cooldown : bandCooldown_) cooldown = std::max(0.0f, cooldown - safeSeconds);
 
     if (sampleCount > 0) {
         sampleCount_ = std::min(sampleCount, kMaxSamples);
         analyzeSamples(frameScale);
     } else {
-        lowLevel_ *= std::pow(0.965f, frameScale);
-        midLevel_ *= std::pow(0.955f, frameScale);
-        presenceLevel_ *= std::pow(0.95f, frameScale);
-        airLevel_ *= std::pow(0.945f, frameScale);
-        lowBaseline_ *= std::pow(0.985f, frameScale);
-        presenceBaseline_ *= std::pow(0.98f, frameScale);
-        airBaseline_ *= std::pow(0.985f, frameScale);
-        lowPeak_ = {};
-        presencePeak_ = {};
-        airPeak_ = {};
+        for (auto& baseline : bandBaseline_) baseline *= std::pow(0.985f, frameScale);
+        overallLevel_ *= std::pow(0.96f, frameScale);
+        bandPeak_ = {};
     }
 
-    songClock_ += safeSeconds;
-    // Keep the clock bounded across a long-running session; only differences
-    // between peak timestamps matter, and a wrap can only ever cost one
-    // discarded interval sample.
-    if (songClock_ > 1.0e6f) {
-        songClock_ = 0.0f;
-        lastLowPeakTime_ = -1.0f;
-    }
-    updateTempoTracker(lowPeak_.fired, safeSeconds);
-
-    const float overallLevel = (lowLevel_ + midLevel_ + presenceLevel_ + airLevel_) / 4.0f;
-    songEnergy_ = frameFollow(songEnergy_, clampUnit(overallLevel), 0.02f, 0.015f, frameScale);
+    songEnergy_ = frameFollow(songEnergy_, clampUnit(overallLevel_), 0.02f, 0.015f, frameScale);
 
     // Silence gate: below this the track has effectively stopped (or a long
-    // gap is playing), so every spawn source -- including the tempo-locked
-    // fill-in, which otherwise has no idea whether the song is still
-    // playing -- goes quiet instead of continuing to produce scenery.
+    // gap is playing), so every spawn source goes quiet instead of
+    // continuing to produce scenery.
     constexpr float kSilenceLevel = 0.025f;
     constexpr float kSilenceHoldSeconds = 0.4f;
-    // A longer silence also invalidates the tempo lock and peak history so a
-    // new song, or a new section after a real pause, re-acquires cleanly
-    // instead of inheriting a stale tempo.
-    constexpr float kTempoResetSeconds = 1.5f;
-    if (overallLevel < kSilenceLevel) {
+    if (overallLevel_ < kSilenceLevel) {
         silenceSeconds_ += safeSeconds;
     } else {
         silenceSeconds_ = 0.0f;
     }
     const bool audible = silenceSeconds_ < kSilenceHoldSeconds;
-    if (silenceSeconds_ > kTempoResetSeconds) {
-        tempoLocked_ = false;
-        peakIntervalCount_ = 0;
-        peakIntervalCursor_ = 0;
-        lastLowPeakTime_ = -1.0f;
-    }
 
     for (auto& layer : layers_) {
         for (auto& instance : layer.objects) {
@@ -207,73 +235,79 @@ void StarGuitarEngine::update(size_t sampleCount, float frameSeconds) noexcept {
         return;
     }
 
-    // Low-band peak (kick-like, the "쿵") -> far layer: a water tower for a
-    // strong hit, a building otherwise, sized by how hard it hit.
-    if (lowPeak_.fired) {
-        const auto type = lowPeak_.magnitude > 0.62f
-                              ? StarGuitarObjectType::waterTower
-                              : (nextRandom() < 0.5f ? StarGuitarObjectType::buildingA
-                                                      : StarGuitarObjectType::buildingC);
-        spawnInstance(layers_[kFarLayer], type, sizeFromMagnitude(lowPeak_.magnitude));
-    } else {
+    // Near layer <- low group (<300Hz, the "쿵"): the sub-bass sub-band
+    // spawns a streetlight/signal marker, the kick-body sub-band a pine tree.
+    bool nearGotPeak = false;
+    if (bandPeak_[kBandLow0].fired) {
+        spawnInstance(layers_[kNearLayer], StarGuitarObjectType::signalMarker,
+                     sizeFromMagnitude(bandPeak_[kBandLow0].magnitude));
+        nearGotPeak = true;
+    }
+    if (bandPeak_[kBandLow1].fired) {
+        spawnInstance(layers_[kNearLayer], StarGuitarObjectType::pine,
+                     sizeFromMagnitude(bandPeak_[kBandLow1].magnitude));
+        nearGotPeak = true;
+    }
+    if (!nearGotPeak) {
+        spawnAmbient(layers_[kNearLayer], StarGuitarObjectType::buildingB, safeSeconds);
+    }
+
+    // Mid layer <- mid group (300Hz-1kHz spawns a tree, 1-4kHz a pole).
+    bool midGotPeak = false;
+    if (bandPeak_[kBandMid0].fired) {
+        spawnInstance(layers_[kMidLayer], StarGuitarObjectType::tree,
+                     sizeFromMagnitude(bandPeak_[kBandMid0].magnitude));
+        midGotPeak = true;
+    }
+    if (bandPeak_[kBandMid1].fired) {
+        spawnInstance(layers_[kMidLayer], StarGuitarObjectType::pole,
+                     sizeFromMagnitude(bandPeak_[kBandMid1].magnitude));
+        midGotPeak = true;
+    }
+    if (!midGotPeak) {
+        spawnAmbient(layers_[kMidLayer], nextRandom() < 0.5f ? StarGuitarObjectType::pole
+                                                              : StarGuitarObjectType::tree,
+                    safeSeconds);
+    }
+
+    // Far layer <- treble group (4-6kHz spawns a stepped building silhouette,
+    // 6-8kHz a plain building).
+    bool farGotPeak = false;
+    if (bandPeak_[kBandTreble0].fired) {
+        spawnInstance(layers_[kFarLayer], StarGuitarObjectType::buildingC,
+                     sizeFromMagnitude(bandPeak_[kBandTreble0].magnitude));
+        farGotPeak = true;
+    }
+    if (bandPeak_[kBandTreble1].fired) {
+        spawnInstance(layers_[kFarLayer], StarGuitarObjectType::buildingA,
+                     sizeFromMagnitude(bandPeak_[kBandTreble1].magnitude));
+        farGotPeak = true;
+    }
+    if (!farGotPeak) {
         spawnAmbient(layers_[kFarLayer], StarGuitarObjectType::buildingB, safeSeconds);
     }
 
-    // The mid layer is the visible "pulse": the same low-band peak that
-    // triggers the far layer also spawns a pole/tree here, landing on the
-    // same beat.
-    updateMidPulse(layers_[kMidLayer], lowPeak_, options_.algorithmMode, StarGuitarObjectType::pole,
-                  StarGuitarObjectType::tree, safeSeconds);
-    // Presence-band peak (snare/clap-like, the "짝") -> a bright trackside
-    // signal marker layered onto the same mid layer, so the two alternating
-    // rhythmic voices are both visible without one masking the other.
-    if (presencePeak_.fired) {
-        spawnInstance(layers_[kMidLayer], StarGuitarObjectType::signalMarker,
-                     sizeFromMagnitude(presencePeak_.magnitude));
+    // Sky <- air group (8-12kHz spawns a star, >12kHz a UFO). No ambient
+    // fallback: the sky only ever reflects an actual air-band peak.
+    if (bandPeak_[kBandAir0].fired) {
+        spawnInstance(layers_[kSkyLayer], StarGuitarObjectType::star,
+                     sizeFromMagnitude(bandPeak_[kBandAir0].magnitude));
     }
-
-    // Air-band peak (hi-hat/cymbal/shimmer-like) -> near layer: a quick
-    // bright flash close to the viewer.
-    if (airPeak_.fired) {
-        spawnInstance(layers_[kNearLayer], StarGuitarObjectType::signalMarker,
-                     sizeFromMagnitude(airPeak_.magnitude));
-    } else {
-        spawnAmbient(layers_[kNearLayer], StarGuitarObjectType::buildingC, safeSeconds);
+    if (bandPeak_[kBandAir1].fired) {
+        spawnInstance(layers_[kSkyLayer], StarGuitarObjectType::ufo,
+                     sizeFromMagnitude(bandPeak_[kBandAir1].magnitude));
     }
-
-    // Sky: the same air peak, weighted toward stars for a light, frequent
-    // twinkle -- see spawnSky().
-    spawnSky(layers_[kSkyLayer], airPeak_);
 }
 
 void StarGuitarEngine::reset() noexcept {
     sampleCount_ = 0;
-    lowFilter_ = 0.0f;
-    midFilter_ = 0.0f;
-    presenceFilter_ = 0.0f;
-    lowLevel_ = 0.0f;
-    midLevel_ = 0.0f;
-    presenceLevel_ = 0.0f;
-    airLevel_ = 0.0f;
-    lowBaseline_ = 0.0f;
-    presenceBaseline_ = 0.0f;
-    airBaseline_ = 0.0f;
-    lowPeakCooldown_ = 0.0f;
-    presencePeakCooldown_ = 0.0f;
-    airPeakCooldown_ = 0.0f;
-    lowPeak_ = {};
-    presencePeak_ = {};
-    airPeak_ = {};
+    bandFilters_ = {};
+    bandBaseline_ = {};
+    bandCooldown_ = {};
+    bandPeak_ = {};
+    overallLevel_ = 0.0f;
     songEnergy_ = 0.0f;
     silenceSeconds_ = 0.0f;
-    songClock_ = 0.0f;
-    lastLowPeakTime_ = -1.0f;
-    beatPeriodSeconds_ = 0.5f;
-    beatPhase_ = 0.0f;
-    tempoLocked_ = false;
-    peakIntervals_ = {};
-    peakIntervalCount_ = 0;
-    peakIntervalCursor_ = 0;
     spawnSerial_ = 0;
     randomState_ = 0x9f2c86adu;
     for (auto& layer : layers_) {
@@ -284,70 +318,63 @@ void StarGuitarEngine::reset() noexcept {
 }
 
 void StarGuitarEngine::analyzeSamples(float frameScale) noexcept {
-    // Three cascaded one-pole low-pass filters at increasing cutoffs split
-    // the signal into four bands (low/mid/presence/air) by taking successive
-    // residuals. See docs/STAR_GUITAR_FREQUENCY_BANDS.md for why these
-    // specific cutoffs were chosen and what each band is meant to capture.
+    // Seven cascaded one-pole low-pass filters at increasing cutoffs split
+    // the signal into eight sub-bands by taking successive residuals. See
+    // docs/STAR_GUITAR_FREQUENCY_BANDS.md for why these specific cutoffs
+    // were chosen and what each sub-band is meant to capture.
     const float rate = static_cast<float>(sampleRate_.load(std::memory_order_acquire));
-    const float lowCoefficient = 1.0f - std::exp(-2.0f * kPi * 150.0f / rate);
-    const float midCoefficient = 1.0f - std::exp(-2.0f * kPi * 2500.0f / rate);
-    const float presenceCoefficient = 1.0f - std::exp(-2.0f * kPi * 6000.0f / rate);
-    double lowEnergy = 0.0;
-    double midEnergy = 0.0;
-    double presenceEnergy = 0.0;
-    double airEnergy = 0.0;
+    std::array<float, kBandCount - 1> coefficients{};
+    for (size_t i = 0; i < coefficients.size(); ++i) {
+        coefficients[i] = 1.0f - std::exp(-2.0f * kPi * kBandCutoffsHz[i] / rate);
+    }
+
+    std::array<double, kBandCount> energy{};
     for (size_t index = 0; index < sampleCount_; ++index) {
         const float left = finiteSample(left_[index]);
         const float right = finiteSample(right_[index]);
         const float mono = (left + right) * 0.5f;
-        lowFilter_ += lowCoefficient * (mono - lowFilter_);
-        midFilter_ += midCoefficient * (mono - midFilter_);
-        presenceFilter_ += presenceCoefficient * (mono - presenceFilter_);
-        const float low = lowFilter_;
-        const float mid = midFilter_ - lowFilter_;
-        const float presence = presenceFilter_ - midFilter_;
-        const float air = mono - presenceFilter_;
-        lowEnergy += static_cast<double>(low) * low;
-        midEnergy += static_cast<double>(mid) * mid;
-        presenceEnergy += static_cast<double>(presence) * presence;
-        airEnergy += static_cast<double>(air) * air;
+        for (size_t i = 0; i < bandFilters_.size(); ++i) {
+            bandFilters_[i] += coefficients[i] * (mono - bandFilters_[i]);
+        }
+        float previous = 0.0f;
+        for (size_t i = 0; i < bandFilters_.size(); ++i) {
+            const float value = bandFilters_[i] - previous;
+            energy[i] += static_cast<double>(value) * value;
+            previous = bandFilters_[i];
+        }
+        const float topValue = mono - previous;
+        energy[kBandCount - 1] += static_cast<double>(topValue) * topValue;
     }
+
     const float divisor = static_cast<float>(std::max<size_t>(1, sampleCount_));
-    const float lowTarget = clampUnit(std::sqrt(static_cast<float>(lowEnergy) / divisor) * 4.3f);
-    const float midTarget = clampUnit(std::sqrt(static_cast<float>(midEnergy) / divisor) * 5.7f);
-    const float presenceTarget =
-        clampUnit(std::sqrt(static_cast<float>(presenceEnergy) / divisor) * 6.4f);
-    const float airTarget = clampUnit(std::sqrt(static_cast<float>(airEnergy) / divisor) * 8.6f);
+    std::array<float, kBandCount> target{};
+    for (size_t i = 0; i < kBandCount; ++i) {
+        target[i] =
+            clampUnit(std::sqrt(static_cast<float>(energy[i]) / divisor) * kBandGain[i]);
+    }
 
-    lowLevel_ = frameFollow(lowLevel_, lowTarget, 0.42f, 0.10f, frameScale);
-    // Mid (150Hz-2.5kHz, vocals/guitars/keys) deliberately gets no baseline
-    // or peak detector: it's too dense and continuously-present in most
-    // mixes for a relative-rise test to mean anything -- it would fire
-    // almost constantly. It's tracked only as a sustained "how busy is the
-    // song" measure for songEnergy_ and the reactive mode's ambient cadence.
-    midLevel_ = frameFollow(midLevel_, midTarget, 0.18f, 0.05f, frameScale);
-    presenceLevel_ = frameFollow(presenceLevel_, presenceTarget, 0.40f, 0.10f, frameScale);
-    airLevel_ = frameFollow(airLevel_, airTarget, 0.40f, 0.10f, frameScale);
+    // Baselines move much more slowly than the per-frame targets above --
+    // they represent "what has this sub-band typically been doing the last
+    // couple of seconds," which a peak is then measured against. Captured
+    // *before* this frame updates them, so the peak test compares against
+    // where the baseline already was, not where this frame's own energy just
+    // dragged it.
+    const std::array<float, kBandCount> previousBaseline = bandBaseline_;
+    for (size_t i = 0; i < kBandCount; ++i) {
+        bandBaseline_[i] = frameFollow(bandBaseline_[i], target[i], 0.035f, 0.02f, frameScale);
+    }
 
-    // Baselines move much more slowly than the levels above -- they
-    // represent "what has this band typically been doing the last couple of
-    // seconds," which a peak is then measured against. Captured *before*
-    // this frame updates them, so the peak test compares against where the
-    // baseline already was, not where this frame's own energy just dragged
-    // it.
-    const float previousLowBaseline = lowBaseline_;
-    const float previousPresenceBaseline = presenceBaseline_;
-    const float previousAirBaseline = airBaseline_;
-    lowBaseline_ = frameFollow(lowBaseline_, lowTarget, 0.03f, 0.02f, frameScale);
-    presenceBaseline_ = frameFollow(presenceBaseline_, presenceTarget, 0.05f, 0.03f, frameScale);
-    airBaseline_ = frameFollow(airBaseline_, airTarget, 0.05f, 0.03f, frameScale);
+    const std::array<int, 4> sensitivity{options_.lowSensitivity, options_.midSensitivity,
+                                         options_.trebleSensitivity, options_.airSensitivity};
+    for (size_t i = 0; i < kBandCount; ++i) {
+        const float threshold = thresholdFromSensitivity(sensitivity[i / 2], i / 2);
+        bandPeak_[i] = detectPeak(target[i], previousBaseline[i], bandCooldown_[i],
+                                  kBandCooldownSeconds[i], threshold, kBandFloor[i]);
+    }
 
-    // One rule, three bands: a peak is a sharp rise *relative to the band's
-    // own recent baseline*, not an absolute level -- see detectPeak().
-    lowPeak_ = detectPeak(lowTarget, previousLowBaseline, lowPeakCooldown_, 0.22f, 0.55f, 0.08f);
-    presencePeak_ = detectPeak(presenceTarget, previousPresenceBaseline, presencePeakCooldown_,
-                               0.16f, 0.50f, 0.06f);
-    airPeak_ = detectPeak(airTarget, previousAirBaseline, airPeakCooldown_, 0.12f, 0.50f, 0.05f);
+    float sum = 0.0f;
+    for (float value : target) sum += value;
+    overallLevel_ = sum / static_cast<float>(kBandCount);
 }
 
 float StarGuitarEngine::nextRandom() noexcept {
@@ -398,97 +425,6 @@ void StarGuitarEngine::spawnAmbient(Layer& layer, StarGuitarObjectType type,
     layer.idleTimer = layer.baseIntervalSeconds + nextRandom() * layer.jitterSeconds;
 }
 
-void StarGuitarEngine::updateTempoTracker(bool lowPeakFired, float frameSeconds) noexcept {
-    (void)frameSeconds;
-    // A tempo lock that never confirms another peak for a long stretch is
-    // stale -- either the song stopped, or moved to a section without a
-    // clear kick -- so stop trusting it rather than letting the mid layer's
-    // fill-in free-run on an old estimate.
-    if (tempoLocked_ && lastLowPeakTime_ >= 0.0f &&
-        (songClock_ - lastLowPeakTime_) > beatPeriodSeconds_ * 3.0f) {
-        tempoLocked_ = false;
-    }
-    if (!lowPeakFired) return;
-
-    if (lastLowPeakTime_ >= 0.0f) {
-        const float interval = songClock_ - lastLowPeakTime_;
-        // Only trust intervals inside a plausible tempo range (roughly
-        // 45-215 BPM); anything outside that is almost certainly a missed or
-        // doubled detection rather than a real beat-to-beat gap, and would
-        // otherwise drag the median estimate off in one step.
-        if (interval > 0.27f && interval < 1.35f) {
-            peakIntervals_[peakIntervalCursor_] = interval;
-            peakIntervalCursor_ = (peakIntervalCursor_ + 1) % kPeakHistory;
-            peakIntervalCount_ = std::min(peakIntervalCount_ + 1, kPeakHistory);
-        }
-    }
-    lastLowPeakTime_ = songClock_;
-
-    if (peakIntervalCount_ >= 3) {
-        std::array<float, kPeakHistory> sorted{};
-        std::copy_n(peakIntervals_.begin(), peakIntervalCount_, sorted.begin());
-        std::sort(sorted.begin(), sorted.begin() + static_cast<ptrdiff_t>(peakIntervalCount_));
-        const float median = sorted[peakIntervalCount_ / 2];
-        // Blend toward the new median rather than snapping to it, so one odd
-        // interval (a fill, a skipped beat) nudges the estimate instead of
-        // yanking it.
-        beatPeriodSeconds_ = tempoLocked_ ? beatPeriodSeconds_ * 0.75f + median * 0.25f : median;
-        tempoLocked_ = true;
-    }
-    // Re-sync phase to the real hit every time -- this is what keeps the
-    // visual pulse from ever drifting away from the audible one.
-    beatPhase_ = 0.0f;
-}
-
-void StarGuitarEngine::updateMidPulse(Layer& layer, Peak lowPeak, StarGuitarAlgorithmMode mode,
-                                      StarGuitarObjectType primaryType,
-                                      StarGuitarObjectType secondaryType,
-                                      float frameSeconds) noexcept {
-    const auto spawnPulse = [&](float sizeScale) {
-        spawnInstance(layer, nextRandom() < 0.55f ? primaryType : secondaryType, sizeScale);
-    };
-    // Both modes react to a confirmed low-band peak the same way -- that's a
-    // direct reaction, not a prediction. Only the gap-filling between peaks
-    // differs by mode.
-    if (lowPeak.fired) {
-        spawnPulse(sizeFromMagnitude(lowPeak.magnitude));
-        return;
-    }
-    if (mode == StarGuitarAlgorithmMode::predictive && tempoLocked_) {
-        // Fill in on the estimated beat phase so the cadence stays steady
-        // even through a soft hit the peak detector misses.
-        beatPhase_ += frameSeconds / std::max(beatPeriodSeconds_, 0.05f);
-        if (beatPhase_ >= 1.0f) {
-            beatPhase_ -= 1.0f;
-            spawnPulse(kAmbientSizeScale);
-        }
-        return;
-    }
-    // Reactive mode, or predictive mode before a tempo lock is acquired:
-    // fall back to a jittered interval timer keyed to general mid-band
-    // busyness, with no tempo estimate involved.
-    layer.idleTimer -= frameSeconds;
-    if (layer.idleTimer > 0.0f) return;
-    spawnPulse(kAmbientSizeScale);
-    // Higher sustained mid-band energy shortens the average interval (busier
-    // cadence) while jitter keeps consecutive spawns asymmetric instead of a
-    // strict metronome grid.
-    const float energyFactor = 1.0f + midLevel_ * 1.8f;
-    layer.idleTimer =
-        (layer.baseIntervalSeconds / energyFactor) + nextRandom() * layer.jitterSeconds;
-}
-
-void StarGuitarEngine::spawnSky(Layer& layer, Peak airPeak) noexcept {
-    if (!airPeak.fired) return;
-    // Heavily weighted toward stars: a light, frequent twinkle rather than a
-    // rare flourish. Birds and planes stay uncommon.
-    const float pick = nextRandom();
-    const StarGuitarObjectType type = pick < 0.70f  ? StarGuitarObjectType::star
-                                      : pick < 0.90f ? StarGuitarObjectType::bird
-                                                      : StarGuitarObjectType::plane;
-    spawnInstance(layer, type, sizeFromMagnitude(airPeak.magnitude));
-}
-
 void StarGuitarEngine::drawGround(DrawList& output, float width, float height,
                                   float groundY) const {
     output.addVerticalGradient(0.0f, 0.0f, width, groundY, color(0x0b1424), color(0x2a3f5c));
@@ -532,6 +468,32 @@ void StarGuitarEngine::drawTree(DrawList& output, float baseX, float groundY, fl
     for (int tier = 0; tier < tiers; ++tier) {
         const float tierFraction = static_cast<float>(tier) / static_cast<float>(tiers);
         const float tierWidth = canopyWidth * (1.0f - tierFraction * 0.55f);
+        const float tierHeight = canopyHeight / static_cast<float>(tiers);
+        const float tierY =
+            groundY - trunkHeight - canopyHeight + tierHeight * static_cast<float>(tier);
+        output.addFillRectangle(baseX - tierWidth * 0.5f, tierY, tierWidth, tierHeight + 0.5f,
+                                canopy);
+    }
+}
+
+void StarGuitarEngine::drawPine(DrawList& output, float baseX, float groundY, float unit,
+                                uint32_t seed, float scale) const {
+    // Visually distinct from drawTree: a taller, narrower, more sharply
+    // tapered silhouette (five tiers instead of three, each much narrower
+    // than the last) reading as a conifer rather than a broad-canopy tree.
+    const float trunkWidth = unit * 0.6f;
+    const float trunkHeight = unit * 1.8f * scale;
+    const Color trunk = color(0x140f0a);
+    output.addFillRectangle(baseX - trunkWidth * 0.5f, groundY - trunkHeight, trunkWidth,
+                            trunkHeight, trunk);
+
+    const float canopyHeight = unit * (6.5f + hash01(seed) * 2.5f) * scale;
+    const float canopyWidth = unit * (3.0f + hash01(seed ^ 0x9e3779b9u) * 1.2f) * scale;
+    const Color canopy = color(0x0a1a12);
+    constexpr int tiers = 5;
+    for (int tier = 0; tier < tiers; ++tier) {
+        const float tierFraction = static_cast<float>(tier) / static_cast<float>(tiers);
+        const float tierWidth = canopyWidth * (1.0f - tierFraction * 0.8f);
         const float tierHeight = canopyHeight / static_cast<float>(tiers);
         const float tierY =
             groundY - trunkHeight - canopyHeight + tierHeight * static_cast<float>(tier);
@@ -680,6 +642,28 @@ void StarGuitarEngine::drawStar(DrawList& output, float baseX, float baseY, floa
                             armThickness, armLength, glow);
 }
 
+void StarGuitarEngine::drawUfo(DrawList& output, float baseX, float baseY, float unit,
+                               float scale) const {
+    // A flat, wide blocky saucer with a small dome and an under-glow --
+    // built entirely from rectangles, kept in the same crisp-block style as
+    // the rest of the scene.
+    const Color hull = color(0x2a2f3a, 235);
+    const float hullWidth = unit * 4.5f * scale;
+    const float hullHeight = unit * 0.9f * scale;
+    output.addFillRectangle(baseX - hullWidth * 0.5f, baseY - hullHeight * 0.5f, hullWidth,
+                            hullHeight, hull);
+
+    const Color dome = color(0x8fd6ff, 210);
+    const float domeWidth = unit * 2.0f * scale;
+    const float domeHeight = unit * 1.0f * scale;
+    output.addFillRectangle(baseX - domeWidth * 0.5f, baseY - hullHeight * 0.5f - domeHeight,
+                            domeWidth, domeHeight, dome);
+
+    const Color glow = color(0x8fd6ff, 110);
+    output.addFillRectangle(baseX - hullWidth * 0.35f, baseY + hullHeight * 0.5f,
+                            hullWidth * 0.7f, unit * 0.3f * scale, glow);
+}
+
 void StarGuitarEngine::buildFrame(float width, float height, DrawList& output) {
     output.reset();
     if (!std::isfinite(width) || !std::isfinite(height) || width <= 0.0f || height <= 0.0f) {
@@ -729,6 +713,9 @@ void StarGuitarEngine::buildFrame(float width, float height, DrawList& output) {
                     case StarGuitarObjectType::star:
                         drawStar(output, screenX, skyY, unit, scale);
                         break;
+                    case StarGuitarObjectType::ufo:
+                        drawUfo(output, screenX, skyY, unit, scale);
+                        break;
                     default:
                         drawBird(output, screenX, skyY, unit, scale);
                         break;
@@ -742,6 +729,9 @@ void StarGuitarEngine::buildFrame(float width, float height, DrawList& output) {
                     break;
                 case StarGuitarObjectType::tree:
                     drawTree(output, screenX, groundY, unit, instance.seed, scale);
+                    break;
+                case StarGuitarObjectType::pine:
+                    drawPine(output, screenX, groundY, unit, instance.seed, scale);
                     break;
                 case StarGuitarObjectType::waterTower:
                     drawWaterTower(output, screenX, groundY, unit, instance.seed, scale);

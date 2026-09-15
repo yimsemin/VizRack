@@ -162,11 +162,13 @@ bool App::initialize(std::string& error) {
             saveSettingsNow();
         });
     starGuitar_.configure(
-        {settings_.starGuitarAlgorithmMode == 1 ? StarGuitarAlgorithmMode::predictive
-                                                 : StarGuitarAlgorithmMode::reactive},
+        {settings_.starGuitarLowSensitivity, settings_.starGuitarMidSensitivity,
+         settings_.starGuitarTrebleSensitivity, settings_.starGuitarAirSensitivity},
         [this](const StarGuitarOptions& options) {
-            settings_.starGuitarAlgorithmMode =
-                options.algorithmMode == StarGuitarAlgorithmMode::predictive ? 1 : 0;
+            settings_.starGuitarLowSensitivity = options.lowSensitivity;
+            settings_.starGuitarMidSensitivity = options.midSensitivity;
+            settings_.starGuitarTrebleSensitivity = options.trebleSensitivity;
+            settings_.starGuitarAirSensitivity = options.airSensitivity;
             saveSettingsNow();
         });
     spectrum3d_.configure(
