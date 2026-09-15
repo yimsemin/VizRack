@@ -69,6 +69,7 @@ std::wstring localizedPluginName(const PluginDefinition& definition) {
     if (definition.id == "builtin-campfire") return trw(Str::PluginNameCampfire);
     if (definition.id == "builtin-spectrum3d") return trw(Str::PluginNameSpectrum3d);
     if (definition.id == "builtin-joydivision") return trw(Str::PluginNameJoyDivision);
+    if (definition.id == "builtin-starguitar") return trw(Str::PluginNameStarGuitar);
     return fromUtf8(definition.displayName);
 }
 
@@ -631,6 +632,17 @@ LRESULT MainWindow::proc(UINT message, WPARAM wParam, LPARAM lParam) {
             break;
         case WM_KEYDOWN:
             if (wParam == VK_F10) {
+                RECT rect{};
+                GetWindowRect(hwnd_, &rect);
+                showContextMenu(POINT{rect.left + 16, rect.top + 16});
+                return 0;
+            }
+            break;
+        case WM_SYSCOMMAND:
+            // Tapping Alt alone (no mnemonic, no menu bar to activate while
+            // borderless) still reaches us as SC_KEYMENU; use it to reopen the
+            // settings menu so hiding the border never strands the user.
+            if (settings_.borderless && (wParam & 0xFFF0) == SC_KEYMENU && lParam == 0) {
                 RECT rect{};
                 GetWindowRect(hwnd_, &rect);
                 showContextMenu(POINT{rect.left + 16, rect.top + 16});

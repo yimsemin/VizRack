@@ -59,11 +59,12 @@ VIZRACK_STR(MenuAbout,               "About VizRack", "VizRack 정보")
 VIZRACK_STR(MenuCredits,             "Credits", "크레딧")
 
 // ── Built-in plug-in display names ──────────────────────────────────────────
-VIZRACK_STR(PluginNameOscilloscope,  "Built-in Oscilloscope", "내장 오실로스코프")
-VIZRACK_STR(PluginNameArtVisualizer, "Built-in Art Visualizer", "내장 아트 비주얼라이저")
-VIZRACK_STR(PluginNameCampfire,      "Built-in Campfire", "내장 캠프파이어")
-VIZRACK_STR(PluginNameSpectrum3d,    "Built-in 3D Spectrum", "내장 3D 스펙트럼")
-VIZRACK_STR(PluginNameJoyDivision,   "Built-in Joy Division", "내장 Joy Division")
+VIZRACK_STR(PluginNameOscilloscope,  "Oscilloscope", "오실로스코프")
+VIZRACK_STR(PluginNameArtVisualizer, "Art Visualizer", "아트 비주얼라이저")
+VIZRACK_STR(PluginNameCampfire,      "Campfire", "캠프파이어")
+VIZRACK_STR(PluginNameSpectrum3d,    "3D Spectrum", "3D 스펙트럼")
+VIZRACK_STR(PluginNameJoyDivision,   "Joy Division", "Joy Division")
+VIZRACK_STR(PluginNameStarGuitar,    "Star Guitar", "Star Guitar")
 
 // ── VST3 file picker ────────────────────────────────────────────────────────
 VIZRACK_STR(PickerFolderTitleFmt,  "Select the {} .vst3 bundle folder", "{} .vst3 번들 폴더 선택")
@@ -135,6 +136,12 @@ VIZRACK_STR(CampfireMenuStarBrightness, "Star base brightness", "별 평소 밝�
 VIZRACK_STR(CampfireMenuStarResponse,   "Star audio reaction", "별 음악 반응")
 VIZRACK_STR(CampfireMenuSparkAmount,    "Spark amount", "불티 양")
 VIZRACK_STR(CampfireMenuSparkIntensity, "Spark intensity", "불티 강도")
+
+// ── Star Guitar view ───────────────────────────────────────────────────────
+VIZRACK_STR(StarGuitarMenuLowSensitivity,     "Low sensitivity (<300Hz)", "저역 민감도 (<300Hz)")
+VIZRACK_STR(StarGuitarMenuMidSensitivity,     "Mid sensitivity (300Hz-4kHz)", "중역 민감도 (300Hz~4kHz)")
+VIZRACK_STR(StarGuitarMenuTrebleSensitivity,  "Treble sensitivity (4-8kHz)", "고역 민감도 (4~8kHz)")
+VIZRACK_STR(StarGuitarMenuAirSensitivity,     "Air sensitivity (>8kHz)", "에어 민감도 (>8kHz)")
 
 // ── Art visualizer view ────────────────────────────────────────────────────
 VIZRACK_STR(ArtMenuScene,   "Scene", "장면")

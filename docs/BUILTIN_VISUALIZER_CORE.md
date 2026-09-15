@@ -1,143 +1,169 @@
-# 내장 비주얼라이저 공통 코어
+# Built-in Visualizer Core
 
-## 목적과 현재 범위
+## Purpose and current scope
 
-이 구조의 목적은 Windows 포터블 EXE와 향후 브라우저 버전이 내장 비주얼라이저의
-신호 처리와 장면 코드를 하나만 공유하게 만드는 것입니다. 현재 작업에는 웹페이지,
-WebAssembly 바인딩, Canvas 렌더러 또는 웹 배포 설정이 포함되지 않습니다. 지금은
-EXE가 공통 코어를 실제로 사용하도록 경계를 먼저 고정했습니다.
+The goal of this design is for the portable Windows EXE and a future browser
+build to share a single copy of the built-in visualizers' signal processing and
+scene code. The current work does not include a web page, WebAssembly bindings, a
+Canvas renderer or web deployment configuration. The boundary was fixed first so
+that the EXE actually consumes the shared core.
 
-공유 범위를 넓혀 범용 프레임워크를 만드는 것이 목표가 아닙니다. 공통화한 대상은
-양쪽 제품에서 동일해야 하는 다음 항목뿐입니다.
+Widening the shared surface into a general-purpose framework is not the goal.
+Only the following, which must behave identically in both products, is shared:
 
-- 오실로스코프 파형·히스토리 계산
-- 아트 비주얼라이저의 저·중·고역 및 스테레오 반응 계산
-- 캠프파이어의 박자·주파수 반응, 10초 무음 축소, 상승 난류, 수명 기반 불티,
-  공통 천구 회전축의 별 궤적과 약 1분 간격의 별똥별, 밀집된 검은 장작·돌 고리 형상
-- 3D 스펙트럼의 손수 작성 1024점 FFT, 40개 로그 밴드, 72칸 시간 히스토리 버퍼,
-  프레임 시간 기반 슬라이스 진행, 쿼터뷰 원근 면(CLASSIC CASCADE)과 흐려지지 않는
-  능선 스택(여백·가장자리 고정·대비 곡선·펜 떨림, JOY DIVISION), 회전/기울기/깊이/높이
-  0–100 옵션(50이 기준값, 스타일마다 반응 곡선이 다름)과 6팔레트
-- 여섯 장면의 도형 배치와 애니메이션 상태
-- 여섯 팔레트와 장면 이름
-- 옵션 기본값과 잘못된 값의 보정
-- 플랫폼과 무관한 최소 그리기 명령
+- Oscilloscope waveform and history computation.
+- Art-visualizer low/mid/high-band and stereo response computation.
+- Campfire beat/frequency response, ten-second silence decay, rising turbulence,
+  lifetime-based embers, star trails around one shared celestial rotation axis, a
+  shooting star roughly once per minute, and the dense black-log and stone-ring
+  silhouettes.
+- 3D spectrum: the hand-written 1024-point FFT, 40 logarithmic bands, the 72-slot
+  time-history buffer, frame-time-based slice advance, the quarter-view
+  perspective surface (`CLASSIC CASCADE`) and the non-fading hidden-line ridge
+  stack (margins, edge clamping, contrast curve and pen jitter — `JOY DIVISION`),
+  plus the rotation/tilt/depth/height 0–100 options (50 is the reference value;
+  each style has a different response curve) and six palettes.
+- Shape layout and animation state for the six art scenes.
+- Six palettes and scene names.
+- Option defaults and correction of invalid values.
+- The platform-neutral minimal drawing commands.
 
-WASAPI, Win32 창과 메뉴, GDI+, VST3, 파일 저장은 Windows 전용으로 남아 있습니다.
-향후 웹의 오디오 입력, Canvas, 브라우저 저장소와 오프라인 캐시는 웹 어댑터가 맡습니다.
+WASAPI, Win32 windows and menus, GDI+, VST3 and file storage stay Windows-only. A
+future web build's audio input, Canvas, browser storage and offline cache belong
+to the web adapter.
 
-## 코드 소유권
+## Code ownership
 
-| 위치 | 책임 | 금지되는 의존성 |
+| Location | Responsibility | Forbidden dependencies |
 | --- | --- | --- |
-| `src/builtin/draw_list.*` | 색상·점과 최소 렌더 명령 계약 | OS, 그래픽 API, DOM |
-| `src/builtin/art_visualizer_engine.*` | 분석, 장면, 팔레트, 애니메이션 | Win32/GDI+, WASAPI, VST3, I/O |
-| `src/builtin/campfire_engine.*` | 박자 분석, 불꽃·장작·불티·연기·별 형상과 애니메이션 | Win32/GDI+, WASAPI, VST3, I/O |
-| `src/builtin/oscilloscope_engine.*` | 파형, 원형 히스토리, 옵션 보정 | Win32/GDI+, WASAPI, VST3, I/O |
-| `src/builtin/spectrum3d_engine.*` | FFT, 로그 밴드, 시간축 히스토리, 두 형상·팔레트 | Win32/GDI+, WASAPI, VST3, I/O |
-| `src/ui/gdi_draw_list_renderer.*` | 공통 명령을 GDI+ 호출로 변환 | 장면·DSP 공식 |
-| `src/ui/gdi_back_buffer.*` | 크기 변경 때만 다시 만드는 Win32 백 버퍼 | 장면·DSP 공식 |
-| `src/ui/*_view.*` | ring 입력, 타이머, 메뉴, 키보드, 텍스트 오버레이 | 장면 복제 |
+| `src/builtin/draw_list.*` | Colour/point and minimal render-command contract | OS, graphics API, DOM |
+| `src/builtin/art_visualizer_engine.*` | Analysis, scenes, palettes, animation | Win32/GDI+, WASAPI, VST3, I/O |
+| `src/builtin/campfire_engine.*` | Beat analysis, flame/log/ember/smoke/star geometry and animation | Win32/GDI+, WASAPI, VST3, I/O |
+| `src/builtin/oscilloscope_engine.*` | Waveform, circular history, option correction | Win32/GDI+, WASAPI, VST3, I/O |
+| `src/builtin/spectrum3d_engine.*` | FFT, logarithmic bands, time-axis history, two shapes and palettes | Win32/GDI+, WASAPI, VST3, I/O |
+| `src/ui/gdi_draw_list_renderer.*` | Translate shared commands into GDI+ calls | Scene/DSP formulas |
+| `src/ui/gdi_back_buffer.*` | Win32 back buffer rebuilt only on resize | Scene/DSP formulas |
+| `src/ui/*_view.*` | Ring input, timers, menus, keyboard, text overlays | Scene duplication |
 
-`vizrack_builtin_core` CMake 타깃은 VST3 및 Windows 타깃보다 먼저 선언됩니다.
-Windows가 아닌 환경에서 최상위 CMake를 구성하면 현재는 이 코어 타깃만 생성되므로,
-플랫폼 헤더가 실수로 유입되는 것을 조기에 발견할 수 있습니다. Windows EXE는 같은
-정적 라이브러리에 링크합니다.
+The `vizrack_builtin_core` CMake target is declared before the VST3 and Windows
+targets. Configuring the top-level CMake on a non-Windows platform currently
+produces only this core target, so a platform header that leaks in by mistake is
+caught early. The Windows EXE links the same static library.
 
-## 실행 흐름
+## Execution flow
 
 ```text
-WASAPI 캡처 스레드
+WASAPI capture thread
     │  StereoFrameRing (float32 L/R, non-blocking)
     ▼
-Win32 내장 뷰 타이머
-    │  최신 최대 4,096 프레임을 엔진 입력 span에 직접 복사
+Win32 built-in view timer
+    │  copies up to the latest 4,096 frames straight into the engine input span
     ▼
-공통 C++ 엔진
-    │  분석·상태 갱신 → DrawList 생성
+Shared C++ engine
+    │  analysis and state update → DrawList
     ▼
-GDI+ 명령 변환기
-    │  재사용 백 버퍼
+GDI+ command translator
+    │  reused back buffer
     ▼
 Win32 child HWND
 ```
 
-향후 웹에서도 가운데 `공통 C++ 엔진 → DrawList`는 바뀌지 않습니다. 앞단은 사용자가
-허용한 브라우저 오디오 입력으로, 뒷단은 Canvas 2D 또는 다른 브라우저 렌더러로
-교체합니다. 따라서 새 장면이나 반응 공식을 `src/builtin`에 한 번 수정하면 두 제품이
-같은 코드를 사용하게 됩니다.
+In a future web build the middle `shared C++ engine → DrawList` does not change.
+The front is replaced with user-permitted browser audio input and the back with
+Canvas 2D or another browser renderer. A new scene or response formula edited
+once in `src/builtin` is therefore used by both products.
 
-## `DrawList` 계약
+## The `DrawList` contract
 
-현재 명령은 세로 그라데이션, 방사형 타원 그라데이션, 선, 폴리라인, 호,
-채운/윤곽 타원, 채운/윤곽 다각형과 채운 사각형입니다. 명령은 좌표와 색상 데이터만
-가지며 GDI+ 객체나 Canvas 객체를 보관하지 않습니다. 방사형 타원 그라데이션의
-`primary`는 중심색, `secondary`는 가장자리색입니다. 텍스트는 메뉴·상태 표시와
-현지화에 가깝기 때문에 어댑터에 남겼습니다.
+The current commands are a vertical gradient, a radial ellipse gradient, a line,
+a polyline, an arc, a filled or outlined ellipse, a filled or outlined polygon
+and a filled rectangle. Commands carry only coordinate and colour data and hold
+no GDI+ or Canvas objects. For the radial ellipse gradient, `primary` is the
+centre colour and `secondary` is the edge colour. Text stays in the adapter
+because it is close to menu and status display and to localization.
 
-새 장면을 만들 때는 기존 명령의 조합을 우선합니다. 새 명령이 정말 필요하면 이는 단순
-장면 수정이 아니라 렌더러 계약 변경입니다. 같은 변경에서 모든 렌더러와 테스트를 함께
-수정해야 합니다. 이 규칙은 한 어댑터만 수정해 다른 어댑터가 깨지는 상황을 막습니다.
+When building a new scene, prefer combining existing commands. If a new command
+is genuinely required, that is a renderer-contract change, not a simple scene
+edit: every renderer and its tests must change in the same commit. This rule
+prevents editing one adapter and breaking another.
 
-다만 공통 소스만으로 픽셀 단위 동일성이 자동 보장되지는 않습니다. GDI+와 Canvas의
-안티앨리어싱, 선 끝, 알파 합성은 다를 수 있으므로 웹 렌더러가 생기면 명령별 계약 테스트와
-대표 장면 이미지 비교를 추가해야 합니다.
+Shared source alone does not automatically guarantee pixel-identical output.
+GDI+ and Canvas can differ in anti-aliasing, line caps and alpha compositing, so
+once a web renderer exists, add per-command contract tests and
+representative-scene image comparisons.
 
-## 성능 설계
+## Performance design
 
-이번 분리에서 런타임 비용을 줄이기 위해 다음 원칙을 적용했습니다.
+To keep runtime cost down, this split follows these principles:
 
-- 뷰가 별도 임시 샘플 벡터를 만들지 않고 ring에서 엔진의 고정 배열로 직접 읽습니다.
-- 오실로스코프 최신 파형과 약 15초 히스토리는 `memmove` 대신 고정 크기 원형 버퍼를
-  사용합니다.
-- 장면 scratch 벡터와 `DrawList`는 최댓값에 맞춰 한 번 reserve한 뒤 프레임마다
-  `clear`하여 용량을 재사용합니다.
-- 렌더 점 수는 오실로스코프 채널당 2,048개, 아트 장면 경로당 720개로 제한합니다.
-- Win32 compatible DC/bitmap은 매 프레임 생성하지 않고 창 크기가 달라질 때만 다시
-  만듭니다.
-- GDI+의 단색 펜과 브러시는 명령마다 생성하지 않고 한 프레임 안에서 재사용합니다.
-- 아트 장면의 감쇠와 위상 진행은 실제 프레임 간격을 사용해 갱신 속도 변화에 따른
-  반응 차이를 줄였습니다.
-- 캠프파이어의 자연 움직임과 감쇠도 실제 프레임 간격을 사용하며, 불꽃 다각형과
-  불티 개수에는 고정 상한을 둡니다. 불티는 고정 배열에서 수명과 속도를 갱신하고,
-  별은 하나의 결정적 타원 회전 변환과 고정 배열의 지연 펄스를 공유합니다.
-  별똥별도 단일 고정 상태로 예약하므로 프레임마다 새 컨테이너를 만들지 않습니다.
+- The view reads from the ring straight into the engine's fixed arrays instead of
+  building a separate temporary sample vector.
+- The oscilloscope's latest waveform and roughly 15-second history use a
+  fixed-size circular buffer rather than `memmove`.
+- Scene scratch vectors and the `DrawList` are reserved once to their maximum,
+  then cleared each frame to reuse the capacity.
+- Rendered point counts are capped at 2,048 per oscilloscope channel and 720 per
+  art-scene path.
+- The Win32 compatible DC and bitmap are created only when the window size
+  changes, not every frame.
+- GDI+ solid pens and brushes are reused within a frame rather than created per
+  command.
+- Art-scene decay and phase advance use the measured frame interval, so behaviour
+  differs less across refresh rates.
+- Campfire's natural motion and decay also use the measured frame interval, and
+  the flame polygon and ember counts have fixed ceilings. Embers update lifetime
+  and velocity in a fixed array; the stars share one deterministic elliptical
+  rotation transform and delayed pulses held in a fixed array. The shooting star
+  is likewise reserved as a single fixed state, so no new container is allocated
+  per frame.
 
-이 코어는 오디오 콜백에서 직접 실행되지 않고 UI 갱신 시점에 실행됩니다. 샘플 수와
-도형 수가 모두 상한을 가지므로 CPU 사용량과 메모리 사용량이 창 크기나 실행 시간에 따라
-무한히 증가하지 않습니다. 가장 무거운 현재 장면은 약 1,000개의 도형 명령을 만드는
-`PULSE MATRIX`이며, 큰 창에서도 예약 용량 안에서 동작하도록 테스트합니다.
+This core does not run in the audio callback; it runs at UI refresh time. Because
+both the sample count and the shape count are bounded, CPU and memory use do not
+grow without limit as the window grows or the process runs longer. The heaviest
+current scene is `PULSE MATRIX`, which emits roughly 1,000 shape commands; it is
+tested to stay within the reserved capacity even in a large window.
 
-추가 최적화는 측정 결과가 있을 때만 진행합니다. GPU 프레임워크, 범용 scene graph,
-별도 DSP 라이브러리 또는 UI 프레임워크를 도입하면 EXE 크기와 웹 번들, 유지보수 범위가
-함께 커지므로 현재 요구에는 적합하지 않습니다.
+Further optimization proceeds only against a measurement. A GPU framework, a
+general-purpose scene graph, a separate DSP library or a UI framework would grow
+the EXE, the web bundle and the maintenance surface together, so none fits the
+current requirements.
 
-## 내장 기능 변경 절차
+## Changing a built-in feature
 
-1. 장면, 분석, 팔레트 또는 옵션은 `src/builtin`에서 수정합니다.
-2. 기존 `DrawPrimitive`만 사용했다면 Win32 어댑터 수정은 원칙적으로 필요하지 않습니다.
-3. 명령 계약을 바꿨다면 모든 렌더러를 같은 변경에서 수정합니다.
-4. `VizRackTests`에서 모든 장면/팔레트, 유효 좌표·point range, 옵션 보정과 반복 프레임의
-   용량 재사용을 확인합니다.
-5. Release 빌드와 `--smoke-test`를 실행하고, 시각 변경은 실제 오디오로 수동 확인합니다.
-6. 향후 웹 타깃이 추가된 뒤에는 네이티브와 웹 빌드를 같은 CI 변경 조건으로 묶습니다.
+1. Edit scenes, analysis, palettes or options in `src/builtin`.
+2. If only existing `DrawPrimitive`s were used, the Win32 adapter normally needs
+   no change.
+3. If the command contract changed, update every renderer in the same commit.
+4. In `VizRackTests`, verify every scene and palette, valid coordinates and point
+   ranges, option correction, and capacity reuse across repeated frames.
+5. Run the Release build and `--smoke-test`, and verify visual changes by hand
+   with real audio.
+6. Once a web target exists, bind the native and web builds to the same CI change
+   conditions.
 
-저장 설정의 필드 이름과 의미도 두 어댑터가 공유해야 합니다. 브라우저 저장 형식 자체는
-달라도 되지만 엔진에 전달되는 옵션 구조와 기본값은 공통 헤더를 기준으로 해야 합니다.
-캠프파이어의 불꽃 반응, 별 이동 속도·평소 밝기·음악 반응, 불티 양·강도는 모두
-`CampfireOptions`의 0–100 값이며 엔진이 범위를 보정합니다. 불꽃 반응 기본값은 20이고,
-기존의 강한 반응은 약 80에 해당합니다.
+The field names and meanings of persisted settings must also be shared by both
+adapters. The browser storage format itself may differ, but the option structs
+and defaults passed to the engine must follow the shared headers. Campfire's
+flame response, star travel speed, star idle brightness, star music response and
+ember amount and intensity are all 0–100 values in `CampfireOptions`,
+range-corrected by the engine. The flame-response default is 20; the previous
+strong response corresponds to about 80.
 
-## 향후 웹 구현 시 최소 작업
+## Minimum work for a future web build
 
-웹 작업을 시작할 때 필요한 것은 공통 엔진의 재작성이나 변환이 아니라 얇은 연결층입니다.
+Starting web work needs a thin connection layer, not a rewrite or a translation
+of the shared engine.
 
-1. `vizrack_builtin_core`를 Emscripten/WebAssembly로 컴파일합니다.
-2. PCM 입력 span, `update`, `buildFrame`, 옵션 읽기/쓰기를 노출하는 작은 바인딩을 둡니다.
-3. `DrawList` 명령을 Canvas 2D 호출로 변환하는 렌더러를 작성합니다.
-4. 사용자 권한이 필요한 오디오 입력과 UI/저장소를 브라우저 어댑터에서 구현합니다.
-5. 정적 자산 캐시, 오프라인 시작과 배포 설정은 웹 어댑터에서 결정합니다.
+1. Compile `vizrack_builtin_core` to Emscripten/WebAssembly.
+2. Add a small binding that exposes the PCM input span, `update`, `buildFrame` and
+   option read/write.
+3. Write a renderer that translates `DrawList` commands into Canvas 2D calls.
+4. Implement the permission-gated audio input and the UI and storage in the
+   browser adapter.
+5. Decide static-asset caching, offline start and deployment configuration in the
+   web adapter.
 
-VST3 호스팅은 이 경로에 포함하지 않습니다. 또한 브라우저 보안 정책상 시스템 전체
-오디오를 Windows EXE처럼 무조건 읽을 수 있다고 가정해서는 안 되며, 이는 공통 코어가
-아닌 웹 입력 어댑터의 제품 제약입니다.
+VST3 hosting is not part of this path. Browser security policy also means you
+cannot assume unconditional system-wide audio capture the way the Windows EXE
+has; that is a product constraint of the web input adapter, not of the shared
+core.

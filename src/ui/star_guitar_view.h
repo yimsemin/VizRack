@@ -1,7 +1,7 @@
 #pragma once
 
 #include "builtin/draw_list.h"
-#include "builtin/spectrum3d_engine.h"
+#include "builtin/star_guitar_engine.h"
 #include "ui/gdi_back_buffer.h"
 #include "ui/gdi_draw_list_renderer.h"
 
@@ -15,19 +15,20 @@ namespace vizrack {
 
 class StereoFrameRing;
 
-// One view class backs both built-in cascade plug-ins; `style` (0 = CLASSIC CASCADE,
-// 1 = JOY DIVISION) is fixed per instance and the palette is the only runtime option.
-class Spectrum3dView {
+// View for the "Star Guitar" homage: a thin Win32 adapter mirroring
+// CampfireView's shape. Tunable options are the four per-band peak-
+// detection sensitivities; see StarGuitarOptions.
+class StarGuitarView {
 public:
-    using OptionsChangedCallback = std::function<void(const Spectrum3dOptions&)>;
+    using OptionsChangedCallback = std::function<void(const StarGuitarOptions&)>;
 
-    Spectrum3dView(StereoFrameRing& ring, int style);
-    ~Spectrum3dView();
+    explicit StarGuitarView(StereoFrameRing& ring);
+    ~StarGuitarView();
 
-    Spectrum3dView(const Spectrum3dView&) = delete;
-    Spectrum3dView& operator=(const Spectrum3dView&) = delete;
+    StarGuitarView(const StarGuitarView&) = delete;
+    StarGuitarView& operator=(const StarGuitarView&) = delete;
 
-    void configure(Spectrum3dOptions options, OptionsChangedCallback callback);
+    void configure(StarGuitarOptions options, OptionsChangedCallback callback);
     bool attach(HINSTANCE instance, HWND parent, std::string& error);
     void detach();
     void resize(int width, int height);
@@ -41,16 +42,13 @@ private:
     void updateSamples();
     void paint();
     void drawOverlay(HDC dc, float width, float height) const;
-    void changePalette(int offset);
     void notifyOptionsChanged();
     void showOptionsMenu(POINT screenPoint);
 
     StereoFrameRing& ring_;
-    int style_;
     std::string inspiration_;
-    const wchar_t* windowClass_;
     HWND hwnd_{};
-    builtin::Spectrum3dEngine engine_;
+    builtin::StarGuitarEngine engine_;
     builtin::DrawList drawList_;
     GdiDrawListRenderer renderer_;
     GdiBackBuffer backBuffer_;

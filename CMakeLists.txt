@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 4.2)
 
-project(VizRack VERSION 0.3.0 LANGUAGES CXX)
+project(VizRack VERSION 0.4.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -23,6 +23,8 @@ add_library(vizrack_builtin_core STATIC
     src/builtin/oscilloscope_engine.h
     src/builtin/spectrum3d_engine.cpp
     src/builtin/spectrum3d_engine.h
+    src/builtin/star_guitar_engine.cpp
+    src/builtin/star_guitar_engine.h
 )
 target_include_directories(vizrack_builtin_core PUBLIC src)
 if(MSVC)
@@ -102,6 +104,8 @@ add_executable(VizRack WIN32
     src/ui/oscilloscope_view.h
     src/ui/spectrum3d_view.cpp
     src/ui/spectrum3d_view.h
+    src/ui/star_guitar_view.cpp
+    src/ui/star_guitar_view.h
     src/vst/plugin_discovery.cpp
     src/vst/plugin_discovery.h
     src/vst/vst_host.cpp

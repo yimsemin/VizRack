@@ -146,6 +146,10 @@ void Spectrum3dView::drawOverlay(HDC dc, float width, float height) const {
                         {18.0f, height - 27.0f}, &dim);
     graphics.DrawString(L"CLICK: PALETTE  ·  RIGHT CLICK: OPTIONS", -1, &smallFont,
                         {width - 300.0f, height - 27.0f, 282.0f, 18.0f}, &right, &dim);
+    if (!inspiration_.empty()) {
+        const std::wstring inspiration = fromUtf8(inspiration_);
+        graphics.DrawString(inspiration.c_str(), -1, &smallFont, {18.0f, 34.0f}, &dim);
+    }
 }
 
 void Spectrum3dView::paint() {

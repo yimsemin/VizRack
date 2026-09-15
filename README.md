@@ -1,6 +1,7 @@
-<!-- The Introduction and "What you can watch" sections are mirrored in
-     README.ko.md. When you change them here, update README.ko.md in the same
-     commit. Everything else is English-only on purpose. -->
+<!-- README.ko.md mirrors the user-facing core of this file: the Introduction,
+     "What you can watch", "Getting started", "Common controls", and "Portable
+     storage and audio handling". When you change one of those sections here,
+     update README.ko.md in the same commit. Everything else is English-only. -->
 
 # VizRack
 
@@ -53,7 +54,7 @@ Choose `More info > Run anyway` only when you trust where the file came from.
 | Arrow keys or number `1`–`6` | Select a scene |
 | `C` | Next palette |
 | Right-click | Current screen and window settings |
-| `F10` | Open the menu while the border is hidden |
+| `F10` or tap `Alt` | Open the menu while the border is hidden |
 
 The `Settings` menu changes always-on-top, hidden border, opacity, the output
 device and the UI language. By default VizRack follows the Windows default
@@ -140,6 +141,8 @@ structure, including how localization works, is in
 Some built-in visualizers take after the work below.
 
 - **Built-in Joy Division** — Inspired by Joy Division
+- **Built-in Star Guitar** — Inspired by The Chemical Brothers / Michel
+  Gondry's "Star Guitar"
 
 These names credit the source of inspiration only. The names and works stay with
 their owners and are not covered by VizRack's MIT License.

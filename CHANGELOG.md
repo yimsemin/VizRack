@@ -11,6 +11,47 @@ ZIP attached. How these notes are written and cut: `docs/RELEASE_NOTES_STYLE.md`
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-09-15
+
+_A rhythmic pixel-art landscape that reacts to the music's frequency
+spectrum, and a handful of polish fixes._
+
+### Added
+
+- **Star Guitar.** A new built-in visualizer (Inspired by The Chemical
+  Brothers / Michel Gondry's "Star Guitar"): a horizontally-scrolling,
+  blocky pixel-art landscape of streetlights, pine trees, trees, telephone
+  poles, building silhouettes, a starry sky and the occasional passing UFO,
+  in four parallax depth layers that scroll at different speeds. Audio
+  splits into eight frequency sub-bands, and each spawns its own object
+  into its own depth layer — under 300Hz (streetlight/pine tree) into the
+  near layer, 300Hz-4kHz (tree/pole) into the mid layer, 4-8kHz (building
+  silhouettes) into the far layer, and above 8kHz (star/UFO) into the sky —
+  whenever that sub-band rises sharply *relative to its own recent level*.
+  A harder hit spawns a visibly bigger object, and every spawn grows up
+  from ground level the same way, so the landscape reads as the music's
+  rhythm rather than scenery that happens to move. Right-click exposes four
+  **sensitivity** settings (Low/Mid/Treble/Air) to tune how easily each
+  frequency group reacts.
+
+### Changed
+
+- **Shorter plug-in menu names.** The redundant "Built-in" / "내장" prefix is
+  gone from the visualizer list, and the "Inspired by …" homage credit moved
+  off the menu bar onto the visualizer's own on-screen caption (Joy Division,
+  Star Guitar).
+- **Art Visualizer's "Neon" palette renamed to "Hatsune Miku."** Its teal and
+  pink duo reads as the character's colors, so the name says so.
+
+### Fixed
+
+- **Joy Division ridges no longer jitter during silence.** The per-ridge wiggle
+  is now scaled by the band's own amplitude, so a silent signal draws a flat
+  line instead of a constant tremor.
+- **The window border can always be brought back.** Hiding it via Settings ▸
+  Hide window border can be undone with `F10` as before, or now by tapping
+  `Alt` alone — no separate hotkey to remember.
+
 ## [0.3.0] - 2026-09-03
 
 _A bilingual interface, a rack of 3D spectrum cascades, and visualizers that name what inspired them._
@@ -62,7 +103,8 @@ _First public release._
   (Windows x64 VST3) as the picture instead of a built-in. Their audio output is
   discarded; VizRack only ever monitors.
 
-[Unreleased]: https://github.com/yimsemin/VizRack/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/yimsemin/VizRack/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/yimsemin/VizRack/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/yimsemin/VizRack/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/yimsemin/VizRack/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/yimsemin/VizRack/releases/tag/v0.1.0
