@@ -187,6 +187,12 @@ SettingsLoadResult loadSettings(const std::filesystem::path& path) {
     if (auto value = readInt(json, "starGuitarAirSensitivity")) {
         result.value.starGuitarAirSensitivity = std::clamp(*value, 0, 100);
     }
+    if (auto value = readInt(json, "rhythmRippleSensitivity")) {
+        result.value.rhythmRippleSensitivity = std::clamp(*value, 0, 100);
+    }
+    if (auto value = readInt(json, "rhythmRippleLongNoteSensitivity")) {
+        result.value.rhythmRippleLongNoteSensitivity = std::clamp(*value, 0, 100);
+    }
     if (auto value = readInt(json, "spectrum3dPalette")) {
         result.value.spectrum3dPalette = std::clamp(*value, 0, 5);
     }
@@ -263,6 +269,10 @@ bool saveSettings(const std::filesystem::path& path, const Settings& settings, s
            << std::clamp(settings.starGuitarTrebleSensitivity, 0, 100) << ",\n"
            << "  \"starGuitarAirSensitivity\": "
            << std::clamp(settings.starGuitarAirSensitivity, 0, 100) << ",\n"
+           << "  \"rhythmRippleSensitivity\": "
+           << std::clamp(settings.rhythmRippleSensitivity, 0, 100) << ",\n"
+           << "  \"rhythmRippleLongNoteSensitivity\": "
+           << std::clamp(settings.rhythmRippleLongNoteSensitivity, 0, 100) << ",\n"
            << "  \"spectrum3dPalette\": " << std::clamp(settings.spectrum3dPalette, 0, 5) << ",\n"
            << "  \"spectrum3dRotation\": " << std::clamp(settings.spectrum3dRotation, 0, 100) << ",\n"
            << "  \"spectrum3dTilt\": " << std::clamp(settings.spectrum3dTilt, 0, 100) << ",\n"

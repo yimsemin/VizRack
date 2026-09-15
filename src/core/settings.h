@@ -33,6 +33,8 @@ struct Settings {
     int starGuitarMidSensitivity{50};
     int starGuitarTrebleSensitivity{50};
     int starGuitarAirSensitivity{50};
+    int rhythmRippleSensitivity{50};
+    int rhythmRippleLongNoteSensitivity{0};
     int spectrum3dPalette{0};
     int spectrum3dRotation{50};
     int spectrum3dTilt{50};

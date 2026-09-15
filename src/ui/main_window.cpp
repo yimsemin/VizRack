@@ -70,6 +70,7 @@ std::wstring localizedPluginName(const PluginDefinition& definition) {
     if (definition.id == "builtin-spectrum3d") return trw(Str::PluginNameSpectrum3d);
     if (definition.id == "builtin-joydivision") return trw(Str::PluginNameJoyDivision);
     if (definition.id == "builtin-starguitar") return trw(Str::PluginNameStarGuitar);
+    if (definition.id == "builtin-rhythmripple") return trw(Str::PluginNameRhythmRipple);
     return fromUtf8(definition.displayName);
 }
 
