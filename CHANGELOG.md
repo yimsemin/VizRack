@@ -11,6 +11,8 @@ ZIP attached. How these notes are written and cut: `docs/RELEASE_NOTES_STYLE.md`
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-09-15
+
 _A rhythmic pixel-art landscape that reacts to the music's frequency
 spectrum, and a handful of polish fixes._
 
@@ -101,7 +103,8 @@ _First public release._
   (Windows x64 VST3) as the picture instead of a built-in. Their audio output is
   discarded; VizRack only ever monitors.
 
-[Unreleased]: https://github.com/yimsemin/VizRack/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/yimsemin/VizRack/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/yimsemin/VizRack/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/yimsemin/VizRack/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/yimsemin/VizRack/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/yimsemin/VizRack/releases/tag/v0.1.0
