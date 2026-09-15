@@ -15,6 +15,10 @@ constexpr float kPi = std::numbers::pi_v<float>;
 // size.
 constexpr float kReferenceWidth = 1920.0f;
 constexpr float kUnitReference = 10.0f; // reference px per "unit" used by the draw helpers
+// How long an accented instance's spawn-moment flash lasts, in real seconds
+// (independent of layer scroll speed, so it reads consistently whether the
+// object is a slow far-layer building or a fast near-layer flash).
+constexpr float kAccentFlashSeconds = 0.16f;
 
 float finiteSample(float value) noexcept {
     return std::isfinite(value) ? value : 0.0f;
@@ -165,6 +169,7 @@ void StarGuitarEngine::update(size_t sampleCount, float frameSeconds) noexcept {
         for (auto& instance : layer.objects) {
             if (!instance.active) continue;
             instance.traveled += layer.speed * safeSeconds;
+            instance.age += safeSeconds;
             // Objects are reclaimed lazily in buildFrame once they scroll
             // fully off screen (screen width varies per call), so no
             // fixed-lifetime cutoff is needed here.
@@ -338,7 +343,8 @@ float StarGuitarEngine::nextRandom() noexcept {
     return static_cast<float>(randomState_ & 0x00ffffffu) / 16777215.0f;
 }
 
-void StarGuitarEngine::spawnInstance(Layer& layer, StarGuitarObjectType type) noexcept {
+void StarGuitarEngine::spawnInstance(Layer& layer, StarGuitarObjectType type,
+                                     bool accented) noexcept {
     // Search for a free slot starting at the round-robin cursor. If every
     // slot is still occupied by an object that hasn't scrolled off screen
     // yet, drop this spawn instead of overwriting (and visually truncating)
@@ -351,8 +357,10 @@ void StarGuitarEngine::spawnInstance(Layer& layer, StarGuitarObjectType type) no
         layer.nextSlot = (index + 1) % kLayerCapacity;
         ++spawnSerial_;
         instance.active = true;
+        instance.accented = accented;
         instance.type = type;
         instance.traveled = 0.0f;
+        instance.age = 0.0f;
         instance.seed = hashCombine(spawnSerial_, spawnSerial_ * 2246822519u);
         return;
     }
@@ -373,15 +381,19 @@ void StarGuitarEngine::updateEdgeTriggeredLayer(Layer& layer, bool onset,
                                                 float frameSeconds) noexcept {
     layer.idleTimer -= frameSeconds;
     if (onset) {
-        spawnInstance(layer, onsetType);
+        // A real onset: accented, so it gets the spawn-moment flash -- this
+        // object's arrival IS the beat note.
+        spawnInstance(layer, onsetType, /*accented=*/true);
         layer.idleTimer = layer.baseIntervalSeconds + nextRandom() * layer.jitterSeconds;
         return;
     }
     if (layer.idleTimer <= 0.0f) {
         // Ambient fallback: keeps the layer from sitting empty through a
         // quiet-but-audible passage, on a randomized (not fixed-grid)
-        // cadence. Suspended entirely during silence by the caller.
-        spawnInstance(layer, ambientType);
+        // cadence. Suspended entirely during silence by the caller. Not
+        // accented -- it isn't tied to a real audio event, so it shouldn't
+        // compete visually with a real hit.
+        spawnInstance(layer, ambientType, /*accented=*/false);
         layer.idleTimer = layer.baseIntervalSeconds + nextRandom() * layer.jitterSeconds;
     }
 }
@@ -394,8 +406,10 @@ void StarGuitarEngine::updateIntervalLayer(Layer& layer, float sustainedLevel,
     if (layer.idleTimer > 0.0f) return;
     // Mixing in the secondary type (trees alongside poles) keeps the cadence
     // from reading as one repeating shape even though the timing itself is
-    // still driven by a single interval.
-    spawnInstance(layer, nextRandom() < 0.55f ? primaryType : secondaryType);
+    // still driven by a single interval. Not accented: this timer isn't tied
+    // to a real onset.
+    spawnInstance(layer, nextRandom() < 0.55f ? primaryType : secondaryType,
+                 /*accented=*/false);
     // Higher sustained energy shortens the average interval (busier cadence)
     // while jitter keeps consecutive spawns asymmetric instead of a strict
     // metronome grid.
@@ -409,7 +423,7 @@ void StarGuitarEngine::updateSecondaryOnset(Layer& layer, float rise, float thre
                                             float frameSeconds) noexcept {
     (void)frameSeconds;
     if (detectOnset(rise, threshold, layer.secondaryCooldown, 0.22f)) {
-        spawnInstance(layer, type);
+        spawnInstance(layer, type, /*accented=*/true);
     }
 }
 
@@ -471,7 +485,10 @@ void StarGuitarEngine::updateMidLayerBeatLocked(Layer& layer, bool confirmedOnse
                                                 StarGuitarObjectType secondaryType,
                                                 float frameSeconds) noexcept {
     const auto spawnPulse = [&] {
-        spawnInstance(layer, nextRandom() < 0.55f ? primaryType : secondaryType);
+        // Both the confirmed-onset and phase-fill-in pulses represent a real
+        // beat moment, so both are accented.
+        spawnInstance(layer, nextRandom() < 0.55f ? primaryType : secondaryType,
+                     /*accented=*/true);
     };
     // Both modes react to a confirmed kick the same way -- that's a direct
     // reaction, not a prediction, so it belongs in both. Only the fill-in
@@ -509,7 +526,9 @@ void StarGuitarEngine::updateSkyLayer(Layer& layer, float airRise, float frameSe
     const StarGuitarObjectType type =
         pick < 0.5f ? StarGuitarObjectType::bird
                     : pick < 0.8f ? StarGuitarObjectType::star : StarGuitarObjectType::plane;
-    spawnInstance(layer, type);
+    // Not accented: the spawn-moment flash is deliberately reserved for the
+    // ground-level rhythm layers for now (sky twinkle is a lower priority).
+    spawnInstance(layer, type, /*accented=*/false);
 
     // The minimum spacing shortens a little as the song's overall energy
     // rises, but stays within a several-second-plus range either way, so a
@@ -712,6 +731,20 @@ void StarGuitarEngine::drawStar(DrawList& output, float baseX, float baseY,
                             armThickness, armLength, glow);
 }
 
+void StarGuitarEngine::drawAccentFlash(DrawList& output, float baseX, float baseY, float unit,
+                                       float ageFraction) const {
+    // A quick, bright "shockwave" ring anchored at the object's ground point
+    // (works for every object type without per-type placement logic): it
+    // expands slightly and fades out over the flash window, so the moment an
+    // accented object appears reads as a struck note rather than scenery
+    // that simply materialized.
+    const float alpha = 1.0f - ageFraction;
+    const float radius = unit * (2.2f + ageFraction * 2.6f);
+    output.addRadialGradientEllipse(baseX - radius, baseY - radius * 0.6f, radius * 2.0f,
+                                    radius * 1.2f, color(0xfff3d6, static_cast<uint8_t>(190.0f * alpha * alpha)),
+                                    color(0xfff3d6, 0));
+}
+
 void StarGuitarEngine::buildFrame(float width, float height, DrawList& output) {
     output.reset();
     if (!std::isfinite(width) || !std::isfinite(height) || width <= 0.0f || height <= 0.0f) {
@@ -779,6 +812,10 @@ void StarGuitarEngine::buildFrame(float width, float height, DrawList& output) {
                 default:
                     drawBuilding(output, screenX, groundY, unit, instance.type, instance.seed);
                     break;
+            }
+            if (instance.accented && instance.age < kAccentFlashSeconds) {
+                drawAccentFlash(output, screenX, groundY, unit,
+                                instance.age / kAccentFlashSeconds);
             }
         }
     }

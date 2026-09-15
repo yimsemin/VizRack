@@ -85,12 +85,21 @@ private:
     // pixels) the object has moved since it spawned at the right edge of the
     // reference frame; screen position is derived from it every frame rather
     // than stored, so layers need no index/grid bookkeeping. `seed` also
-    // supplies the sky layer's deterministic vertical placement.
+    // supplies the sky layer's deterministic vertical placement. `age` is
+    // real elapsed seconds since spawn (independent of layer speed), used
+    // only to time the spawn-moment accent flash below.
     struct Instance {
         bool active{false};
+        // True when this instance was spawned directly by a confirmed
+        // rhythmic onset (a real "쿵"/"짝"/hi-hat hit), as opposed to an
+        // ambient/interval fallback spawn. Only accented instances get the
+        // spawn-moment flash -- the point is for the object's arrival itself
+        // to read as a struck beat note, not a generic decoration.
+        bool accented{false};
         StarGuitarObjectType type{StarGuitarObjectType::pole};
         uint32_t seed{};
         float traveled{};
+        float age{};
     };
 
     // Per-layer scroll speed, spawn cadence and trigger state. Each layer is
@@ -113,8 +122,9 @@ private:
     // Spawns into the next free slot in round-robin order; if every slot is
     // still occupied by an object that hasn't scrolled off screen yet, the
     // spawn is dropped rather than stomping (and visually truncating) that
-    // still-active object.
-    void spawnInstance(Layer& layer, StarGuitarObjectType type) noexcept;
+    // still-active object. `accented` marks a real onset-triggered spawn (as
+    // opposed to an ambient fallback) for the spawn-moment flash in buildFrame.
+    void spawnInstance(Layer& layer, StarGuitarObjectType type, bool accented) noexcept;
     // Debounced rising-edge check shared by every onset-driven trigger: fires
     // when `rise` crosses `threshold` and at least `cooldownSeconds` (plus a
     // little jitter) has passed since the last firing tracked in `cooldown`.
@@ -179,6 +189,13 @@ private:
     void drawWaterTower(DrawList& output, float baseX, float groundY, float unit,
                         uint32_t seed);
     void drawSignalMarker(DrawList& output, float baseX, float groundY, float unit) const;
+    // The spawn-moment "note attack": a brief bright glow drawn on top of an
+    // accented instance for its first fraction of a second, fading out as
+    // `ageFraction` (0 at spawn, 1 at the end of the flash window) rises.
+    // This is what should make the object's arrival itself read as a struck
+    // beat rather than scenery that simply appeared.
+    void drawAccentFlash(DrawList& output, float baseX, float baseY, float unit,
+                         float ageFraction) const;
     void drawBird(DrawList& output, float baseX, float baseY, float unit) const;
     void drawPlane(DrawList& output, float baseX, float baseY, float unit) const;
     void drawStar(DrawList& output, float baseX, float baseY, float unit) const;

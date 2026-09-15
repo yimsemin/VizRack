@@ -32,8 +32,12 @@ ZIP attached. How these notes are written and cut: `docs/RELEASE_NOTES_STYLE.md`
   confirmed onsets, no tempo estimate) or Predictive (also estimates the
   song's tempo from recent kick onsets and fills in the mid layer's pulse on
   the predicted beat between hits; falls back to reactive until a lock is
-  acquired). This is an early prototype to evaluate feel and quality, not a
-  finished feature.
+  acquired). Every onset-triggered spawn (not ambient/interval fallback
+  spawns) now flashes briefly the moment it appears, so the object's arrival
+  itself reads as a struck beat note rather than scenery that just showed
+  up — closer to how a sequencer note lights up than a continuous audio-
+  reactive animation. This is an early prototype to evaluate feel and
+  quality, not a finished feature.
 
 ## [0.3.0] - 2026-09-03
 
