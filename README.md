@@ -141,6 +141,8 @@ structure, including how localization works, is in
 Some built-in visualizers take after the work below.
 
 - **Built-in Joy Division** — Inspired by Joy Division
+- **Built-in Star Guitar** — Inspired by The Chemical Brothers / Michel
+  Gondry's "Star Guitar"
 
 These names credit the source of inspiration only. The names and works stay with
 their owners and are not covered by VizRack's MIT License.

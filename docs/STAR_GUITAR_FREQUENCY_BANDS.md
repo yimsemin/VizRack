@@ -1,110 +1,133 @@
 # Star Guitar — frequency bands
 
 Reference for `src/builtin/star_guitar_engine.cpp`'s band split and what
-drives each visual layer. Prototype scope only; revisit if the algorithm
-design changes.
+drives each visual layer. The cutoffs and mapping below were chosen by hand
+and can still be tuned interactively via the right-click sensitivity
+settings (see "Customizing peak sensitivity" below) — revisit this doc
+whenever that tuning settles or the layer/band mapping changes.
 
-## What lives where (general audio-engineering knowledge)
+## Eight sub-bands, seven filters
 
-| Range | Typical source | Rhythmic usefulness |
+Seven cascaded one-pole low-pass filters at increasing cutoffs split the
+signal into eight sub-bands; each sub-band is the residual between
+consecutive filters (the last sub-band is everything above the highest
+cutoff):
+
+| # | Range | Typical source |
 | --- | --- | --- |
-| <150Hz | Kick/bass drum fundamental, sub-bass | Strong, clean on-beat pulse ("쿵") |
-| 150Hz-2.5kHz | Bass guitar harmonics, vocals, guitars, keys, snare body (~150-400Hz) | Dense and near-continuous in most mixes — a poor onset trigger, useful only as a "how busy is the song" level |
-| 2.5-6kHz | Snare/clap snap, vocal sibilance, pick attack | The most reliable backbeat ("짝") cue — a snare's identity is this broadband snap, not a narrow band |
-| >6kHz | Hi-hats, cymbals, shakers, shimmer/air | Short, frequent transients; the only band that should represent "sky" material |
+| 0 | <80Hz | Deep sub-bass |
+| 1 | 80-300Hz | Kick/bass drum fundamental |
+| 2 | 300Hz-1kHz | Bass guitar harmonics, low vocals/guitars |
+| 3 | 1-4kHz | Vocals, guitars, keys (most harmonic content) |
+| 4 | 4-6kHz | Snare/clap snap (lower part), pick attack |
+| 5 | 6-8kHz | Snare/clap snap (upper part), vocal sibilance |
+| 6 | 8-12kHz | Hi-hats, cymbals, shimmer |
+| 7 | >12kHz | Air, cymbal shimmer tail, very high transients |
 
-Two corrections from the first version of this engine:
-
-- A snare/clap is **not** a mid-band signal. Its identity is a broadband
-  transient combining body resonance (~150-400Hz) and wire/clap noise
-  (mostly >2kHz) — closer to "presence" than "mid." Using the old
-  170Hz-2100Hz mid band as a snare proxy mostly picked up whatever vocal or
-  harmonic instrument was playing instead.
-- A single "high" band (>2100Hz) conflated snare snap with hi-hat/cymbal
-  content, so the near-layer cymbal cue and the "짝" cue could fire on the
-  same material. Splitting presence (2.5-6kHz) from air (>6kHz) separates
-  them.
-
-## Engine band split (4 bands, 3 cascaded one-pole filters)
-
-```
-low       = lowFilter_                (cutoff 150Hz)
-mid       = midFilter_ - lowFilter_   (150Hz-2.5kHz)
-presence  = presenceFilter_ - midFilter_  (2.5-6kHz)
-air       = mono - presenceFilter_    (>6kHz)
-```
-
-3 bands were considered but rejected: a single "high" band above ~2.1kHz
-cannot separate snare snap from hi-hat/cymbal content, which was the direct
-cause of the near-layer and "짝" triggers overlapping. 5 bands (splitting out
-a dedicated snare-body band around 150-400Hz) was also considered, but the
-150-400Hz zone overlaps too heavily with kick/bass fundamentals and toms to
-cleanly separate with a simple filter cutoff — not worth the added
-complexity for a prototype.
+These are deliberately coarse, hand-picked splits, not a claim of precise
+instrument separation — see "Known limitation" below.
 
 ## Peak detection: relative, not absolute
 
-A band "peaks" when its current level rises sharply **relative to its own
-recent baseline** — not when it crosses some fixed number. This matters: a
-loud, bass-heavy song and a quiet, sparse one should both read their kicks as
-peaks, and a busy bassline holding a consistently high level shouldn't read
-as one long peak just because it's loud. `detectPeak()` in
-`star_guitar_engine.cpp` implements this once, shared by all three bands that
-spawn anything:
+A sub-band "peaks" when its current level rises sharply **relative to its
+own recent baseline** — not when it crosses some fixed number. `detectPeak()`
+implements this once, shared by all eight sub-bands:
 
 ```
 relativeRise = (level - baseline) / (baseline + floor)
 peaks when relativeRise > threshold AND level > floorLevel AND cooldown expired
 ```
 
-`baseline` is a slow (multi-second) follow of the band's own level, captured
-*before* the current frame updates it, so the comparison is always against
-where the band already was. `level > floorLevel` additionally gates out pure
-noise when the band is near silent (a tiny absolute level can still produce a
-large *relative* jump that isn't musically meaningful).
+`baseline` is a slow (multi-second) follow of the sub-band's own level,
+captured *before* the current frame updates it. A confirmed peak carries its
+`magnitude` (the sub-band's own level at that instant) into
+`sizeFromMagnitude()`, which every peak-driven spawn uses to size the
+resulting object — a harder hit spawns a visibly bigger object, uniformly
+across every sub-band.
 
-A confirmed peak carries its `magnitude` (the band's own level at that
-instant) forward into two things, uniformly across every spawn source:
+## Customizing peak sensitivity
 
-- **Size.** `sizeFromMagnitude()` maps magnitude to how big the spawned
-  object grows — a harder hit spawns a visibly bigger building/pole/marker.
-- **Type/layer.** Which band peaked selects what spawns and where (see the
-  table below) — this was already true in the previous version; what's new
-  is that size now also comes from the same peak instead of being fixed.
+The eight sub-bands group into four coarse controls exposed in the
+visualizer's right-click menu ("Low/Mid/Treble/Air sensitivity", 0-100):
+each pair of adjacent sub-bands shares one setting.
+`thresholdFromSensitivity()` maps 0-100 to the `relativeThreshold` above —
+higher sensitivity means a smaller relative rise is enough to count as a
+peak. These are genuinely meant to be tuned by ear per source material
+rather than nailed down once in code; there is no single globally-correct
+value.
 
-## Visual mapping
+Each group's curve is individually recentred so its own slider's midpoint
+(50) reproduces a value found good by ear during tuning
+(`kBandReferenceSensitivity` in the .cpp), while the endpoints (0 and 100)
+stay at the same raw insensitive/sensitive extremes for every group:
 
-| Band | Drives |
+| Group | Slider 50 reproduces raw value |
 | --- | --- |
-| low | Far layer (building, or a water tower for a strong-enough peak, "쿵") + mid layer's primary pulse (pole/tree, in both algorithm modes) + the tempo tracker |
-| mid | No peak detector at all (see below) — only `songEnergy_` and the reactive mode's ambient mid-layer cadence |
-| presence | Mid layer's secondary marker ("짝") |
-| air | Near layer's cymbal/hi-hat marker **and** the sky layer (heavily weighted toward stars, occasional bird/plane) |
+| Low | 70 |
+| Mid | 80 |
+| Treble | 90 |
+| Air | 80 |
 
-The sky layer is intentionally restricted to the air band only — never mid —
-per the "하늘은 반드시 고역대" requirement: a song with no hi-hat/cymbal/shimmer
-content simply never spawns anything in the sky, rather than falling back to
-a generic timer or a denser band.
+This is a two-segment piecewise-linear remap per group, not a shift of the
+whole range — `sensitivity <= 50` interpolates between the raw-0 and
+raw-reference thresholds, `sensitivity > 50` interpolates between
+raw-reference and raw-100.
 
-Mid is the one band with no peak detector, on purpose: it's dense and
-near-continuously present in most mixes (vocals, guitars, keys, the bass
-line's own harmonics), so a relative-rise test on it would fire almost
-constantly rather than marking anything distinctive. This isn't an arbitrary
-exception — every other band gets the identical treatment; mid specifically
-fails the "peaks are meaningful" premise the whole mechanism depends on.
+## Sub-band → object type → depth layer
 
-Every spawn — peak-triggered or an ambient filler spawned on a quiet-passage
-timer — animates in with the same grow-from-ground motion (`growEase()` in
-`buildFrame()`). The only thing that distinguishes a real hit from filler is
-size: peak spawns use `sizeFromMagnitude()`, filler spawns use a fixed,
-smaller `kAmbientSizeScale`. There is deliberately no case where some spawns
-animate and others don't.
+Each sub-band drives exactly one object type in exactly one depth layer —
+no sub-band drives more than one destination, and no layer receives spawns
+from more than the two sub-bands in its group:
+
+| Sub-band | Object | Layer | Sensitivity control |
+| --- | --- | --- | --- |
+| 0 (<80Hz) | Signal marker (streetlight) | Near (fastest/largest) | Low |
+| 1 (80-300Hz) | Pine tree | Near | Low |
+| 2 (300Hz-1kHz) | Tree | Mid | Mid |
+| 3 (1-4kHz) | Telephone pole | Mid | Mid |
+| 4 (4-6kHz) | Stepped building silhouette | Far (slowest/smallest) | Treble |
+| 5 (6-8kHz) | Plain building | Far | Treble |
+| 6 (8-12kHz) | Star | Sky | Air |
+| 7 (>12kHz) | UFO | Sky | Air |
+
+`pine` and `tree` are deliberately different silhouettes (pine: five
+sharply-tapering tiers reading as a conifer; tree: three broader tiers) so
+the two "tree" spawns stay visually distinguishable even though they share a
+family resemblance. `waterTower`, `bird` and `plane` are currently unmapped
+by any sub-band (kept in the type enum and their draw functions in case a
+future remap reintroduces them).
+
+This intentionally **inverts** the original version's depth assignment: low
+frequencies now drive the *nearest* layer (big, fast, close) and the treble
+group drives the *farthest* (small, slow, distant), with mid in between and
+air reserved for the sky. Near/mid/far still keep their original speed and
+scale characteristics (far is always slowest/smallest, near always
+fastest/largest) — only which frequency group feeds which layer changed.
+
+There is no tempo estimation or beat prediction anywhere in the engine: every
+layer reacts only to confirmed peaks, with a plain jittered ambient timer
+filling the gaps between them (a filler pine tree, in the near layer's
+case). A tempo-tracking "predictive" mode was tried and removed — it added a
+second, harder-to-reason-about code path for a benefit that didn't hold up
+once the grow-in animation (see below) made peak-triggered spawns read as
+clear beat cues on their own.
+
+Sky has no ambient/filler fallback — it only ever reflects an actual air-band
+peak, per the "하늘은 반드시 고역대" requirement from earlier design
+discussion, now generalized: a sub-band with no peaks simply produces
+nothing, rather than falling back to a timer.
+
+Every spawn — peak-triggered or an ambient filler on a quiet-passage timer
+(used by near/mid/far, not sky) — animates in with the same grow-from-ground
+motion (`growEase()` in `buildFrame()`). The only thing distinguishing a real
+hit from filler is size: peak spawns use `sizeFromMagnitude()`, filler
+spawns use a fixed, smaller `kAmbientSizeScale`. There is deliberately no
+case where some spawns animate and others don't.
 
 ## Known limitation
 
-Three analysis bands (four counting the split residual) is a coarse
-approximation. Real drum/vocal/instrument separation would need spectral
-analysis (FFT-based band energy, or an actual onset-detection model), not
-three cascaded one-pole filters. This is accurate enough to be a meaningfully
-better proxy than the 3-band version, not a claim of precise instrument
-classification.
+Eight one-pole-filter sub-bands is a coarse approximation, not real
+spectral/instrument separation — a proper implementation would need an
+FFT-based band analysis or an actual onset-detection model. This is accurate
+enough to give each sub-band a distinct, describable character, not a claim
+of precise instrument classification.

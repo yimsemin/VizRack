@@ -31,28 +31,21 @@ ZIP attached. How these notes are written and cut: `docs/RELEASE_NOTES_STYLE.md`
 
 ### Added
 
-- **Star Guitar (prototype).** A new built-in visualizer, `Built-in Star Guitar`
-  (Inspired by The Chemical Brothers / Michel Gondry's "Star Guitar"): a
-  horizontally-scrolling, blocky pixel-art landscape of telephone poles,
-  trees, building silhouettes, a water tower, trackside signal markers and
-  a sky of birds/planes/stars, in four parallax layers (far/mid/near/sky)
-  that scroll at different speeds. What spawns is driven by one rule
-  applied across four frequency bands (low/mid/presence/air — see
-  `docs/STAR_GUITAR_FREQUENCY_BANDS.md`): a band "peaks" when it rises
-  sharply *relative to its own recent level*, not past a fixed number: a
-  low-band peak ("쿵") spawns a water tower or building in the far layer
-  and the mid layer's pole/tree pulse; a presence-band peak ("짝",
-  snare/clap-like) flashes a signal marker; an air-band peak (hi-hat/
-  cymbal-like) flashes a marker in the near layer and spawns a sky object
-  (weighted toward stars). A peak's magnitude sets how big the spawned
-  object grows. Every spawn — a real peak or a quiet-passage filler alike
-  — grows up from ground level the same way, so a rising object is always
-  the beat cue, the same way a rising band on a spectrum display reads as
-  rhythm. Nothing spawns while the signal is silent. Right-click exposes a
-  **Rhythm detection** option: Reactive (no tempo estimate) or Predictive
-  (also estimates the song's tempo from recent low-band peaks and fills
-  the mid layer's pulse on the predicted beat between them). This is an
-  early prototype to evaluate feel and quality, not a finished feature.
+- **Star Guitar.** A new built-in visualizer (Inspired by The Chemical
+  Brothers / Michel Gondry's "Star Guitar"): a horizontally-scrolling,
+  blocky pixel-art landscape of streetlights, pine trees, trees, telephone
+  poles, building silhouettes, a starry sky and the occasional passing UFO,
+  in four parallax depth layers that scroll at different speeds. Audio
+  splits into eight frequency sub-bands, and each spawns its own object
+  into its own depth layer — under 300Hz (streetlight/pine tree) into the
+  near layer, 300Hz-4kHz (tree/pole) into the mid layer, 4-8kHz (building
+  silhouettes) into the far layer, and above 8kHz (star/UFO) into the sky —
+  whenever that sub-band rises sharply *relative to its own recent level*.
+  A harder hit spawns a visibly bigger object, and every spawn grows up
+  from ground level the same way, so the landscape reads as the music's
+  rhythm rather than scenery that happens to move. Right-click exposes four
+  **sensitivity** settings (Low/Mid/Treble/Air) to tune how easily each
+  frequency group reacts.
 
 ## [0.3.0] - 2026-09-03
 

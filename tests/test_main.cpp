@@ -652,13 +652,22 @@ void testStarGuitarCore() {
 
     StarGuitarEngine engine;
     engine.setOptions(StarGuitarOptions{});
-    CHECK(engine.options().algorithmMode == vizrack::StarGuitarAlgorithmMode::reactive);
-    engine.setOptions({vizrack::StarGuitarAlgorithmMode::predictive});
-    CHECK(engine.options().algorithmMode == vizrack::StarGuitarAlgorithmMode::predictive);
-    // An invalid enum value (e.g. corrupted settings) must normalize back to
-    // the default rather than being stored or interpreted.
-    engine.setOptions({static_cast<vizrack::StarGuitarAlgorithmMode>(99)});
-    CHECK(engine.options().algorithmMode == vizrack::StarGuitarAlgorithmMode::reactive);
+
+    // Per-band sensitivity values must clamp to 0-100 rather than being
+    // stored out of range.
+    StarGuitarOptions outOfRange{};
+    outOfRange.lowSensitivity = -20;
+    outOfRange.midSensitivity = 250;
+    outOfRange.trebleSensitivity = 50;
+    outOfRange.airSensitivity = 101;
+    engine.setOptions(outOfRange);
+    const auto clamped = engine.options();
+    CHECK(clamped.lowSensitivity == 0);
+    CHECK(clamped.midSensitivity == 100);
+    CHECK(clamped.trebleSensitivity == 50);
+    CHECK(clamped.airSensitivity == 100);
+    engine.setOptions(StarGuitarOptions{});
+
     engine.setSampleRate(96000);
     engine.setSampleRate(1);  // out of range, ignored
 

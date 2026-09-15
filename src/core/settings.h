@@ -29,7 +29,10 @@ struct Settings {
     int campfireStarResponse{40};
     int campfireParticleAmount{60};
     int campfireParticleIntensity{50};
-    int starGuitarAlgorithmMode{0};  // 0 = reactive, 1 = predictive
+    int starGuitarLowSensitivity{50};
+    int starGuitarMidSensitivity{50};
+    int starGuitarTrebleSensitivity{50};
+    int starGuitarAirSensitivity{50};
     int spectrum3dPalette{0};
     int spectrum3dRotation{50};
     int spectrum3dTilt{50};

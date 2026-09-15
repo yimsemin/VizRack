@@ -79,7 +79,7 @@ const std::vector<PluginDefinition>& pluginCatalog() {
             "",
             "",
             "",
-            "Prototype / Rhythm Sequencer Landscape",
+            "Rhythm Sequencer Landscape",
             {},
             "",
             "Inspired by The Chemical Brothers / Michel Gondry's \"Star Guitar\"",
