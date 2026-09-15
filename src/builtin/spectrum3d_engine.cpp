@@ -382,7 +382,7 @@ void Spectrum3dEngine::drawJoyDivision(DrawList& output, float width, float heig
                                smoothstep(deadZone, rampEnd, 1.0f - t);
             const float raw = std::clamp(sampleBand(slice, t), 0.0f, 1.0f);
             const float shaped = std::pow(raw, 1.9f);  // widen crest-to-trough contrast
-            const float jitter = mask * wiggle * ridgeWiggle(salt, t);
+            const float jitter = mask * wiggle * shaped * ridgeWiggle(salt, t);
             const float x = centerX + (t - 0.5f) * 2.0f * halfWidth;
             const float y = rowY - shaped * mask * rowAmp - jitter;
             scratch_.push_back({x, y});

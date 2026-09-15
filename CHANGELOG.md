@@ -11,6 +11,12 @@ ZIP attached. How these notes are written and cut: `docs/RELEASE_NOTES_STYLE.md`
 
 ## [Unreleased]
 
+### Fixed
+
+- **Joy Division ridges no longer jitter during silence.** The per-ridge wiggle
+  is now scaled by the band's own amplitude, so a silent signal draws a flat
+  line instead of a constant tremor.
+
 ## [0.3.0] - 2026-09-03
 
 _A bilingual interface, a rack of 3D spectrum cascades, and visualizers that name what inspired them._
