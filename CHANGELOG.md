@@ -16,6 +16,18 @@ ZIP attached. How these notes are written and cut: `docs/RELEASE_NOTES_STYLE.md`
 - **Joy Division ridges no longer jitter during silence.** The per-ridge wiggle
   is now scaled by the band's own amplitude, so a silent signal draws a flat
   line instead of a constant tremor.
+- **The window border can always be brought back.** Hiding it via Settings ▸
+  Hide window border can be undone with `F10` as before, or now by tapping
+  `Alt` alone — no separate hotkey to remember.
+
+### Changed
+
+- **Shorter plug-in menu names.** The redundant "Built-in" / "내장" prefix is
+  gone from the visualizer list, and the "Inspired by …" homage credit moved
+  off the menu bar onto the visualizer's own on-screen caption (Joy Division,
+  Star Guitar).
+- **Art Visualizer's "Neon" palette renamed to "Hatsune Miku."** Its teal and
+  pink duo reads as the character's colors, so the name says so.
 
 ### Added
 

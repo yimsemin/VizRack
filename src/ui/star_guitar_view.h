@@ -33,6 +33,7 @@ public:
     void detach();
     void resize(int width, int height);
     void setSampleRate(uint32_t sampleRate) noexcept;
+    void setInspiration(std::string inspiration) { inspiration_ = std::move(inspiration); }
     bool active() const noexcept { return hwnd_ != nullptr; }
 
 private:
@@ -45,6 +46,7 @@ private:
     void showOptionsMenu(POINT screenPoint);
 
     StereoFrameRing& ring_;
+    std::string inspiration_;
     HWND hwnd_{};
     builtin::StarGuitarEngine engine_;
     builtin::DrawList drawList_;

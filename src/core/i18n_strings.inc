@@ -59,12 +59,12 @@ VIZRACK_STR(MenuAbout,               "About VizRack", "VizRack 정보")
 VIZRACK_STR(MenuCredits,             "Credits", "크레딧")
 
 // ── Built-in plug-in display names ──────────────────────────────────────────
-VIZRACK_STR(PluginNameOscilloscope,  "Built-in Oscilloscope", "내장 오실로스코프")
-VIZRACK_STR(PluginNameArtVisualizer, "Built-in Art Visualizer", "내장 아트 비주얼라이저")
-VIZRACK_STR(PluginNameCampfire,      "Built-in Campfire", "내장 캠프파이어")
-VIZRACK_STR(PluginNameSpectrum3d,    "Built-in 3D Spectrum", "내장 3D 스펙트럼")
-VIZRACK_STR(PluginNameJoyDivision,   "Built-in Joy Division", "내장 Joy Division")
-VIZRACK_STR(PluginNameStarGuitar,    "Built-in Star Guitar", "내장 Star Guitar")
+VIZRACK_STR(PluginNameOscilloscope,  "Oscilloscope", "오실로스코프")
+VIZRACK_STR(PluginNameArtVisualizer, "Art Visualizer", "아트 비주얼라이저")
+VIZRACK_STR(PluginNameCampfire,      "Campfire", "캠프파이어")
+VIZRACK_STR(PluginNameSpectrum3d,    "3D Spectrum", "3D 스펙트럼")
+VIZRACK_STR(PluginNameJoyDivision,   "Joy Division", "Joy Division")
+VIZRACK_STR(PluginNameStarGuitar,    "Star Guitar", "Star Guitar")
 
 // ── VST3 file picker ────────────────────────────────────────────────────────
 VIZRACK_STR(PickerFolderTitleFmt,  "Select the {} .vst3 bundle folder", "{} .vst3 번들 폴더 선택")

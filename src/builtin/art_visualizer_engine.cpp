@@ -16,7 +16,7 @@ constexpr std::array<std::string_view, ArtVisualizerEngine::kSceneCount> kSceneN
 };
 
 constexpr std::array<ArtPalette, ArtVisualizerEngine::kPaletteCount> kPalettes{{
-    {"NEON",   0x060d18, 0x0c0519, 0x3aecd6, 0x6976ff, 0xf64daf},
+    {"HATSUNE MIKU", 0x060d18, 0x0c0519, 0x3aecd6, 0x6976ff, 0xf64daf},
     {"AURORA", 0x031713, 0x071126, 0x59f19b, 0x37b9ff, 0xb66cff},
     {"SUNSET", 0x210810, 0x10091f, 0xff5d73, 0xffa45b, 0xb36cff},
     {"OCEAN",  0x031522, 0x02080f, 0x35d7ff, 0x3176ff, 0x4ff0c8},
