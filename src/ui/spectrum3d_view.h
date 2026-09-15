@@ -32,6 +32,7 @@ public:
     void detach();
     void resize(int width, int height);
     void setSampleRate(uint32_t sampleRate) noexcept;
+    void setInspiration(std::string inspiration) { inspiration_ = std::move(inspiration); }
     bool active() const noexcept { return hwnd_ != nullptr; }
 
 private:
@@ -46,6 +47,7 @@ private:
 
     StereoFrameRing& ring_;
     int style_;
+    std::string inspiration_;
     const wchar_t* windowClass_;
     HWND hwnd_{};
     builtin::Spectrum3dEngine engine_;

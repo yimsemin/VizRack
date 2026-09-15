@@ -439,9 +439,12 @@ bool App::startBuiltInPlugin(const PluginDefinition& definition, std::string& er
     joyDivision_.setSampleRate(sampleRate);
     starGuitar_.setSampleRate(sampleRate);
     activeBuiltInPluginId_ = definition.id;
-    std::string status = definition.displayName;
-    if (!definition.inspiration.empty()) status += "  —  " + definition.inspiration;
-    window_->setPluginStatus(std::move(status));
+    if (definition.id == "builtin-joydivision") {
+        joyDivision_.setInspiration(definition.inspiration);
+    } else if (definition.id == "builtin-starguitar") {
+        starGuitar_.setInspiration(definition.inspiration);
+    }
+    window_->setPluginStatus(definition.displayName);
     pluginSelectionNeeded_ = false;
     logger_.info("Built-in visualization activated: id='" + definition.id + "'");
     return true;
