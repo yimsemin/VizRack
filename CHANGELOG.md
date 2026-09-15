@@ -35,26 +35,24 @@ ZIP attached. How these notes are written and cut: `docs/RELEASE_NOTES_STYLE.md`
   (Inspired by The Chemical Brothers / Michel Gondry's "Star Guitar"): a
   horizontally-scrolling, blocky pixel-art landscape of telephone poles,
   trees, building silhouettes, a water tower, trackside signal markers and
-  a sparse sky of birds/planes/stars, in four parallax layers (far/mid/
-  near/sky) that scroll at different speeds and spawn scenery independently,
-  so several objects at different depths can be on screen at once. Audio is
-  split into four bands (low/mid/presence/air — see
-  `docs/STAR_GUITAR_FREQUENCY_BANDS.md`): a low-band kick onset ("쿵") spawns
-  a lingering water tower or building in the far layer and the mid layer's
-  pole/tree pulse; a presence-band onset ("짝", snare/clap-like) flashes a
-  bright signal marker; an air-band onset (hi-hat/cymbal-like) flashes a
-  marker in the near layer and is the only thing allowed to spawn sky
-  objects, kept rare by a long minimum spacing. Nothing spawns while the
-  signal is silent, including the mid layer's beat-phase fill-in. Right-click
-  exposes a **Rhythm detection** option: Reactive (spawns directly on
-  confirmed onsets, no tempo estimate) or Predictive (also estimates the
-  song's tempo from recent kick onsets and fills in the mid layer's pulse on
-  the predicted beat between hits; falls back to reactive until a lock is
-  acquired). Every onset-triggered spawn (not an ambient/interval fallback
-  spawn) grows up from ground level over its first fraction of a second
-  instead of appearing at full height immediately, echoing how a rising
-  band on a spectrum display reads as a beat. This is an early prototype
-  to evaluate feel and quality, not a finished feature.
+  a sky of birds/planes/stars, in four parallax layers (far/mid/near/sky)
+  that scroll at different speeds. What spawns is driven by one rule
+  applied across four frequency bands (low/mid/presence/air — see
+  `docs/STAR_GUITAR_FREQUENCY_BANDS.md`): a band "peaks" when it rises
+  sharply *relative to its own recent level*, not past a fixed number: a
+  low-band peak ("쿵") spawns a water tower or building in the far layer
+  and the mid layer's pole/tree pulse; a presence-band peak ("짝",
+  snare/clap-like) flashes a signal marker; an air-band peak (hi-hat/
+  cymbal-like) flashes a marker in the near layer and spawns a sky object
+  (weighted toward stars). A peak's magnitude sets how big the spawned
+  object grows. Every spawn — a real peak or a quiet-passage filler alike
+  — grows up from ground level the same way, so a rising object is always
+  the beat cue, the same way a rising band on a spectrum display reads as
+  rhythm. Nothing spawns while the signal is silent. Right-click exposes a
+  **Rhythm detection** option: Reactive (no tempo estimate) or Predictive
+  (also estimates the song's tempo from recent low-band peaks and fills
+  the mid layer's pulse on the predicted beat between them). This is an
+  early prototype to evaluate feel and quality, not a finished feature.
 
 ## [0.3.0] - 2026-09-03
 
