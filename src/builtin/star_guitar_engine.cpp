@@ -15,12 +15,18 @@ constexpr float kPi = std::numbers::pi_v<float>;
 // size.
 constexpr float kReferenceWidth = 1920.0f;
 constexpr float kUnitReference = 10.0f; // reference px per "unit" used by the draw helpers
-// How long an accented instance's grow-in lasts, in real seconds (independent
-// of layer scroll speed, so it reads consistently across layers).
+
+// Every spawn -- peak-triggered or ambient filler alike -- grows in over the
+// same real-time window, so there is exactly one animation rule in the whole
+// engine rather than a per-source special case.
 constexpr float kGrowInSeconds = 0.22f;
 
+// A filler (non-peak) spawn always gets this fixed size: smaller than a
+// typical real hit, so it reads as background rather than competing with one.
+constexpr float kAmbientSizeScale = 0.6f;
+
 // Eased 0..1 growth curve: a quick rise that slightly overshoots past 1 then
-// settles back, so the object's arrival reads as a snappy "struck" motion
+// settles back, so an object's arrival reads as a snappy "struck" motion
 // (like a needle jumping up) rather than a slow, mushy fade-in.
 float growEase(float t) noexcept {
     t = std::clamp(t, 0.0f, 1.0f);
@@ -58,39 +64,45 @@ float hash01(uint32_t value) noexcept {
     return static_cast<float>(value & 0x00ffffffu) / 16777215.0f;
 }
 
+// Maps a band's raw 0..1 magnitude at the moment it peaked to the visual size
+// scale an object spawned from it should grow to. Every peak-driven spawn in
+// the engine goes through this one mapping, so "how hard was the hit" reads
+// consistently as "how big is the object" everywhere.
+float sizeFromMagnitude(float magnitude) noexcept {
+    return 0.65f + clampUnit(magnitude) * 1.15f;
+}
+
 } // namespace
 
 StarGuitarEngine::StarGuitarEngine() {
     scratch_.reserve(16);
 
-    // Far: small, sparse — water towers and buildings loom and linger.
-    layers_[kFarLayer].speed = 90.0f;
+    // Far: small, sparse -- water towers and buildings loom and linger.
+    layers_[kFarLayer].speed = 110.0f;
     layers_[kFarLayer].depthScale = 0.55f;
-    layers_[kFarLayer].baseIntervalSeconds = 2.4f;
-    layers_[kFarLayer].jitterSeconds = 1.1f;
+    layers_[kFarLayer].baseIntervalSeconds = 2.6f;
+    layers_[kFarLayer].jitterSeconds = 1.2f;
 
     // Mid: telephone-pole / tree cadence, jittered rather than metronomic,
-    // plus a secondary onset for a distinct rhythmic marker (see
-    // updateSecondaryOnset) so a second beat voice (e.g. a snare/clap
+    // plus a presence-band marker so a second rhythmic voice (e.g. a snare
     // alongside a kick) is visually distinguishable from the kick-driven far
     // layer instead of blending into it.
     layers_[kMidLayer].speed = 190.0f;
     layers_[kMidLayer].depthScale = 0.85f;
-    layers_[kMidLayer].baseIntervalSeconds = 1.5f;
+    layers_[kMidLayer].baseIntervalSeconds = 1.6f;
     layers_[kMidLayer].jitterSeconds = 0.9f;
 
-    // Near: fast, large-relative, brief — cymbal-like transients flash by.
+    // Near: fast, large-relative, brief -- cymbal-like transients flash by.
     layers_[kNearLayer].speed = 430.0f;
     layers_[kNearLayer].depthScale = 1.35f;
-    layers_[kNearLayer].baseIntervalSeconds = 1.6f;
+    layers_[kNearLayer].baseIntervalSeconds = 1.8f;
     layers_[kNearLayer].jitterSeconds = 1.2f;
 
-    // Sky: deliberately rare, audio-independent — a bird/plane/star should
-    // read as an occasional flourish, not a steady stream.
+    // Sky: same air band as the near layer's cymbal marker, but weighted
+    // toward stars so it reads as a light, frequent twinkle rather than a
+    // rare flourish -- see spawnSky().
     layers_[kSkyLayer].speed = 55.0f;
     layers_[kSkyLayer].depthScale = 0.5f;
-    layers_[kSkyLayer].baseIntervalSeconds = 11.0f;
-    layers_[kSkyLayer].jitterSeconds = 7.0f;
 
     for (auto& layer : layers_) {
         layer.idleTimer = layer.baseIntervalSeconds;
@@ -116,9 +128,11 @@ void StarGuitarEngine::update(size_t sampleCount, float frameSeconds) noexcept {
                                   ? std::clamp(frameSeconds, 1.0f / 240.0f, 1.0f / 10.0f)
                                   : 1.0f / 60.0f;
     const float frameScale = safeSeconds * 60.0f;
-    const float previousLowBeat = lowBeatLevel_;
-    const float previousPresenceBeat = presenceBeatLevel_;
-    const float previousAirBeat = airBeatLevel_;
+
+    lowPeakCooldown_ = std::max(0.0f, lowPeakCooldown_ - safeSeconds);
+    presencePeakCooldown_ = std::max(0.0f, presencePeakCooldown_ - safeSeconds);
+    airPeakCooldown_ = std::max(0.0f, airPeakCooldown_ - safeSeconds);
+
     if (sampleCount > 0) {
         sampleCount_ = std::min(sampleCount, kMaxSamples);
         analyzeSamples(frameScale);
@@ -127,26 +141,23 @@ void StarGuitarEngine::update(size_t sampleCount, float frameSeconds) noexcept {
         midLevel_ *= std::pow(0.955f, frameScale);
         presenceLevel_ *= std::pow(0.95f, frameScale);
         airLevel_ *= std::pow(0.945f, frameScale);
-        lowAverage_ *= std::pow(0.985f, frameScale);
-        presenceAverage_ *= std::pow(0.98f, frameScale);
-        airAverage_ *= std::pow(0.985f, frameScale);
-        lowBeatLevel_ *= std::pow(0.84f, frameScale);
-        presenceBeatLevel_ *= std::pow(0.68f, frameScale);
-        airBeatLevel_ *= std::pow(0.62f, frameScale);
+        lowBaseline_ *= std::pow(0.985f, frameScale);
+        presenceBaseline_ *= std::pow(0.98f, frameScale);
+        airBaseline_ *= std::pow(0.985f, frameScale);
+        lowPeak_ = {};
+        presencePeak_ = {};
+        airPeak_ = {};
     }
-    const float lowRise = std::max(0.0f, lowBeatLevel_ - previousLowBeat);
-    const float presenceRise = std::max(0.0f, presenceBeatLevel_ - previousPresenceBeat);
-    const float airRise = std::max(0.0f, airBeatLevel_ - previousAirBeat);
 
     songClock_ += safeSeconds;
     // Keep the clock bounded across a long-running session; only differences
-    // between onset timestamps matter, and a wrap can only ever cost one
+    // between peak timestamps matter, and a wrap can only ever cost one
     // discarded interval sample.
     if (songClock_ > 1.0e6f) {
         songClock_ = 0.0f;
-        lastLowOnsetTime_ = -1.0f;
+        lastLowPeakTime_ = -1.0f;
     }
-    const bool confirmedLowOnset = updateTempoTracker(lowRise, safeSeconds);
+    updateTempoTracker(lowPeak_.fired, safeSeconds);
 
     const float overallLevel = (lowLevel_ + midLevel_ + presenceLevel_ + airLevel_) / 4.0f;
     songEnergy_ = frameFollow(songEnergy_, clampUnit(overallLevel), 0.02f, 0.015f, frameScale);
@@ -157,8 +168,8 @@ void StarGuitarEngine::update(size_t sampleCount, float frameSeconds) noexcept {
     // playing -- goes quiet instead of continuing to produce scenery.
     constexpr float kSilenceLevel = 0.025f;
     constexpr float kSilenceHoldSeconds = 0.4f;
-    // A longer silence also invalidates the tempo lock and onset history so
-    // a new song, or a new section after a real pause, re-acquires cleanly
+    // A longer silence also invalidates the tempo lock and peak history so a
+    // new song, or a new section after a real pause, re-acquires cleanly
     // instead of inheriting a stale tempo.
     constexpr float kTempoResetSeconds = 1.5f;
     if (overallLevel < kSilenceLevel) {
@@ -169,9 +180,9 @@ void StarGuitarEngine::update(size_t sampleCount, float frameSeconds) noexcept {
     const bool audible = silenceSeconds_ < kSilenceHoldSeconds;
     if (silenceSeconds_ > kTempoResetSeconds) {
         tempoLocked_ = false;
-        onsetIntervalCount_ = 0;
-        onsetIntervalCursor_ = 0;
-        lastLowOnsetTime_ = -1.0f;
+        peakIntervalCount_ = 0;
+        peakIntervalCursor_ = 0;
+        lastLowPeakTime_ = -1.0f;
     }
 
     for (auto& layer : layers_) {
@@ -183,8 +194,6 @@ void StarGuitarEngine::update(size_t sampleCount, float frameSeconds) noexcept {
             // fully off screen (screen width varies per call), so no
             // fixed-lifetime cutoff is needed here.
         }
-        layer.spawnCooldown = std::max(0.0f, layer.spawnCooldown - safeSeconds);
-        layer.secondaryCooldown = std::max(0.0f, layer.secondaryCooldown - safeSeconds);
     }
 
     if (!audible) {
@@ -198,34 +207,43 @@ void StarGuitarEngine::update(size_t sampleCount, float frameSeconds) noexcept {
         return;
     }
 
-    // Confirmed low-band onset (kick-like, the "쿵") -> far layer: water
-    // towers and buildings that loom and linger.
-    updateEdgeTriggeredLayer(layers_[kFarLayer], confirmedLowOnset,
-                             (lowLevel_ > 0.55f) ? StarGuitarObjectType::waterTower
-                                                  : StarGuitarObjectType::buildingA,
-                             StarGuitarObjectType::buildingB, safeSeconds);
+    // Low-band peak (kick-like, the "쿵") -> far layer: a water tower for a
+    // strong hit, a building otherwise, sized by how hard it hit.
+    if (lowPeak_.fired) {
+        const auto type = lowPeak_.magnitude > 0.62f
+                              ? StarGuitarObjectType::waterTower
+                              : (nextRandom() < 0.5f ? StarGuitarObjectType::buildingA
+                                                      : StarGuitarObjectType::buildingC);
+        spawnInstance(layers_[kFarLayer], type, sizeFromMagnitude(lowPeak_.magnitude));
+    } else {
+        spawnAmbient(layers_[kFarLayer], StarGuitarObjectType::buildingB, safeSeconds);
+    }
 
-    // The mid layer is the visible "pulse": it spawns a pole/tree directly on
-    // every confirmed low-band onset (landing alongside the far layer's own
-    // kick reaction); in predictive mode it also fills in on the estimated
-    // tempo between onsets once a lock exists (see StarGuitarAlgorithmMode).
-    updateMidLayerBeatLocked(layers_[kMidLayer], confirmedLowOnset, options_.algorithmMode,
-                             StarGuitarObjectType::pole, StarGuitarObjectType::tree, safeSeconds);
-    // Presence-band onset (snare/clap-like, the "짝") -> a bright trackside
+    // The mid layer is the visible "pulse": the same low-band peak that
+    // triggers the far layer also spawns a pole/tree here, landing on the
+    // same beat.
+    updateMidPulse(layers_[kMidLayer], lowPeak_, options_.algorithmMode, StarGuitarObjectType::pole,
+                  StarGuitarObjectType::tree, safeSeconds);
+    // Presence-band peak (snare/clap-like, the "짝") -> a bright trackside
     // signal marker layered onto the same mid layer, so the two alternating
     // rhythmic voices are both visible without one masking the other.
-    updateSecondaryOnset(layers_[kMidLayer], presenceRise, 0.05f,
-                         StarGuitarObjectType::signalMarker, safeSeconds);
+    if (presencePeak_.fired) {
+        spawnInstance(layers_[kMidLayer], StarGuitarObjectType::signalMarker,
+                     sizeFromMagnitude(presencePeak_.magnitude));
+    }
 
-    // Air-band onset (hi-hat/cymbal/shimmer-like) -> near layer: a quick
+    // Air-band peak (hi-hat/cymbal/shimmer-like) -> near layer: a quick
     // bright flash close to the viewer.
-    const bool nearOnset = detectOnset(airRise, 0.08f, layers_[kNearLayer].spawnCooldown, 0.16f);
-    updateEdgeTriggeredLayer(layers_[kNearLayer], nearOnset, StarGuitarObjectType::signalMarker,
-                             StarGuitarObjectType::buildingC, safeSeconds);
+    if (airPeak_.fired) {
+        spawnInstance(layers_[kNearLayer], StarGuitarObjectType::signalMarker,
+                     sizeFromMagnitude(airPeak_.magnitude));
+    } else {
+        spawnAmbient(layers_[kNearLayer], StarGuitarObjectType::buildingC, safeSeconds);
+    }
 
-    // Sky: must be driven by the air band (the highest band) and nothing
-    // lower, and stays rare regardless.
-    updateSkyLayer(layers_[kSkyLayer], airRise, safeSeconds);
+    // Sky: the same air peak, weighted toward stars for a light, frequent
+    // twinkle -- see spawnSky().
+    spawnSky(layers_[kSkyLayer], airPeak_);
 }
 
 void StarGuitarEngine::reset() noexcept {
@@ -237,28 +255,28 @@ void StarGuitarEngine::reset() noexcept {
     midLevel_ = 0.0f;
     presenceLevel_ = 0.0f;
     airLevel_ = 0.0f;
-    lowAverage_ = 0.0f;
-    presenceAverage_ = 0.0f;
-    airAverage_ = 0.0f;
-    lowBeatLevel_ = 0.0f;
-    presenceBeatLevel_ = 0.0f;
-    airBeatLevel_ = 0.0f;
+    lowBaseline_ = 0.0f;
+    presenceBaseline_ = 0.0f;
+    airBaseline_ = 0.0f;
+    lowPeakCooldown_ = 0.0f;
+    presencePeakCooldown_ = 0.0f;
+    airPeakCooldown_ = 0.0f;
+    lowPeak_ = {};
+    presencePeak_ = {};
+    airPeak_ = {};
     songEnergy_ = 0.0f;
     silenceSeconds_ = 0.0f;
     songClock_ = 0.0f;
-    tempoOnsetCooldown_ = 0.0f;
-    lastLowOnsetTime_ = -1.0f;
+    lastLowPeakTime_ = -1.0f;
     beatPeriodSeconds_ = 0.5f;
     beatPhase_ = 0.0f;
     tempoLocked_ = false;
-    onsetIntervals_ = {};
-    onsetIntervalCount_ = 0;
-    onsetIntervalCursor_ = 0;
+    peakIntervals_ = {};
+    peakIntervalCount_ = 0;
+    peakIntervalCursor_ = 0;
     spawnSerial_ = 0;
     randomState_ = 0x9f2c86adu;
     for (auto& layer : layers_) {
-        layer.spawnCooldown = 0.0f;
-        layer.secondaryCooldown = 0.0f;
         layer.idleTimer = layer.baseIntervalSeconds;
         layer.nextSlot = 0;
         layer.objects = {};
@@ -301,48 +319,35 @@ void StarGuitarEngine::analyzeSamples(float frameScale) noexcept {
         clampUnit(std::sqrt(static_cast<float>(presenceEnergy) / divisor) * 6.4f);
     const float airTarget = clampUnit(std::sqrt(static_cast<float>(airEnergy) / divisor) * 8.6f);
 
-    const float previousLowAverage = lowAverage_;
-    lowAverage_ = frameFollow(lowAverage_, lowTarget, 0.018f, 0.012f, frameScale);
-    // The excess-over-average margin (0.03) and cooldown floor (set where
-    // this feeds the tempo tracker) are deliberately not too sensitive: a
-    // busy, continuously-present bassline can drift the low band's level up
-    // and down on its own just from pitch/note changes, which otherwise gets
-    // misread as a stream of kick onsets and produces bursts of far/mid
-    // scenery in sections that don't actually have a stronger beat.
-    const float lowBeatTarget = clampUnit(
-        std::max(0.0f, lowTarget - previousLowAverage - 0.03f) * 4.8f +
-        std::max(0.0f, lowTarget - lowLevel_) * 1.5f);
-    lowBeatLevel_ = frameFollow(lowBeatLevel_, lowBeatTarget, 0.66f, 0.095f, frameScale);
-
-    // Presence-band envelope (2.5-6kHz): a snare/clap's identifying snap and
-    // vocal sibilance live here, distinct from both the kick (low) and the
-    // hi-hat/cymbal shimmer (air, see below).
-    const float previousPresenceAverage = presenceAverage_;
-    presenceAverage_ = frameFollow(presenceAverage_, presenceTarget, 0.07f, 0.04f, frameScale);
-    const float presenceBeatTarget = clampUnit(
-        std::max(0.0f, presenceTarget - previousPresenceAverage - 0.03f) * 5.2f);
-    presenceBeatLevel_ =
-        frameFollow(presenceBeatLevel_, presenceBeatTarget, 0.78f, 0.42f, frameScale);
-
-    // Air-band envelope (>6kHz) uses a much faster attack/release than the
-    // low band: it should register a rising edge on a brief transient
-    // (hi-hat, cymbal, shimmer) and decay again almost immediately, rather
-    // than sustain. This is the only band the sky layer may use.
-    const float previousAirAverage = airAverage_;
-    airAverage_ = frameFollow(airAverage_, airTarget, 0.05f, 0.03f, frameScale);
-    const float airBeatTarget =
-        clampUnit(std::max(0.0f, airTarget - previousAirAverage - 0.02f) * 5.5f);
-    airBeatLevel_ = frameFollow(airBeatLevel_, airBeatTarget, 0.85f, 0.5f, frameScale);
-
-    lowLevel_ = frameFollow(lowLevel_, lowTarget, 0.20f, 0.045f, frameScale);
-    // Mid (150Hz-2.5kHz, vocals/guitars/keys) is deliberately not given an
-    // onset envelope: it's too dense and continuously-present in most mixes
-    // to make a clean rhythm trigger, so it's tracked only as a sustained
-    // "how busy is the song" measure for songEnergy_ and the reactive mode's
-    // ambient cadence.
+    lowLevel_ = frameFollow(lowLevel_, lowTarget, 0.42f, 0.10f, frameScale);
+    // Mid (150Hz-2.5kHz, vocals/guitars/keys) deliberately gets no baseline
+    // or peak detector: it's too dense and continuously-present in most
+    // mixes for a relative-rise test to mean anything -- it would fire
+    // almost constantly. It's tracked only as a sustained "how busy is the
+    // song" measure for songEnergy_ and the reactive mode's ambient cadence.
     midLevel_ = frameFollow(midLevel_, midTarget, 0.18f, 0.05f, frameScale);
-    presenceLevel_ = frameFollow(presenceLevel_, presenceTarget, 0.16f, 0.055f, frameScale);
-    airLevel_ = frameFollow(airLevel_, airTarget, 0.16f, 0.055f, frameScale);
+    presenceLevel_ = frameFollow(presenceLevel_, presenceTarget, 0.40f, 0.10f, frameScale);
+    airLevel_ = frameFollow(airLevel_, airTarget, 0.40f, 0.10f, frameScale);
+
+    // Baselines move much more slowly than the levels above -- they
+    // represent "what has this band typically been doing the last couple of
+    // seconds," which a peak is then measured against. Captured *before*
+    // this frame updates them, so the peak test compares against where the
+    // baseline already was, not where this frame's own energy just dragged
+    // it.
+    const float previousLowBaseline = lowBaseline_;
+    const float previousPresenceBaseline = presenceBaseline_;
+    const float previousAirBaseline = airBaseline_;
+    lowBaseline_ = frameFollow(lowBaseline_, lowTarget, 0.03f, 0.02f, frameScale);
+    presenceBaseline_ = frameFollow(presenceBaseline_, presenceTarget, 0.05f, 0.03f, frameScale);
+    airBaseline_ = frameFollow(airBaseline_, airTarget, 0.05f, 0.03f, frameScale);
+
+    // One rule, three bands: a peak is a sharp rise *relative to the band's
+    // own recent baseline*, not an absolute level -- see detectPeak().
+    lowPeak_ = detectPeak(lowTarget, previousLowBaseline, lowPeakCooldown_, 0.22f, 0.55f, 0.08f);
+    presencePeak_ = detectPeak(presenceTarget, previousPresenceBaseline, presencePeakCooldown_,
+                               0.16f, 0.50f, 0.06f);
+    airPeak_ = detectPeak(airTarget, previousAirBaseline, airPeakCooldown_, 0.12f, 0.50f, 0.05f);
 }
 
 float StarGuitarEngine::nextRandom() noexcept {
@@ -353,12 +358,11 @@ float StarGuitarEngine::nextRandom() noexcept {
 }
 
 void StarGuitarEngine::spawnInstance(Layer& layer, StarGuitarObjectType type,
-                                     bool accented) noexcept {
+                                     float sizeScale) noexcept {
     // Search for a free slot starting at the round-robin cursor. If every
     // slot is still occupied by an object that hasn't scrolled off screen
     // yet, drop this spawn instead of overwriting (and visually truncating)
-    // one that's still mid-flight -- that overwrite was the bug behind far
-    // objects appearing to vanish before reaching the left edge.
+    // one that's still mid-flight.
     for (size_t attempt = 0; attempt < kLayerCapacity; ++attempt) {
         const size_t index = (layer.nextSlot + attempt) % kLayerCapacity;
         Instance& instance = layer.objects[index];
@@ -366,187 +370,123 @@ void StarGuitarEngine::spawnInstance(Layer& layer, StarGuitarObjectType type,
         layer.nextSlot = (index + 1) % kLayerCapacity;
         ++spawnSerial_;
         instance.active = true;
-        instance.accented = accented;
         instance.type = type;
         instance.traveled = 0.0f;
         instance.age = 0.0f;
+        instance.sizeScale = sizeScale;
         instance.seed = hashCombine(spawnSerial_, spawnSerial_ * 2246822519u);
         return;
     }
 }
 
-bool StarGuitarEngine::detectOnset(float rise, float threshold, float& cooldown,
-                                   float cooldownSeconds) noexcept {
-    if (rise > threshold && cooldown <= 0.0f) {
-        cooldown = cooldownSeconds + nextRandom() * (cooldownSeconds * 0.4f);
-        return true;
-    }
-    return false;
+StarGuitarEngine::Peak StarGuitarEngine::detectPeak(float level, float baseline, float& cooldown,
+                                                    float cooldownSeconds,
+                                                    float relativeThreshold,
+                                                    float floorLevel) noexcept {
+    if (level <= floorLevel || cooldown > 0.0f) return {};
+    const float relativeRise = (level - baseline) / (baseline + 0.05f);
+    if (relativeRise <= relativeThreshold) return {};
+    cooldown = cooldownSeconds + nextRandom() * (cooldownSeconds * 0.4f);
+    return {true, level};
 }
 
-void StarGuitarEngine::updateEdgeTriggeredLayer(Layer& layer, bool onset,
-                                                StarGuitarObjectType onsetType,
-                                                StarGuitarObjectType ambientType,
-                                                float frameSeconds) noexcept {
-    layer.idleTimer -= frameSeconds;
-    if (onset) {
-        // A real onset: accented, so it gets the spawn-moment flash -- this
-        // object's arrival IS the beat note.
-        spawnInstance(layer, onsetType, /*accented=*/true);
-        layer.idleTimer = layer.baseIntervalSeconds + nextRandom() * layer.jitterSeconds;
-        return;
-    }
-    if (layer.idleTimer <= 0.0f) {
-        // Ambient fallback: keeps the layer from sitting empty through a
-        // quiet-but-audible passage, on a randomized (not fixed-grid)
-        // cadence. Suspended entirely during silence by the caller. Not
-        // accented -- it isn't tied to a real audio event, so it shouldn't
-        // compete visually with a real hit.
-        spawnInstance(layer, ambientType, /*accented=*/false);
-        layer.idleTimer = layer.baseIntervalSeconds + nextRandom() * layer.jitterSeconds;
-    }
-}
-
-void StarGuitarEngine::updateIntervalLayer(Layer& layer, float sustainedLevel,
-                                           StarGuitarObjectType primaryType,
-                                           StarGuitarObjectType secondaryType,
-                                           float frameSeconds) noexcept {
+void StarGuitarEngine::spawnAmbient(Layer& layer, StarGuitarObjectType type,
+                                    float frameSeconds) noexcept {
     layer.idleTimer -= frameSeconds;
     if (layer.idleTimer > 0.0f) return;
-    // Mixing in the secondary type (trees alongside poles) keeps the cadence
-    // from reading as one repeating shape even though the timing itself is
-    // still driven by a single interval. Not accented: this timer isn't tied
-    // to a real onset.
-    spawnInstance(layer, nextRandom() < 0.55f ? primaryType : secondaryType,
-                 /*accented=*/false);
-    // Higher sustained energy shortens the average interval (busier cadence)
-    // while jitter keeps consecutive spawns asymmetric instead of a strict
-    // metronome grid.
-    const float energyFactor = 1.0f + sustainedLevel * 1.8f;
-    layer.idleTimer =
-        (layer.baseIntervalSeconds / energyFactor) + nextRandom() * layer.jitterSeconds;
+    spawnInstance(layer, type, kAmbientSizeScale);
+    layer.idleTimer = layer.baseIntervalSeconds + nextRandom() * layer.jitterSeconds;
 }
 
-void StarGuitarEngine::updateSecondaryOnset(Layer& layer, float rise, float threshold,
-                                            StarGuitarObjectType type,
-                                            float frameSeconds) noexcept {
+void StarGuitarEngine::updateTempoTracker(bool lowPeakFired, float frameSeconds) noexcept {
     (void)frameSeconds;
-    if (detectOnset(rise, threshold, layer.secondaryCooldown, 0.22f)) {
-        spawnInstance(layer, type, /*accented=*/true);
-    }
-}
-
-bool StarGuitarEngine::updateTempoTracker(float lowRise, float frameSeconds) noexcept {
-    tempoOnsetCooldown_ = std::max(0.0f, tempoOnsetCooldown_ - frameSeconds);
-    // A tempo lock that never confirms another onset for a long stretch is
+    // A tempo lock that never confirms another peak for a long stretch is
     // stale -- either the song stopped, or moved to a section without a
     // clear kick -- so stop trusting it rather than letting the mid layer's
-    // fill-in free-run on an old estimate. This is the fix for objects
-    // continuing to scroll on after the audio has actually stopped.
-    if (tempoLocked_ && lastLowOnsetTime_ >= 0.0f &&
-        (songClock_ - lastLowOnsetTime_) > beatPeriodSeconds_ * 3.0f) {
+    // fill-in free-run on an old estimate.
+    if (tempoLocked_ && lastLowPeakTime_ >= 0.0f &&
+        (songClock_ - lastLowPeakTime_) > beatPeriodSeconds_ * 3.0f) {
         tempoLocked_ = false;
     }
-    // The threshold and cooldown floor here are deliberately conservative: a
-    // busy, continuously-present bassline can wobble the low band enough on
-    // its own to look like a stream of kicks, which was producing bursts of
-    // far/mid scenery clustered wherever the bassline happened to be active
-    // rather than tracking the actual beat.
-    const bool confirmed = detectOnset(lowRise, 0.07f, tempoOnsetCooldown_, 0.28f);
-    if (confirmed) {
-        if (lastLowOnsetTime_ >= 0.0f) {
-            const float interval = songClock_ - lastLowOnsetTime_;
-            // Only trust intervals inside a plausible tempo range (roughly
-            // 45-215 BPM, matching the cooldown floor above); anything
-            // outside that is almost certainly a missed or doubled detection
-            // rather than a real beat-to-beat gap, and would otherwise drag
-            // the median estimate off in one step.
-            if (interval > 0.27f && interval < 1.35f) {
-                onsetIntervals_[onsetIntervalCursor_] = interval;
-                onsetIntervalCursor_ = (onsetIntervalCursor_ + 1) % kOnsetHistory;
-                onsetIntervalCount_ = std::min(onsetIntervalCount_ + 1, kOnsetHistory);
-            }
-        }
-        lastLowOnsetTime_ = songClock_;
+    if (!lowPeakFired) return;
 
-        if (onsetIntervalCount_ >= 3) {
-            std::array<float, kOnsetHistory> sorted{};
-            std::copy_n(onsetIntervals_.begin(), onsetIntervalCount_, sorted.begin());
-            std::sort(sorted.begin(), sorted.begin() + static_cast<ptrdiff_t>(onsetIntervalCount_));
-            const float median = sorted[onsetIntervalCount_ / 2];
-            // Blend toward the new median rather than snapping to it, so one
-            // odd interval (a fill, a skipped beat) nudges the estimate
-            // instead of yanking it.
-            beatPeriodSeconds_ = tempoLocked_ ? beatPeriodSeconds_ * 0.75f + median * 0.25f
-                                              : median;
-            tempoLocked_ = true;
+    if (lastLowPeakTime_ >= 0.0f) {
+        const float interval = songClock_ - lastLowPeakTime_;
+        // Only trust intervals inside a plausible tempo range (roughly
+        // 45-215 BPM); anything outside that is almost certainly a missed or
+        // doubled detection rather than a real beat-to-beat gap, and would
+        // otherwise drag the median estimate off in one step.
+        if (interval > 0.27f && interval < 1.35f) {
+            peakIntervals_[peakIntervalCursor_] = interval;
+            peakIntervalCursor_ = (peakIntervalCursor_ + 1) % kPeakHistory;
+            peakIntervalCount_ = std::min(peakIntervalCount_ + 1, kPeakHistory);
         }
-        // Re-sync phase to the real hit every time -- this is what keeps the
-        // visual pulse from ever drifting away from the audible one.
-        beatPhase_ = 0.0f;
     }
-    return confirmed;
+    lastLowPeakTime_ = songClock_;
+
+    if (peakIntervalCount_ >= 3) {
+        std::array<float, kPeakHistory> sorted{};
+        std::copy_n(peakIntervals_.begin(), peakIntervalCount_, sorted.begin());
+        std::sort(sorted.begin(), sorted.begin() + static_cast<ptrdiff_t>(peakIntervalCount_));
+        const float median = sorted[peakIntervalCount_ / 2];
+        // Blend toward the new median rather than snapping to it, so one odd
+        // interval (a fill, a skipped beat) nudges the estimate instead of
+        // yanking it.
+        beatPeriodSeconds_ = tempoLocked_ ? beatPeriodSeconds_ * 0.75f + median * 0.25f : median;
+        tempoLocked_ = true;
+    }
+    // Re-sync phase to the real hit every time -- this is what keeps the
+    // visual pulse from ever drifting away from the audible one.
+    beatPhase_ = 0.0f;
 }
 
-void StarGuitarEngine::updateMidLayerBeatLocked(Layer& layer, bool confirmedOnset,
-                                                StarGuitarAlgorithmMode mode,
-                                                StarGuitarObjectType primaryType,
-                                                StarGuitarObjectType secondaryType,
-                                                float frameSeconds) noexcept {
-    const auto spawnPulse = [&] {
-        // Both the confirmed-onset and phase-fill-in pulses represent a real
-        // beat moment, so both are accented.
-        spawnInstance(layer, nextRandom() < 0.55f ? primaryType : secondaryType,
-                     /*accented=*/true);
+void StarGuitarEngine::updateMidPulse(Layer& layer, Peak lowPeak, StarGuitarAlgorithmMode mode,
+                                      StarGuitarObjectType primaryType,
+                                      StarGuitarObjectType secondaryType,
+                                      float frameSeconds) noexcept {
+    const auto spawnPulse = [&](float sizeScale) {
+        spawnInstance(layer, nextRandom() < 0.55f ? primaryType : secondaryType, sizeScale);
     };
-    // Both modes react to a confirmed kick the same way -- that's a direct
-    // reaction, not a prediction, so it belongs in both. Only the fill-in
-    // between confirmed onsets differs by mode.
-    if (confirmedOnset) {
-        spawnPulse();
+    // Both modes react to a confirmed low-band peak the same way -- that's a
+    // direct reaction, not a prediction. Only the gap-filling between peaks
+    // differs by mode.
+    if (lowPeak.fired) {
+        spawnPulse(sizeFromMagnitude(lowPeak.magnitude));
         return;
     }
     if (mode == StarGuitarAlgorithmMode::predictive && tempoLocked_) {
         // Fill in on the estimated beat phase so the cadence stays steady
-        // even through a soft hit the onset detector misses.
+        // even through a soft hit the peak detector misses.
         beatPhase_ += frameSeconds / std::max(beatPeriodSeconds_, 0.05f);
         if (beatPhase_ >= 1.0f) {
             beatPhase_ -= 1.0f;
-            spawnPulse();
+            spawnPulse(kAmbientSizeScale);
         }
         return;
     }
     // Reactive mode, or predictive mode before a tempo lock is acquired:
-    // fall back to the original jittered interval timer keyed to general
-    // mid-band busyness, with no tempo estimate involved at all.
-    updateIntervalLayer(layer, midLevel_, primaryType, secondaryType, frameSeconds);
+    // fall back to a jittered interval timer keyed to general mid-band
+    // busyness, with no tempo estimate involved.
+    layer.idleTimer -= frameSeconds;
+    if (layer.idleTimer > 0.0f) return;
+    spawnPulse(kAmbientSizeScale);
+    // Higher sustained mid-band energy shortens the average interval (busier
+    // cadence) while jitter keeps consecutive spawns asymmetric instead of a
+    // strict metronome grid.
+    const float energyFactor = 1.0f + midLevel_ * 1.8f;
+    layer.idleTimer =
+        (layer.baseIntervalSeconds / energyFactor) + nextRandom() * layer.jitterSeconds;
 }
 
-void StarGuitarEngine::updateSkyLayer(Layer& layer, float airRise, float frameSeconds) noexcept {
-    // The sky must be driven by the air band (hi-hats/cymbals/shimmer, the
-    // highest band) and nothing lower -- a song with no air-band presence at
-    // all simply never spawns anything here, which is the correct behaviour
-    // for "the sky reflects the song" rather than "the sky is a timer."
-    // (layer.spawnCooldown is already decremented once per frame in update().)
-    (void)frameSeconds;
-    if (airRise <= 0.05f || layer.spawnCooldown > 0.0f) return;
-
+void StarGuitarEngine::spawnSky(Layer& layer, Peak airPeak) noexcept {
+    if (!airPeak.fired) return;
+    // Heavily weighted toward stars: a light, frequent twinkle rather than a
+    // rare flourish. Birds and planes stay uncommon.
     const float pick = nextRandom();
-    const StarGuitarObjectType type =
-        pick < 0.5f ? StarGuitarObjectType::bird
-                    : pick < 0.8f ? StarGuitarObjectType::star : StarGuitarObjectType::plane;
-    // Not accented: the spawn-moment flash is deliberately reserved for the
-    // ground-level rhythm layers for now (sky twinkle is a lower priority).
-    spawnInstance(layer, type, /*accented=*/false);
-
-    // The minimum spacing shortens a little as the song's overall energy
-    // rises, but stays within a several-second-plus range either way, so a
-    // hi-hat-heavy mix still reads as an occasional flourish rather than a
-    // stream even though air-band onsets themselves can be frequent.
-    const float energeticInterval = layer.baseIntervalSeconds * 0.55f;
-    const float interval =
-        layer.baseIntervalSeconds - songEnergy_ * (layer.baseIntervalSeconds - energeticInterval);
-    layer.spawnCooldown = interval + nextRandom() * layer.jitterSeconds;
+    const StarGuitarObjectType type = pick < 0.70f  ? StarGuitarObjectType::star
+                                      : pick < 0.90f ? StarGuitarObjectType::bird
+                                                      : StarGuitarObjectType::plane;
+    spawnInstance(layer, type, sizeFromMagnitude(airPeak.magnitude));
 }
 
 void StarGuitarEngine::drawGround(DrawList& output, float width, float height,
@@ -557,10 +497,10 @@ void StarGuitarEngine::drawGround(DrawList& output, float width, float height,
     output.addFillRectangle(0.0f, groundY - 2.0f, width, 2.0f, color(0x40597a));
 }
 
-void StarGuitarEngine::drawPole(DrawList& output, float baseX, float groundY,
-                                float unit, float heightScale) const {
+void StarGuitarEngine::drawPole(DrawList& output, float baseX, float groundY, float unit,
+                                float scale) const {
     const float poleWidth = unit * 0.9f;
-    const float poleHeight = unit * 11.0f * heightScale;
+    const float poleHeight = unit * 11.0f * scale;
     const Color body = color(0x0a0e16);
     output.addFillRectangle(baseX - poleWidth * 0.5f, groundY - poleHeight, poleWidth,
                             poleHeight, body);
@@ -576,17 +516,17 @@ void StarGuitarEngine::drawPole(DrawList& output, float baseX, float groundY,
 }
 
 void StarGuitarEngine::drawTree(DrawList& output, float baseX, float groundY, float unit,
-                                uint32_t seed, float heightScale) const {
+                                uint32_t seed, float scale) const {
     const float trunkWidth = unit * 0.8f;
-    const float trunkHeight = unit * 2.6f * heightScale;
+    const float trunkHeight = unit * 2.6f * scale;
     const Color trunk = color(0x120e0a);
     output.addFillRectangle(baseX - trunkWidth * 0.5f, groundY - trunkHeight, trunkWidth,
                             trunkHeight, trunk);
 
     // A stepped, blocky canopy: three shrinking tiers instead of a smooth
     // circle, keeping the silhouette axis-aligned like the rest of the scene.
-    const float canopyHeight = unit * (4.5f + hash01(seed) * 2.0f) * heightScale;
-    const float canopyWidth = unit * (4.0f + hash01(seed ^ 0x27d4eb2fu) * 2.2f);
+    const float canopyHeight = unit * (4.5f + hash01(seed) * 2.0f) * scale;
+    const float canopyWidth = unit * (4.0f + hash01(seed ^ 0x27d4eb2fu) * 2.2f) * scale;
     const Color canopy = color(0x0e1c12);
     constexpr int tiers = 3;
     for (int tier = 0; tier < tiers; ++tier) {
@@ -600,13 +540,13 @@ void StarGuitarEngine::drawTree(DrawList& output, float baseX, float groundY, fl
     }
 }
 
-void StarGuitarEngine::drawBuilding(DrawList& output, float baseX, float groundY,
-                                    float unit, StarGuitarObjectType variant,
-                                    uint32_t seed, float heightScale) const {
+void StarGuitarEngine::drawBuilding(DrawList& output, float baseX, float groundY, float unit,
+                                    StarGuitarObjectType variant, uint32_t seed,
+                                    float scale) const {
     const float heightUnits = 8.0f + hash01(seed) * 10.0f;
-    const float widthUnits = 5.0f + hash01(seed ^ 0x51ed270bu) * 3.0f;
+    const float widthUnits = (5.0f + hash01(seed ^ 0x51ed270bu) * 3.0f) * scale;
     const float bodyWidth = unit * widthUnits;
-    const float bodyHeight = unit * heightUnits * heightScale;
+    const float bodyHeight = unit * heightUnits * scale;
     const Color body = color(0x0c1017);
     const Color window = color(0x1d3a52, 200);
     output.addFillRectangle(baseX - bodyWidth * 0.5f, groundY - bodyHeight, bodyWidth,
@@ -651,20 +591,18 @@ void StarGuitarEngine::drawBuilding(DrawList& output, float baseX, float groundY
     }
 }
 
-void StarGuitarEngine::drawWaterTower(DrawList& output, float baseX, float groundY,
-                                      float unit, uint32_t seed, float heightScale) {
+void StarGuitarEngine::drawWaterTower(DrawList& output, float baseX, float groundY, float unit,
+                                      uint32_t seed, float scale) {
     const Color body = color(0x0d1218);
-    // Only the legs grow -- the tank rides up on top of them at its full
-    // size, which reads as the whole tower rising out of the ground.
-    const float legHeight = unit * 6.0f * heightScale;
-    const float tankHalfWidth = unit * 3.4f;
-    const float tankHeight = unit * 3.4f;
+    const float legHeight = unit * 6.0f * scale;
+    const float tankHalfWidth = unit * 3.4f * scale;
+    const float tankHeight = unit * 3.4f * scale;
     const float tankY = groundY - legHeight - tankHeight;
 
     // Four blocky support legs.
     constexpr std::array<float, 4> legOffsets{-2.6f, -1.1f, 1.1f, 2.6f};
     for (const float offset : legOffsets) {
-        output.addFillRectangle(baseX + offset * unit - unit * 0.22f, groundY - legHeight,
+        output.addFillRectangle(baseX + offset * unit * scale - unit * 0.22f, groundY - legHeight,
                                 unit * 0.44f, legHeight, body);
     }
 
@@ -684,58 +622,58 @@ void StarGuitarEngine::drawWaterTower(DrawList& output, float baseX, float groun
 
     // A small conical cap made of two shrinking blocks (kept blocky/axis
     // aligned per the pixel-art constraint).
-    output.addFillRectangle(baseX - tankHalfWidth * 0.6f, tankY - unit * 0.7f,
-                            tankHalfWidth * 1.2f, unit * 0.7f, body);
-    output.addFillRectangle(baseX - tankHalfWidth * 0.28f, tankY - unit * 1.2f,
-                            tankHalfWidth * 0.56f, unit * 0.5f, body);
+    output.addFillRectangle(baseX - tankHalfWidth * 0.6f, tankY - unit * 0.7f * scale,
+                            tankHalfWidth * 1.2f, unit * 0.7f * scale, body);
+    output.addFillRectangle(baseX - tankHalfWidth * 0.28f, tankY - unit * 1.2f * scale,
+                            tankHalfWidth * 0.56f, unit * 0.5f * scale, body);
     (void)seed;
 }
 
-void StarGuitarEngine::drawSignalMarker(DrawList& output, float baseX, float groundY,
-                                        float unit) const {
+void StarGuitarEngine::drawSignalMarker(DrawList& output, float baseX, float groundY, float unit,
+                                        float scale) const {
     // A bright, high-contrast trackside signal: deliberately unlike the dark
-    // silhouettes around it so a rhythmic onset reads as a visible flash
+    // silhouettes around it so a rhythmic peak reads as a visible flash
     // rather than blending into the scenery.
     const float postWidth = unit * 0.5f;
-    const float postHeight = unit * 3.2f;
+    const float postHeight = unit * 3.2f * scale;
     const Color post = color(0x0a0e16);
     output.addFillRectangle(baseX - postWidth * 0.5f, groundY - postHeight, postWidth,
                             postHeight, post);
-    const float lampSize = unit * 1.4f;
+    const float lampSize = unit * 1.4f * scale;
     const Color lamp = color(0xe0a63a, 235);
     output.addFillRectangle(baseX - lampSize * 0.5f, groundY - postHeight - lampSize * 0.85f,
                             lampSize, lampSize, lamp);
 }
 
-void StarGuitarEngine::drawBird(DrawList& output, float baseX, float baseY,
-                                float unit) const {
+void StarGuitarEngine::drawBird(DrawList& output, float baseX, float baseY, float unit,
+                                float scale) const {
     // A small chevron silhouette built from two blocky wing rectangles.
     const Color body = color(0x0c1017, 220);
-    const float wingWidth = unit * 1.6f;
-    const float wingHeight = unit * 0.5f;
+    const float wingWidth = unit * 1.6f * scale;
+    const float wingHeight = unit * 0.5f * scale;
     output.addFillRectangle(baseX - wingWidth, baseY - wingHeight * 0.5f, wingWidth,
                             wingHeight, body);
     output.addFillRectangle(baseX, baseY - wingHeight * 0.5f, wingWidth, wingHeight, body);
 }
 
-void StarGuitarEngine::drawPlane(DrawList& output, float baseX, float baseY,
-                                 float unit) const {
+void StarGuitarEngine::drawPlane(DrawList& output, float baseX, float baseY, float unit,
+                                 float scale) const {
     const Color body = color(0x0c1017, 230);
-    const float fuselageLength = unit * 5.0f;
-    const float fuselageHeight = unit * 0.6f;
+    const float fuselageLength = unit * 5.0f * scale;
+    const float fuselageHeight = unit * 0.6f * scale;
     output.addFillRectangle(baseX - fuselageLength * 0.5f, baseY - fuselageHeight * 0.5f,
                             fuselageLength, fuselageHeight, body);
-    const float wingWidth = unit * 1.0f;
-    const float wingHeight = unit * 2.2f;
+    const float wingWidth = unit * 1.0f * scale;
+    const float wingHeight = unit * 2.2f * scale;
     output.addFillRectangle(baseX - wingWidth * 0.5f, baseY - wingHeight * 0.5f, wingWidth,
                             wingHeight, body);
 }
 
-void StarGuitarEngine::drawStar(DrawList& output, float baseX, float baseY,
-                                float unit) const {
+void StarGuitarEngine::drawStar(DrawList& output, float baseX, float baseY, float unit,
+                                float scale) const {
     const Color glow = color(0xdce8ff, 220);
-    const float armThickness = unit * 0.35f;
-    const float armLength = unit * 1.6f;
+    const float armThickness = unit * 0.35f * scale;
+    const float armLength = unit * 1.6f * scale;
     output.addFillRectangle(baseX - armLength * 0.5f, baseY - armThickness * 0.5f, armLength,
                             armThickness, glow);
     output.addFillRectangle(baseX - armThickness * 0.5f, baseY - armLength * 0.5f,
@@ -775,48 +713,45 @@ void StarGuitarEngine::buildFrame(float width, float height, DrawList& output) {
             }
             if (screenX > width + offscreenMargin * renderScale) continue;
 
+            // Every instance grows in the same way, scaled to its own
+            // sizeScale (a real peak's magnitude, or the fixed ambient
+            // size) -- one animation rule, applied uniformly everywhere.
+            const float scale = instance.sizeScale * growEase(instance.age / kGrowInSeconds);
+
             if (isSky) {
                 // Deterministic per-instance vertical placement within the
                 // upper part of the sky, kept well clear of the skyline.
                 const float skyY = height * (0.06f + hash01(instance.seed) * 0.30f);
                 switch (instance.type) {
                     case StarGuitarObjectType::plane:
-                        drawPlane(output, screenX, skyY, unit);
+                        drawPlane(output, screenX, skyY, unit, scale);
                         break;
                     case StarGuitarObjectType::star:
-                        drawStar(output, screenX, skyY, unit);
+                        drawStar(output, screenX, skyY, unit, scale);
                         break;
                     default:
-                        drawBird(output, screenX, skyY, unit);
+                        drawBird(output, screenX, skyY, unit, scale);
                         break;
                 }
                 continue;
             }
 
-            // Accented instances (real onset hits) grow up from ground level
-            // over their first fraction of a second instead of appearing at
-            // full height immediately -- the rise itself is the beat cue.
-            // Ambient/interval fallback spawns appear at full height right
-            // away since they aren't tied to a real hit worth calling out.
-            const float heightScale = instance.accented
-                                          ? growEase(instance.age / kGrowInSeconds)
-                                          : 1.0f;
             switch (instance.type) {
                 case StarGuitarObjectType::pole:
-                    drawPole(output, screenX, groundY, unit, heightScale);
+                    drawPole(output, screenX, groundY, unit, scale);
                     break;
                 case StarGuitarObjectType::tree:
-                    drawTree(output, screenX, groundY, unit, instance.seed, heightScale);
+                    drawTree(output, screenX, groundY, unit, instance.seed, scale);
                     break;
                 case StarGuitarObjectType::waterTower:
-                    drawWaterTower(output, screenX, groundY, unit, instance.seed, heightScale);
+                    drawWaterTower(output, screenX, groundY, unit, instance.seed, scale);
                     break;
                 case StarGuitarObjectType::signalMarker:
-                    drawSignalMarker(output, screenX, groundY, unit);
+                    drawSignalMarker(output, screenX, groundY, unit, scale);
                     break;
                 default:
                     drawBuilding(output, screenX, groundY, unit, instance.type, instance.seed,
-                                heightScale);
+                                scale);
                     break;
             }
         }
