@@ -86,15 +86,17 @@ private:
     // reference frame; screen position is derived from it every frame rather
     // than stored, so layers need no index/grid bookkeeping. `seed` also
     // supplies the sky layer's deterministic vertical placement. `age` is
-    // real elapsed seconds since spawn (independent of layer speed), used
-    // only to time the spawn-moment accent flash below.
+    // real elapsed seconds since spawn (independent of layer speed), used to
+    // time the grow-in below.
     struct Instance {
         bool active{false};
         // True when this instance was spawned directly by a confirmed
         // rhythmic onset (a real "쿵"/"짝"/hi-hat hit), as opposed to an
-        // ambient/interval fallback spawn. Only accented instances get the
-        // spawn-moment flash -- the point is for the object's arrival itself
-        // to read as a struck beat note, not a generic decoration.
+        // ambient/interval fallback spawn. Only accented, height-bearing
+        // instances (far/mid layer scenery) grow up from ground level over
+        // their first fraction of a second instead of appearing at full
+        // height immediately -- the rise itself is the beat cue, the same
+        // way a spectrum band's rising edge reads as rhythm.
         bool accented{false};
         StarGuitarObjectType type{StarGuitarObjectType::pole};
         uint32_t seed{};
@@ -123,7 +125,7 @@ private:
     // still occupied by an object that hasn't scrolled off screen yet, the
     // spawn is dropped rather than stomping (and visually truncating) that
     // still-active object. `accented` marks a real onset-triggered spawn (as
-    // opposed to an ambient fallback) for the spawn-moment flash in buildFrame.
+    // opposed to an ambient fallback) for the grow-in animation in buildFrame.
     void spawnInstance(Layer& layer, StarGuitarObjectType type, bool accented) noexcept;
     // Debounced rising-edge check shared by every onset-driven trigger: fires
     // when `rise` crosses `threshold` and at least `cooldownSeconds` (plus a
@@ -181,21 +183,19 @@ private:
     void updateSkyLayer(Layer& layer, float airRise, float frameSeconds) noexcept;
 
     void drawGround(DrawList& output, float width, float height, float groundY) const;
-    void drawPole(DrawList& output, float baseX, float groundY, float unit) const;
+    // `heightScale` (0..1] scales every height-based measurement while
+    // keeping the shape bottom-anchored at `groundY`, so a value below 1
+    // reads as the object still rising up out of the ground rather than a
+    // shrunken copy of the final shape.
+    void drawPole(DrawList& output, float baseX, float groundY, float unit,
+                 float heightScale) const;
     void drawTree(DrawList& output, float baseX, float groundY, float unit,
-                 uint32_t seed) const;
+                 uint32_t seed, float heightScale) const;
     void drawBuilding(DrawList& output, float baseX, float groundY, float unit,
-                      StarGuitarObjectType variant, uint32_t seed) const;
+                      StarGuitarObjectType variant, uint32_t seed, float heightScale) const;
     void drawWaterTower(DrawList& output, float baseX, float groundY, float unit,
-                        uint32_t seed);
+                        uint32_t seed, float heightScale);
     void drawSignalMarker(DrawList& output, float baseX, float groundY, float unit) const;
-    // The spawn-moment "note attack": a brief bright glow drawn on top of an
-    // accented instance for its first fraction of a second, fading out as
-    // `ageFraction` (0 at spawn, 1 at the end of the flash window) rises.
-    // This is what should make the object's arrival itself read as a struck
-    // beat rather than scenery that simply appeared.
-    void drawAccentFlash(DrawList& output, float baseX, float baseY, float unit,
-                         float ageFraction) const;
     void drawBird(DrawList& output, float baseX, float baseY, float unit) const;
     void drawPlane(DrawList& output, float baseX, float baseY, float unit) const;
     void drawStar(DrawList& output, float baseX, float baseY, float unit) const;
