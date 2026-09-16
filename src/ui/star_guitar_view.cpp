@@ -115,6 +115,12 @@ void StarGuitarView::setSampleRate(uint32_t sampleRate) noexcept {
     engine_.setSampleRate(sampleRate);
 }
 
+void StarGuitarView::setShowOverlay(bool show) {
+    if (showOverlay_ == show) return;
+    showOverlay_ = show;
+    if (hwnd_) InvalidateRect(hwnd_, nullptr, FALSE);
+}
+
 void StarGuitarView::updateSamples() {
     ring_.discardOlderThan(builtin::StarGuitarEngine::kMaxSamples);
     auto left = engine_.inputLeft();
@@ -160,7 +166,7 @@ void StarGuitarView::paint() {
     HDC dc = buffered ? backBuffer_.dc() : target;
     engine_.buildFrame(static_cast<float>(width), static_cast<float>(height), drawList_);
     renderer_.render(dc, drawList_);
-    drawOverlay(dc, static_cast<float>(width), static_cast<float>(height));
+    if (showOverlay_) drawOverlay(dc, static_cast<float>(width), static_cast<float>(height));
     if (buffered) backBuffer_.present(target, width, height);
     EndPaint(hwnd_, &paint);
 }

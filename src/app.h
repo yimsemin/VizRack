@@ -51,6 +51,7 @@ private:
     bool builtInViewActive() const noexcept;
     const PluginDefinition* activeBuiltInDefinition() const;
     void detachBuiltInViews();
+    void applyOverlayVisibility();
 
     HINSTANCE instance_{};
     PortablePaths paths_;

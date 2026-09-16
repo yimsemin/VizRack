@@ -114,6 +114,12 @@ void OscilloscopeView::setSampleRate(uint32_t sampleRate) noexcept {
     engine_.setSampleRate(sampleRate);
 }
 
+void OscilloscopeView::setShowOverlay(bool show) {
+    if (showOverlay_ == show) return;
+    showOverlay_ = show;
+    if (hwnd_) InvalidateRect(hwnd_, nullptr, FALSE);
+}
+
 void OscilloscopeView::applyTimer() {
     if (!hwnd_) return;
     KillTimer(hwnd_, kRefreshTimer);
@@ -176,7 +182,7 @@ void OscilloscopeView::paint() {
     HDC dc = buffered ? backBuffer_.dc() : target;
     engine_.buildFrame(static_cast<float>(width), static_cast<float>(height), drawList_);
     renderer_.render(dc, drawList_);
-    drawOverlay(dc, client);
+    if (showOverlay_) drawOverlay(dc, client);
     if (buffered) backBuffer_.present(target, width, height);
     EndPaint(hwnd_, &paint);
 }

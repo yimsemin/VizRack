@@ -25,6 +25,7 @@ constexpr UINT_PTR kSmokeTestTimer = 0x4d56;
 constexpr UINT kCommandFollowDefault = 100;
 constexpr UINT kCommandAlwaysOnTop = 120;
 constexpr UINT kCommandBorderless = 121;
+constexpr UINT kCommandShowOverlayText = 122;
 constexpr UINT kCommandExit = 130;
 constexpr UINT kCommandProjectPage = 140;
 constexpr UINT kCommandAbout = 141;
@@ -196,6 +197,8 @@ void MainWindow::createMenus() {
     AppendMenuW(viewMenu_, MF_SEPARATOR, 0, nullptr);
     AppendMenuW(viewMenu_, MF_STRING, kCommandAlwaysOnTop, trw(Str::MenuAlwaysOnTop).c_str());
     AppendMenuW(viewMenu_, MF_STRING, kCommandBorderless, trw(Str::MenuBorderless).c_str());
+    AppendMenuW(viewMenu_, MF_STRING | (settings_.showOverlayText ? MF_CHECKED : MF_UNCHECKED),
+                kCommandShowOverlayText, trw(Str::MenuShowOverlayText).c_str());
     for (size_t index = 0; index < std::size(kOpacityValues); ++index) {
         const std::wstring label = std::to_wstring(kOpacityValues[index]) + L"%";
         AppendMenuW(opacityMenu_, MF_STRING, kCommandOpacityBase + index, label.c_str());
@@ -286,6 +289,8 @@ void MainWindow::showContextMenu(POINT point) {
                   MF_BYCOMMAND | (settings_.alwaysOnTop ? MF_CHECKED : MF_UNCHECKED));
     CheckMenuItem(viewMenu_, kCommandBorderless,
                   MF_BYCOMMAND | (settings_.borderless ? MF_CHECKED : MF_UNCHECKED));
+    CheckMenuItem(viewMenu_, kCommandShowOverlayText,
+                  MF_BYCOMMAND | (settings_.showOverlayText ? MF_CHECKED : MF_UNCHECKED));
     for (size_t index = 0; index < std::size(kOpacityValues); ++index) {
         CheckMenuItem(opacityMenu_, kCommandOpacityBase + static_cast<UINT>(index),
                       MF_BYCOMMAND | (settings_.opacityPercent == kOpacityValues[index]
@@ -545,6 +550,11 @@ void MainWindow::handleCommand(UINT command) {
     } else if (command == kCommandBorderless) {
         settings_.borderless = !settings_.borderless;
         applyWindowOptions();
+        notifySettingsChanged();
+    } else if (command == kCommandShowOverlayText) {
+        settings_.showOverlayText = !settings_.showOverlayText;
+        CheckMenuItem(viewMenu_, kCommandShowOverlayText,
+                      MF_BYCOMMAND | (settings_.showOverlayText ? MF_CHECKED : MF_UNCHECKED));
         notifySettingsChanged();
     } else if (command >= kCommandOpacityBase &&
                command < kCommandOpacityBase + std::size(kOpacityValues)) {

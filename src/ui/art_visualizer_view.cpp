@@ -104,6 +104,12 @@ void ArtVisualizerView::setSampleRate(uint32_t sampleRate) noexcept {
     engine_.setSampleRate(sampleRate);
 }
 
+void ArtVisualizerView::setShowOverlay(bool show) {
+    if (showOverlay_ == show) return;
+    showOverlay_ = show;
+    if (hwnd_) InvalidateRect(hwnd_, nullptr, FALSE);
+}
+
 void ArtVisualizerView::updateSamples() {
     ring_.discardOlderThan(builtin::ArtVisualizerEngine::kMaxSamples);
     auto left = engine_.inputLeft();
@@ -131,9 +137,9 @@ void ArtVisualizerView::drawOverlay(HDC dc, float width, float height) const {
                         {width - 218.0f, 16.0f, 200.0f, 20.0f}, &right, &dim);
     const std::wstring tagline = trw(Str::ArtTagline);
     graphics.DrawString(tagline.c_str(), -1, &smallFont, {18.0f, height - 27.0f}, &dim);
-    const std::wstring hint = trw(Str::HintClickSceneRightClickOptions);
+    const std::wstring hint = trw(Str::HintRightClickOptions);
     graphics.DrawString(hint.c_str(), -1, &smallFont,
-                        {width - 300.0f, height - 27.0f, 282.0f, 18.0f}, &right, &dim);
+                        {width - 208.0f, height - 27.0f, 190.0f, 18.0f}, &right, &dim);
 }
 
 void ArtVisualizerView::paint() {
@@ -151,7 +157,7 @@ void ArtVisualizerView::paint() {
     HDC dc = buffered ? backBuffer_.dc() : target;
     engine_.buildFrame(static_cast<float>(width), static_cast<float>(height), drawList_);
     renderer_.render(dc, drawList_);
-    drawOverlay(dc, static_cast<float>(width), static_cast<float>(height));
+    if (showOverlay_) drawOverlay(dc, static_cast<float>(width), static_cast<float>(height));
     if (buffered) backBuffer_.present(target, width, height);
     EndPaint(hwnd_, &paint);
 }
@@ -238,7 +244,6 @@ LRESULT ArtVisualizerView::proc(UINT message, WPARAM wParam, LPARAM lParam) {
         case WM_PAINT: paint(); return 0;
         case WM_ERASEBKGND: return 1;
         case WM_LBUTTONDOWN: SetFocus(hwnd_); return 0;
-        case WM_LBUTTONUP: changeScene(1); return 0;
         case WM_CONTEXTMENU:
             SetFocus(hwnd_);
             showOptionsMenu({GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)});
