@@ -143,7 +143,7 @@ SettingsLoadResult loadSettings(const std::filesystem::path& path) {
     }
     if (auto value = readBool(json, "showOverlayText")) result.value.showOverlayText = *value;
     if (auto value = readInt(json, "oscilloscopeFps");
-        value && (*value == 15 || *value == 30 || *value == 60)) {
+        value && (*value == 15 || *value == 30 || *value == 60 || *value == 120)) {
         result.value.oscilloscopeFps = *value;
     }
     if (auto value = readInt(json, "oscilloscopeScalePercent");

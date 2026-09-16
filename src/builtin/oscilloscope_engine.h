@@ -29,7 +29,7 @@ struct OscilloscopeFrameInfo {
 class OscilloscopeEngine {
 public:
     static constexpr size_t kMaxSamples = 4096;
-    static constexpr size_t kHistoryPoints = 900;
+    static constexpr size_t kHistoryPoints = 1800;
     static constexpr size_t kMaxRenderedPoints = 2048;
 
     OscilloscopeEngine();

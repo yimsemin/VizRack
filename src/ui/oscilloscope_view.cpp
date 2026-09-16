@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <string>
 #include <windowsx.h>
+#include <mmsystem.h>
 
 namespace vizrack {
 namespace {
@@ -25,9 +26,10 @@ constexpr UINT kSmoothingStrong = 302;
 constexpr UINT kFps15 = 415;
 constexpr UINT kFps30 = 430;
 constexpr UINT kFps60 = 460;
+constexpr UINT kFps120 = 4120;
 
 int timerInterval(int fps) {
-    return fps == 15 ? 67 : (fps == 30 ? 33 : 16);
+    return fps == 15 ? 67 : (fps == 30 ? 33 : (fps == 120 ? 8 : 16));
 }
 
 void checkMenu(HMENU menu, UINT command, bool checked) {
@@ -77,8 +79,12 @@ bool OscilloscopeView::attach(HINSTANCE instance, HWND parent, std::string& erro
                 formatWindowsError(GetLastError());
         return false;
     }
+    if (engine_.options().fps == 120) {
+        highResTimer_ = timeBeginPeriod(1) == TIMERR_NOERROR;
+    }
     if (!SetTimer(hwnd_, kRefreshTimer, timerInterval(engine_.options().fps), nullptr)) {
         error = "Failed to start the built-in oscilloscope refresh timer.";
+        if (highResTimer_) { timeEndPeriod(1); highResTimer_ = false; }
         DestroyWindow(hwnd_);
         hwnd_ = nullptr;
         return false;
@@ -98,6 +104,7 @@ void OscilloscopeView::detach() {
         DestroyWindow(hwnd_);
         hwnd_ = nullptr;
     }
+    if (highResTimer_) { timeEndPeriod(1); highResTimer_ = false; }
     if (titleFont_) { DeleteObject(titleFont_); titleFont_ = nullptr; }
     if (smallFont_) { DeleteObject(smallFont_); smallFont_ = nullptr; }
     backBuffer_.reset();
@@ -123,6 +130,11 @@ void OscilloscopeView::setShowOverlay(bool show) {
 void OscilloscopeView::applyTimer() {
     if (!hwnd_) return;
     KillTimer(hwnd_, kRefreshTimer);
+    const bool wantHighRes = engine_.options().fps == 120;
+    if (wantHighRes != highResTimer_) {
+        if (highResTimer_) timeEndPeriod(1);
+        highResTimer_ = wantHighRes && timeBeginPeriod(1) == TIMERR_NOERROR;
+    }
     SetTimer(hwnd_, kRefreshTimer, timerInterval(engine_.options().fps), nullptr);
 }
 
@@ -215,11 +227,14 @@ void OscilloscopeView::showOptionsMenu(POINT point) {
     AppendMenuW(fps, MF_STRING, kFps15, L"15 FPS");
     AppendMenuW(fps, MF_STRING, kFps30, L"30 FPS");
     AppendMenuW(fps, MF_STRING, kFps60, L"60 FPS");
+    AppendMenuW(fps, MF_STRING, kFps120, L"120 FPS");
     checkMenu(mode, options.historyMode ? kModeHistory : kModeWaveform, true);
     checkMenu(scale, options.scalePercent == 50 ? kScaleSmall :
                      (options.scalePercent == 100 ? kScaleLarge : kScaleNormal), true);
     checkMenu(smoothing, kSmoothingOff + static_cast<UINT>(options.smoothing), true);
-    checkMenu(fps, options.fps == 15 ? kFps15 : (options.fps == 30 ? kFps30 : kFps60), true);
+    checkMenu(fps, options.fps == 15 ? kFps15 :
+                   (options.fps == 30 ? kFps30 : (options.fps == 120 ? kFps120 : kFps60)),
+              true);
     AppendMenuW(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(mode), trw(Str::ScopeMenuDisplayMode).c_str());
     AppendMenuW(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(scale), trw(Str::ScopeMenuWaveformSize).c_str());
     AppendMenuW(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(smoothing),
@@ -236,8 +251,12 @@ void OscilloscopeView::showOptionsMenu(POINT point) {
     if (command >= kSmoothingOff && command <= kSmoothingStrong) {
         options.smoothing = static_cast<int>(command - kSmoothingOff);
     }
-    const bool fpsChanged = command == kFps15 || command == kFps30 || command == kFps60;
-    if (fpsChanged) options.fps = command == kFps15 ? 15 : (command == kFps30 ? 30 : 60);
+    const bool fpsChanged =
+        command == kFps15 || command == kFps30 || command == kFps60 || command == kFps120;
+    if (fpsChanged) {
+        options.fps = command == kFps15 ? 15 :
+                      (command == kFps30 ? 30 : (command == kFps120 ? 120 : 60));
+    }
     DestroyMenu(menu);
     if (command) {
         engine_.setOptions(options);

@@ -141,6 +141,7 @@ target_link_libraries(VizRack PRIVATE
     shlwapi
     user32
     uuid
+    winmm
 )
 set_target_properties(VizRack PROPERTIES
     OUTPUT_NAME "VizRack"

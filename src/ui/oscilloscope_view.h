@@ -52,6 +52,7 @@ private:
     HFONT titleFont_{};
     HFONT smallFont_{};
     bool showOverlay_{true};
+    bool highResTimer_{};
 };
 
 } // namespace vizrack
