@@ -93,9 +93,7 @@ from more than the two sub-bands in its group:
 `pine` and `tree` are deliberately different silhouettes (pine: five
 sharply-tapering tiers reading as a conifer; tree: three broader tiers) so
 the two "tree" spawns stay visually distinguishable even though they share a
-family resemblance. `waterTower`, `bird` and `plane` are currently unmapped
-by any sub-band (kept in the type enum and their draw functions in case a
-future remap reintroduces them).
+family resemblance.
 
 This intentionally **inverts** the original version's depth assignment: low
 frequencies now drive the *nearest* layer (big, fast, close) and the treble
