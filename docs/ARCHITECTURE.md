@@ -86,9 +86,39 @@ fails to compile; a `test_main.cpp` case checks every `Str` is non-empty in both
 languages. Format placeholders are `std::format`-style (`{}`) composed with
 `std::vformat`, so a translation can reorder arguments. A diagnostic is
 English-only: the UI localizes just the MessageBox title and shows the English
-detail beneath it.
+detail beneath it. Every built-in visualizer's overlay caption (title, tagline,
+control hint) is localized the same way; the one exception is a scene/palette
+name read from `src/builtin/` engine state, which stays English because the
+core has no `core/i18n` dependency to draw from.
 
 The string rules to follow when adding UI text are in `CLAUDE.md` ▸ Localization.
+
+## UI conventions
+
+The menu bar is `File` (Exit only) · `View` (output device, always-on-top,
+borderless, opacity, language) · `Plug-in` (the catalog) · `Help` — the
+conventional Windows grouping, so Exit lives in File rather than mixed into a
+settings catch-all. The borderless window has no bar; its right-click / F10 /
+Alt context menu is the `View` popup with Exit spliced onto the end for that
+one call (`MainWindow::showContextMenu`), since it is otherwise unreachable
+while borderless.
+
+A `PluginKind::builtIn` catalog entry is a single item directly under
+`Plug-in`: clicking the name activates it immediately (`kCommandPluginSelectBase`).
+There is nothing to configure before use, so a submenu-then-"Use" step would
+just add friction. `PluginKind::vst3` keeps its submenu (`Use (auto-detect)` /
+pick file / pick folder / install page) because those actions are meaningful
+before a module is even found.
+
+Every built-in visualizer's overlay text (title + tagline + control hint) draws
+with `overlayTitleFont()` / `overlaySmallFont()` from `src/ui/overlay_font.h` —
+"Segoe UI" (the Windows system font, so no licensing to track and Korean
+renders through the OS's own font-linking fallback) at a shared 12px-bold /
+9px-regular pair. A stylized title (a plugin's display name rendered in caps)
+goes through `overlayCaps()` so the look survives translation. The
+oscilloscope view predates GDI+ overlay drawing and stays on plain GDI
+(`gdi_draw_list_renderer.h`), so it matches family and size with two cached
+`HFONT`s created in `attach()` instead of a `Gdiplus::Font`.
 
 ## Audio capture and recovery
 
