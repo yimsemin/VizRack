@@ -60,14 +60,36 @@ English (default) and Korean. Every user-facing string in `src/ui/`, `src/app.cp
 and `src/main.cpp` resolves through `core/i18n` — add a
 `VIZRACK_STR(Id, "English", "한국어")` row to `src/core/i18n_strings.inc` and use
 `trw(Str::Id)` / `tr`. Never write a raw user-facing `L"..."` in a menu, dialog,
-overlay or the window title. Diagnostics (logger and `error`/status strings from
-`src/core`, `src/platform`, `src/vst`) stay English; scene/palette names and
-stylized overlay captions stay English by design. Mechanism:
+overlay or the window title — this includes each built-in visualizer's overlay
+caption (its title, tagline and control hint), which are equally in scope: reuse
+`Str::HintRightClickOptions` / `Str::HintClickSceneRightClickOptions` /
+`Str::HintClickPaletteRightClickOptions` for the standard "right-click: options"
+family of hints instead of inventing a new string per engine. Diagnostics (logger
+and `error`/status strings from `src/core`, `src/platform`, `src/vst`) stay
+English. The one exception is scene/palette names sourced from `src/builtin/`
+engine code (e.g. art visualizer scene names, spectrum3d style/palette names) —
+those stay English because they live in the portable core, which must not depend
+on `core/i18n` (see the portability boundary above). Mechanism:
 `docs/ARCHITECTURE.md` ▸ Localization.
 
 `README.md` is canonical. `README.ko.md` mirrors only the sections its own header
 lists — when you change one of those sections, update `README.ko.md` in the same
 commit.
+
+## UI conventions for a new built-in visualizer
+
+When adding a new built-in visualizer, follow the pattern the existing six
+engines share (`docs/ARCHITECTURE.md` ▸ UI conventions for the details):
+
+- **Menu**: add one `PluginKind::builtIn` catalog entry. It appears as a single
+  clickable item directly under Plug-in — no submenu, no confirmation step, since
+  a built-in needs no file/folder to select first. That behavior is generic in
+  `MainWindow::createMenus`; a new built-in gets it for free.
+- **Overlay font**: use `overlayTitleFont()` / `overlaySmallFont()` from
+  `src/ui/overlay_font.h` — never a locally declared `Gdiplus::Font`. Wrap a
+  stylized title (a plugin display name drawn in caps) with `overlayCaps()`.
+- **Overlay strings**: every caption goes through `core/i18n` (see Localization
+  above) — reuse the shared hint strings where the control scheme matches.
 
 ## Keep the EXE small
 

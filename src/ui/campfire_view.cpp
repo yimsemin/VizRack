@@ -3,6 +3,7 @@
 #include "core/audio_ring.h"
 #include "core/i18n.h"
 #include "core/utf.h"
+#include "ui/overlay_font.h"
 
 #include <windowsx.h>
 
@@ -129,17 +130,18 @@ void CampfireView::updateSamples() {
 
 void CampfireView::drawOverlay(HDC dc, float width, float height) const {
     Gdiplus::Graphics graphics(dc);
-    Gdiplus::Font title(L"Segoe UI", 12.0f, Gdiplus::FontStyleBold, Gdiplus::UnitPixel);
-    Gdiplus::Font smallFont(L"Segoe UI", 9.0f, Gdiplus::FontStyleRegular,
-                            Gdiplus::UnitPixel);
+    Gdiplus::Font title = overlayTitleFont();
+    Gdiplus::Font smallFont = overlaySmallFont();
     Gdiplus::SolidBrush warm(Gdiplus::Color(175, 244, 220, 188));
     Gdiplus::SolidBrush dim(Gdiplus::Color(105, 188, 165, 145));
-    graphics.DrawString(L"CAMPFIRE", -1, &title, {18.0f, 14.0f}, &warm);
-    graphics.DrawString(L"NATURAL FLAME  /  GENTLE AUDIO REACTION", -1, &smallFont,
-                        {18.0f, height - 27.0f}, &dim);
+    const std::wstring name = overlayCaps(trw(Str::PluginNameCampfire));
+    graphics.DrawString(name.c_str(), -1, &title, {18.0f, 14.0f}, &warm);
+    const std::wstring tagline = trw(Str::CampfireTagline);
+    graphics.DrawString(tagline.c_str(), -1, &smallFont, {18.0f, height - 27.0f}, &dim);
     Gdiplus::StringFormat right;
     right.SetAlignment(Gdiplus::StringAlignmentFar);
-    graphics.DrawString(L"RIGHT CLICK: OPTIONS", -1, &smallFont,
+    const std::wstring hint = trw(Str::HintRightClickOptions);
+    graphics.DrawString(hint.c_str(), -1, &smallFont,
                         {width - 208.0f, height - 27.0f, 190.0f, 18.0f}, &right, &dim);
 }
 

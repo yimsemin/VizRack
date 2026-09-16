@@ -3,6 +3,7 @@
 #include "core/audio_ring.h"
 #include "core/i18n.h"
 #include "core/utf.h"
+#include "ui/overlay_font.h"
 
 #include <algorithm>
 #include <string>
@@ -82,6 +83,12 @@ bool OscilloscopeView::attach(HINSTANCE instance, HWND parent, std::string& erro
         hwnd_ = nullptr;
         return false;
     }
+    titleFont_ = CreateFontW(-static_cast<int>(kOverlayTitleSize), 0, 0, 0, FW_BOLD, FALSE, FALSE,
+                             FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+                             CLEARTYPE_QUALITY, DEFAULT_PITCH, kOverlayFontFamily);
+    smallFont_ = CreateFontW(-static_cast<int>(kOverlaySmallSize), 0, 0, 0, FW_NORMAL, FALSE, FALSE,
+                             FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+                             CLEARTYPE_QUALITY, DEFAULT_PITCH, kOverlayFontFamily);
     return true;
 }
 
@@ -91,6 +98,8 @@ void OscilloscopeView::detach() {
         DestroyWindow(hwnd_);
         hwnd_ = nullptr;
     }
+    if (titleFont_) { DeleteObject(titleFont_); titleFont_ = nullptr; }
+    if (smallFont_) { DeleteObject(smallFont_); smallFont_ = nullptr; }
     backBuffer_.reset();
     engine_.reset();
 }
@@ -126,11 +135,12 @@ void OscilloscopeView::drawOverlay(HDC dc, const RECT& client) const {
     const int height = client.bottom;
     const int centers[] = {height / 4, height * 3 / 4};
     SetBkMode(dc, TRANSPARENT);
-    SelectObject(dc, GetStockObject(DEFAULT_GUI_FONT));
+    HFONT previousFont = static_cast<HFONT>(SelectObject(dc, titleFont_));
     SetTextColor(dc, RGB(145, 168, 174));
     const std::wstring title =
         trw(info.options.historyMode ? Str::ScopeTitleHistory : Str::ScopeTitleWaveform);
     TextOutW(dc, 12, 10, title.c_str(), static_cast<int>(title.size()));
+    SelectObject(dc, smallFont_);
     const std::wstring status = std::to_wstring(info.sampleRate) + L" Hz  |  " +
                                 std::to_wstring(info.options.fps) + L" FPS";
     SetTextAlign(dc, TA_RIGHT | TA_TOP);
@@ -148,6 +158,7 @@ void OscilloscopeView::drawOverlay(HDC dc, const RECT& client) const {
         DrawTextW(dc, trw(Str::ScopePlaySomeAudio).c_str(), -1, &textRect,
                   DT_CENTER | DT_VCENTER | DT_SINGLELINE);
     }
+    SelectObject(dc, previousFont);
 }
 
 void OscilloscopeView::paint() {

@@ -30,12 +30,13 @@ VIZRACK_STR(TitleCheckingDevice,   "Checking output device", "출력 장치 확�
 VIZRACK_STR(TitleFrontLrMetering,  "Front L/R metering", "Front L/R 측정")
 
 // ── Menu bar ────────────────────────────────────────────────────────────────
-VIZRACK_STR(MenuSettings,          "Settings", "설정")
+VIZRACK_STR(MenuFile,              "File", "파일")
+VIZRACK_STR(MenuView,              "View", "보기")
 VIZRACK_STR(MenuHelp,              "Help", "도움말")
 VIZRACK_STR(MenuPluginBarFmt,      "Plug-in: {}", "플러그인: {}")
 VIZRACK_STR(PluginStatusSearching, "searching", "찾는 중")
 
-// ── Settings menu ───────────────────────────────────────────────────────────
+// ── View menu ───────────────────────────────────────────────────────────────
 VIZRACK_STR(MenuOutputDevice,      "Output device", "출력 장치")
 VIZRACK_STR(MenuFollowDefault,     "Follow the Windows default output", "Windows 기본 출력 자동 추적")
 VIZRACK_STR(MenuAlwaysOnTop,       "Always on top", "항상 위")
@@ -49,7 +50,6 @@ VIZRACK_STR(MenuExit,              "Exit", "종료")
 VIZRACK_STR(DeviceDefaultSuffix,   " (default)", " (기본)")
 
 // ── Plug-in menu ────────────────────────────────────────────────────────────
-VIZRACK_STR(MenuPluginUse,           "Use", "사용")
 VIZRACK_STR(MenuPluginUseAutoDetect, "Auto-detect and use", "자동 검색하여 사용")
 VIZRACK_STR(MenuPluginPickFile,      "Choose VST3 file...", "VST3 파일 선택...")
 VIZRACK_STR(MenuPluginPickFolder,    "Choose VST3 bundle folder...", "VST3 번들 폴더 선택...")
@@ -62,7 +62,7 @@ VIZRACK_STR(MenuCredits,             "Credits", "크레딧")
 VIZRACK_STR(PluginNameOscilloscope,  "Oscilloscope", "오실로스코프")
 VIZRACK_STR(PluginNameArtVisualizer, "Art Visualizer", "아트 비주얼라이저")
 VIZRACK_STR(PluginNameCampfire,      "Campfire", "캠프파이어")
-VIZRACK_STR(PluginNameSpectrum3d,    "3D Spectrum", "3D 스펙트럼")
+VIZRACK_STR(PluginNameSpectrum3d,    "Classic Cascade", "클래식 캐스케이드")
 VIZRACK_STR(PluginNameJoyDivision,   "Joy Division", "Joy Division")
 VIZRACK_STR(PluginNameStarGuitar,    "Star Guitar", "Star Guitar")
 VIZRACK_STR(PluginNameRhythmRipple,  "Rhythm Ripple", "리듬 리플")
@@ -112,13 +112,18 @@ VIZRACK_STR(DialogBodyPluginRequiredFmt,
     "[아니요] 이미 설치한 .vst3 파일 직접 선택\n"
     "[취소] 나중에 플러그인 메뉴에서 선택")
 
+// ── Shared overlay hints (right-click / click control captions) ────────────
+VIZRACK_STR(HintRightClickOptions,             "RIGHT CLICK: OPTIONS", "우클릭: 옵션")
+VIZRACK_STR(HintClickSceneRightClickOptions,   "CLICK: SCENE  ·  RIGHT CLICK: OPTIONS", "클릭: 장면 전환  ·  우클릭: 옵션")
+VIZRACK_STR(HintClickPaletteRightClickOptions, "CLICK: PALETTE  ·  RIGHT CLICK: OPTIONS", "클릭: 팔레트 변경  ·  우클릭: 옵션")
+
 // ── Oscilloscope view ──────────────────────────────────────────────────────
-VIZRACK_STR(ScopeTitleHistory,   "Built-in Oscilloscope · Time history", "내장 오실로스코프 · 시간 히스토리")
-VIZRACK_STR(ScopeTitleWaveform,  "Built-in Oscilloscope · Instant waveform", "내장 오실로스코프 · 순간 파형")
+VIZRACK_STR(ScopeTitleHistory,   "Oscilloscope · Time history", "오실로스코프 · 시간 기록")
+VIZRACK_STR(ScopeTitleWaveform,  "Oscilloscope · Instant waveform", "오실로스코프 · 순간 파형")
 VIZRACK_STR(ScopeHintRightClick, "Right-click: display settings", "우클릭: 표시 설정")
 VIZRACK_STR(ScopePlaySomeAudio,  "Try playing some system audio", "시스템 소리를 재생해 보세요")
 VIZRACK_STR(ScopeMenuModeWaveform,  "Instant waveform", "순간 파형")
-VIZRACK_STR(ScopeMenuModeHistory,   "Time history (~15 s)", "시간 히스토리 (약 15초)")
+VIZRACK_STR(ScopeMenuModeHistory,   "Time history (~15 s)", "시간 기록 (약 15초)")
 VIZRACK_STR(ScopeMenuScaleSmall,    "Small (50%)", "작게 (50%)")
 VIZRACK_STR(ScopeMenuScaleNormal,   "Normal (70%)", "보통 (70%)")
 VIZRACK_STR(ScopeMenuScaleLarge,    "Large (100%)", "크게 (100%)")
@@ -131,6 +136,7 @@ VIZRACK_STR(ScopeMenuLineStability, "Line stabilization", "선 안정화")
 VIZRACK_STR(ScopeMenuFrameRate,     "Frame rate", "프레임 속도")
 
 // ── Campfire view ──────────────────────────────────────────────────────────
+VIZRACK_STR(CampfireTagline, "NATURAL FLAME  /  GENTLE AUDIO REACTION", "자연스러운 불꽃  /  은은한 오디오 반응")
 VIZRACK_STR(CampfireMenuFlameResponse,  "Flame audio reaction", "불꽃 음악 반응")
 VIZRACK_STR(CampfireMenuStarSpeed,      "Star drift speed", "별 이동 속도")
 VIZRACK_STR(CampfireMenuStarBrightness, "Star base brightness", "별 평소 밝기")
@@ -139,18 +145,22 @@ VIZRACK_STR(CampfireMenuSparkAmount,    "Spark amount", "불티 양")
 VIZRACK_STR(CampfireMenuSparkIntensity, "Spark intensity", "불티 강도")
 
 // ── Star Guitar view ───────────────────────────────────────────────────────
+VIZRACK_STR(StarGuitarTagline, "RHYTHM SEQUENCER LANDSCAPE", "리듬 시퀀서 풍경")
 VIZRACK_STR(StarGuitarMenuLowSensitivity,     "Low sensitivity (<300Hz)", "저역 민감도 (<300Hz)")
 VIZRACK_STR(StarGuitarMenuMidSensitivity,     "Mid sensitivity (300Hz-4kHz)", "중역 민감도 (300Hz~4kHz)")
 VIZRACK_STR(StarGuitarMenuTrebleSensitivity,  "Treble sensitivity (4-8kHz)", "고역 민감도 (4~8kHz)")
 VIZRACK_STR(StarGuitarMenuAirSensitivity,     "Air sensitivity (>8kHz)", "에어 민감도 (>8kHz)")
+VIZRACK_STR(RhythmRippleTagline, "ONE BEAT, ONE RIPPLE", "한 박자, 한 파동")
 VIZRACK_STR(RhythmRippleMenuSensitivity,      "Sensitivity", "민감도")
 VIZRACK_STR(RhythmRippleMenuLongNoteSensitivity, "Long note sensitivity", "롱노트 민감도")
 
 // ── Art visualizer view ────────────────────────────────────────────────────
+VIZRACK_STR(ArtTagline,     "AUDIO REACTIVE", "오디오 반응형")
 VIZRACK_STR(ArtMenuScene,   "Scene", "장면")
 VIZRACK_STR(ArtMenuPalette, "Color palette", "색상 팔레트")
 
 // ── 3D spectrum view ───────────────────────────────────────────────────────
+VIZRACK_STR(Spectrum3dTagline,    "TIME-DEPTH SPECTRUM", "시간 깊이 스펙트럼")
 VIZRACK_STR(SpectrumMenuPalette,  "Color palette", "색상 팔레트")
 VIZRACK_STR(SpectrumMenuRotation, "Rotation (quarter view)", "회전 (쿼터뷰)")
 VIZRACK_STR(SpectrumMenuTilt,     "Tilt / perspective", "기울기 / 원근")

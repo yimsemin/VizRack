@@ -24,6 +24,30 @@ ZIP attached. How these notes are written and cut: `docs/RELEASE_NOTES_STYLE.md`
   start and end with a ripple (never re-bursting while held), lasts up to 5
   seconds, and several can be held at once.
 
+### Changed
+
+- **Menu bar** is now File (Exit) · View (output device, always-on-top,
+  borderless, opacity, language) · Plug-in · Help, matching conventional
+  Windows layout instead of mixing Exit into a settings catch-all. The
+  borderless right-click menu still reaches Exit.
+- **Built-in visualizer selection** is now one click on the plug-in's name —
+  no more opening its submenu and choosing "Use" first. VST3 entries keep
+  their submenu, since picking a file/folder is a real action.
+- Every built-in visualizer's overlay caption (title, tagline, right-click
+  hint) is now localized into Korean, and all five GDI+ engines share one
+  overlay font rule (Segoe UI, 16px bold title / 12px regular hint, bumped up
+  from 12/9 for readability) instead of each hardcoding its own size.
+- Dropped the redundant "Built-in " prefix from every built-in visualizer's
+  display name (plug-in menu, activation status, overlay taglines); "내장" is
+  gone from the Korean equivalents the same way.
+- Renamed the `builtin-spectrum3d` catalog entry from "3D Spectrum" to
+  "Classic Cascade" so its menu name matches the on-screen title it shares
+  with its sibling `builtin-joydivision` ("Joy Division").
+- Retranslated a couple of Korean overlay strings that read as awkward
+  loanwords: oscilloscope's history mode is now "시간 기록" (was "시간
+  히스토리"), and the 3D-style plug-ins' click hint is now "팔레트 변경" (was
+  "팔레트 전환").
+
 ## [0.4.0] - 2026-09-15
 
 _A rhythmic pixel-art landscape that reacts to the music's frequency

@@ -2,6 +2,7 @@
 
 #include "core/settings.h"
 #include "platform/wasapi_capture.h"
+#include "vst/plugin_catalog.h"
 
 #include <filesystem>
 #include <functional>
@@ -47,6 +48,10 @@ public:
     void scheduleClose(unsigned milliseconds);
     const Settings& settings() const noexcept { return settings_; }
 
+    // The name shown for a catalog entry: its localized display name for a
+    // built-in, or its raw (unlocalized) product name for a VST3.
+    static std::wstring localizedPluginName(const PluginDefinition& definition);
+
 private:
     static LRESULT CALLBACK windowProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam);
     LRESULT proc(UINT message, WPARAM wParam, LPARAM lParam);
@@ -72,7 +77,8 @@ private:
     HWND hwnd_{};
     HWND pluginParent_{};
     HMENU menuBar_{};
-    HMENU settingsMenu_{};
+    HMENU fileMenu_{};
+    HMENU viewMenu_{};
     HMENU deviceMenu_{};
     HMENU opacityMenu_{};
     HMENU pluginMenu_{};

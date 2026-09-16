@@ -9,7 +9,7 @@ const std::vector<PluginDefinition>& pluginCatalog() {
         {
             PluginKind::builtIn,
             "builtin-oscilloscope",
-            "Built-in Oscilloscope",
+            "Oscilloscope",
             "VizRack",
             "",
             "",
@@ -22,7 +22,7 @@ const std::vector<PluginDefinition>& pluginCatalog() {
         {
             PluginKind::builtIn,
             "builtin-art-visualizer",
-            "Built-in Art Visualizer",
+            "Art Visualizer",
             "VizRack",
             "",
             "",
@@ -35,7 +35,7 @@ const std::vector<PluginDefinition>& pluginCatalog() {
         {
             PluginKind::builtIn,
             "builtin-campfire",
-            "Built-in Campfire",
+            "Campfire",
             "VizRack",
             "",
             "",
@@ -48,12 +48,12 @@ const std::vector<PluginDefinition>& pluginCatalog() {
         {
             PluginKind::builtIn,
             "builtin-spectrum3d",
-            "Built-in 3D Spectrum",
+            "Classic Cascade",
             "VizRack",
             "",
             "",
             "",
-            "Classic Cascade / Time Depth",
+            "Time-Depth Spectrum",
             {},
             "",
             "",
@@ -61,7 +61,7 @@ const std::vector<PluginDefinition>& pluginCatalog() {
         {
             PluginKind::builtIn,
             "builtin-joydivision",
-            "Built-in Joy Division",
+            "Joy Division",
             "VizRack",
             "",
             "",
@@ -74,7 +74,7 @@ const std::vector<PluginDefinition>& pluginCatalog() {
         {
             PluginKind::builtIn,
             "builtin-starguitar",
-            "Built-in Star Guitar",
+            "Star Guitar",
             "VizRack",
             "",
             "",
@@ -87,7 +87,7 @@ const std::vector<PluginDefinition>& pluginCatalog() {
         {
             PluginKind::builtIn,
             "builtin-rhythmripple",
-            "Built-in Rhythm Ripple",
+            "Rhythm Ripple",
             "VizRack",
             "",
             "",

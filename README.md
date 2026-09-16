@@ -37,8 +37,7 @@ VizRack runs on an **x64 PC with Windows 10 version 1703 or newer, or Windows
 1. Extract `VizRack-win-x64.zip` completely into a local folder of your choice.
 2. Run `VizRack.exe` from the extracted folder.
 3. Play music or video as usual.
-4. Choose `Plug-in > Built-in Art Visualizer > Use` and click the screen to
-   change scenes.
+4. Choose `Plug-in > Art Visualizer` and click the screen to change scenes.
 
 To keep your settings, do not run it from inside the ZIP or place it in a
 write-restricted folder such as `C:\Program Files`.
@@ -56,9 +55,9 @@ Choose `More info > Run anyway` only when you trust where the file came from.
 | Right-click | Current screen and window settings |
 | `F10` or tap `Alt` | Open the menu while the border is hidden |
 
-The `Settings` menu changes always-on-top, hidden border, opacity, the output
+The `View` menu changes always-on-top, hidden border, opacity, the output
 device and the UI language. By default VizRack follows the Windows default
-output device automatically.
+output device automatically. `Exit` is under `File`.
 
 ## Optional external visualizers
 
@@ -80,7 +79,7 @@ plug-ins are not bundled with VizRack.
 
 | Problem | What to check |
 | --- | --- |
-| The screen does not react to the music | Confirm the music is actually playing, then pick the right device under `Settings > Output device`. |
+| The screen does not react to the music | Confirm the music is actually playing, then pick the right device under `View > Output device`. |
 | Settings are not saved | Extract VizRack completely into a writable local folder and run it from there. |
 | An external screen is not found | Confirm you installed the Windows **64-bit VST 3** build of the plug-in, then use auto-detect or pick it manually. |
 | The mvMeter2 GPU screen does not open | Update your graphics driver or use the official noGPU build. |
@@ -140,8 +139,8 @@ structure, including how localization works, is in
 
 Some built-in visualizers take after the work below.
 
-- **Built-in Joy Division** — Inspired by Joy Division
-- **Built-in Star Guitar** — Inspired by The Chemical Brothers / Michel
+- **Joy Division** — Inspired by Joy Division
+- **Star Guitar** — Inspired by The Chemical Brothers / Michel
   Gondry's "Star Guitar"
 
 These names credit the source of inspiration only. The names and works stay with

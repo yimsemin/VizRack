@@ -459,7 +459,7 @@ bool App::startBuiltInPlugin(const PluginDefinition& definition, std::string& er
     } else if (definition.id == "builtin-starguitar") {
         starGuitar_.setInspiration(definition.inspiration);
     }
-    window_->setPluginStatus(definition.displayName);
+    window_->setPluginStatus(toUtf8(MainWindow::localizedPluginName(definition)));
     pluginSelectionNeeded_ = false;
     logger_.info("Built-in visualization activated: id='" + definition.id + "'");
     return true;
