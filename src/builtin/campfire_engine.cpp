@@ -341,16 +341,34 @@ void CampfireEngine::drawStars(DrawList& output, float width, float height,
         return Point{poleX + dx * cosine - dy * sine,
                      poleY + (dx * sine + dy * cosine) * ellipseScale};
     };
+    // Stars orbit a pole below the sky; without a per-star phase offset they all
+    // share the same rotation angle and sweep past the horizon as one clump,
+    // leaving the sky visibly empty while that clump glows near the ground.
+    // Randomizing each star's phase keeps a steady number visible at all times.
+    // The horizon fade then hides whatever's left below the fire line instead of
+    // letting it glow on the ground.
+    const float horizonY = skyHeight;
+    const float fadeBand = std::max(1.0f, skyHeight * 0.08f);
+    const auto horizonFade = [&](float y) {
+        if (y >= horizonY) return 0.0f;
+        if (y <= horizonY - fadeBand) return 1.0f;
+        return (horizonY - y) / fadeBand;
+    };
     for (uint32_t star = 0; star < static_cast<uint32_t>(kStarCount); ++star) {
         const float depth = hash01(star * 47u + 3u);
         const float initialX =
             width * (0.025f + hash01(star * 71u + 13u) * 0.95f);
         const float initialY =
             skyHeight * (0.035f + hash01(star * 97u + 31u) * 0.88f);
+        const float phaseOffset = hash01(star * 151u + 61u) * kPi * 2.0f;
         const auto positionAt = [&](float secondsFromNow) {
-            return rotateFromInitial(initialX, initialY,
-                                     starRotation_ + secondsFromNow * angularSpeed);
+            return rotateFromInitial(
+                initialX, initialY,
+                starRotation_ + phaseOffset + secondsFromNow * angularSpeed);
         };
+        const Point position = positionAt(0.0f);
+        const float horizonAlpha = horizonFade(position.y);
+        if (horizonAlpha <= 0.0f) continue;
         const float naturalTwinkle =
             0.72f + 0.26f * std::sin(time_ * (0.48f + depth * 0.82f) +
                                      hash01(star * 19u + 7u) * kPi * 2.0f);
@@ -361,8 +379,9 @@ void CampfireEngine::drawStars(DrawList& output, float width, float height,
         const float radius = scale * (0.45f + depth * 0.95f) *
                              (1.0f + responsePulse * 0.38f);
         const float starAlpha = std::clamp(
-            (42.0f + brightnessSetting * 178.0f) * brightness +
-                responsePulse * 95.0f,
+            ((42.0f + brightnessSetting * 178.0f) * brightness +
+                responsePulse * 95.0f) *
+                horizonAlpha,
             0.0f, 255.0f);
         constexpr int trailSegments = 5;
         const float trailSeconds = 3.0f + speedSetting * 5.5f;
@@ -372,14 +391,16 @@ void CampfireEngine::drawStars(DrawList& output, float width, float height,
                 static_cast<float>(segment + 1) / trailSegments;
             const Point current =
                 positionAt(-trailSeconds * (1.0f - progress));
-            const float trailAlpha =
-                starAlpha * (0.10f + progress * progress * 0.38f);
-            output.addLine(previous.x, previous.y, current.x, current.y,
-                           color(0xa9caff, static_cast<uint8_t>(trailAlpha)),
-                           std::max(0.45f, radius * (0.34f + progress * 0.12f)), true);
+            const float trailFade = horizonFade(current.y);
+            if (trailFade > 0.0f) {
+                const float trailAlpha =
+                    starAlpha * (0.10f + progress * progress * 0.38f) * trailFade;
+                output.addLine(previous.x, previous.y, current.x, current.y,
+                               color(0xa9caff, static_cast<uint8_t>(trailAlpha)),
+                               std::max(0.45f, radius * (0.34f + progress * 0.12f)), true);
+            }
             previous = current;
         }
-        const Point position = positionAt(0.0f);
         output.addFillEllipse(
             position.x - radius * 2.8f, position.y - radius * 2.8f,
             radius * 5.6f, radius * 5.6f,
