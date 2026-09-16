@@ -33,8 +33,7 @@ VIZRACK_STR(TitleFrontLrMetering,  "Front L/R metering", "Front L/R 측정")
 VIZRACK_STR(MenuFile,              "File", "파일")
 VIZRACK_STR(MenuView,              "View", "보기")
 VIZRACK_STR(MenuHelp,              "Help", "도움말")
-VIZRACK_STR(MenuPluginBarFmt,      "Plug-in: {}", "플러그인: {}")
-VIZRACK_STR(PluginStatusSearching, "searching", "찾는 중")
+VIZRACK_STR(MenuPlugin,            "Plug-in", "플러그인")
 
 // ── View menu ───────────────────────────────────────────────────────────────
 VIZRACK_STR(MenuOutputDevice,      "Output device", "출력 장치")
@@ -55,6 +54,7 @@ VIZRACK_STR(MenuPluginUseAutoDetect, "Auto-detect and use", "자동 검색하여
 VIZRACK_STR(MenuPluginPickFile,      "Choose VST3 file...", "VST3 파일 선택...")
 VIZRACK_STR(MenuPluginPickFolder,    "Choose VST3 bundle folder...", "VST3 번들 폴더 선택...")
 VIZRACK_STR(MenuPluginInstallPage,   "Open the official install page...", "공식 설치 페이지 열기...")
+VIZRACK_STR(MenuPluginProperties,    "Properties...", "속성 보기...")
 VIZRACK_STR(MenuHelpGithub,          "Open the GitHub repository", "GitHub 저장소 열기")
 VIZRACK_STR(MenuAbout,               "About VizRack", "VizRack 정보")
 VIZRACK_STR(MenuCredits,             "Credits", "크레딧")
@@ -73,6 +73,14 @@ VIZRACK_STR(PickerFolderTitleFmt,  "Select the {} .vst3 bundle folder", "{} .vst
 VIZRACK_STR(PickerFileTitleFmt,    "Select {} VST3", "{} VST3 선택")
 VIZRACK_STR(PickerFilterVst3,      "VST3 module (*.vst3)", "VST3 모듈 (*.vst3)")
 VIZRACK_STR(PickerFilterAllFiles,  "All files", "모든 파일")
+
+// ── Plug-in properties dialog ────────────────────────────────────────────────
+VIZRACK_STR(PluginPropertiesVersion,  "Version", "버전")
+VIZRACK_STR(PluginPropertiesEdition,  "Edition", "에디션")
+VIZRACK_STR(PluginPropertiesFile,     "File", "파일")
+VIZRACK_STR(PluginPropertiesNotFound,
+    "Not found yet — select or auto-detect this plug-in first.",
+    "아직 찾지 못했습니다 — 먼저 이 플러그인을 선택하거나 자동 검색하세요.")
 
 // ── About / Credits dialogs ─────────────────────────────────────────────────
 VIZRACK_STR(AboutDescription,
@@ -97,9 +105,6 @@ VIZRACK_STR(DialogTitleBuiltinStartFailed,  "Built-in visualizer failed to start
 VIZRACK_STR(DialogTitleVst3LoadFailed,      "VST3 load failed", "VST3 로딩 실패")
 VIZRACK_STR(DialogTitleSupportedPluginMissing, "Supported plug-in not found", "지원 플러그인을 찾지 못함")
 VIZRACK_STR(DialogTitleIncompatibleVst3,    "Incompatible VST3", "호환되지 않는 VST3")
-VIZRACK_STR(StatusPortableReadOnly,
-    "Portable data folder not writable — settings and logs are not saved",
-    "포터블 데이터 폴더 쓰기 불가 — 설정과 로그를 저장하지 않음")
 
 // ── "Supported plug-in required" dialog ─────────────────────────────────────
 VIZRACK_STR(DialogTitlePluginRequired, "Supported plug-in required", "지원 플러그인 필요")

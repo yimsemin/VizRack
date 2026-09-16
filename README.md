@@ -72,8 +72,10 @@ plug-ins.
 
 After installing the product you need, choose
 `Plug-in > product name > Auto-detect and use`. If it is not found, you can point
-VizRack at the VST 3 file or bundle folder directly from the same menu. External
-plug-ins are not bundled with VizRack.
+VizRack at the VST 3 file or bundle folder directly from the same menu, and
+`Properties...` in that same menu shows its detected version, edition (e.g.
+mvMeter2's GPU/noGPU build) and file path. External plug-ins are not bundled
+with VizRack.
 
 ## When something goes wrong
 

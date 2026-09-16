@@ -99,6 +99,13 @@ engines share (`docs/ARCHITECTURE.md` ▸ UI conventions for the details):
   sensitivity, …) lives behind the right-click menu only. `WM_LBUTTONDOWN` may
   set focus; it must not change what is drawn.
 
+## Dialogs never make noise
+
+Every `MessageBoxW` call passes `MB_OK` / `MB_YESNOCANCEL` alone, with **no**
+`MB_ICON*` flag — an icon flag makes Windows play its system alert sound, which
+is jarring while listening to music. This applies to every dialog, present and
+future: error, warning and info alike.
+
 ## Keep the EXE small
 
 No UI, DSP or serialization framework for what the standard library and Win32

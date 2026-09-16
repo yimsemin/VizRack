@@ -43,6 +43,7 @@ private:
     void loadInitialPlugin();
     void selectPlugin(const std::string& pluginId);
     void selectPluginPath(const std::string& pluginId, const std::filesystem::path& path);
+    void showPluginProperties(const std::string& pluginId);
     void commitPluginSelection(const PluginDefinition& definition,
                                const PluginDescriptor* descriptor = nullptr);
     void saveCurrentPluginState();

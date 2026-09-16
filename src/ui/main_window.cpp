@@ -41,6 +41,7 @@ constexpr UINT kCommandPluginSelectBase = 2000;
 constexpr UINT kCommandPluginFileBase = 3000;
 constexpr UINT kCommandPluginFolderBase = 4000;
 constexpr UINT kCommandPluginWebsiteBase = 5000;
+constexpr UINT kCommandPluginPropertiesBase = 6000;
 constexpr int kOpacityValues[] = {100, 90, 75, 50, 25};
 
 struct PluginSize {
@@ -234,6 +235,9 @@ void MainWindow::createMenus() {
         AppendMenuW(entryMenu, MF_SEPARATOR, 0, nullptr);
         AppendMenuW(entryMenu, MF_STRING, kCommandPluginWebsiteBase + index,
                     trw(Str::MenuPluginInstallPage).c_str());
+        AppendMenuW(entryMenu, MF_SEPARATOR, 0, nullptr);
+        AppendMenuW(entryMenu, MF_STRING, kCommandPluginPropertiesBase + index,
+                    trw(Str::MenuPluginProperties).c_str());
         AppendMenuW(pluginMenu_, MF_POPUP, reinterpret_cast<UINT_PTR>(entryMenu),
                     localizedPluginName(definition).c_str());
     }
@@ -246,11 +250,10 @@ void MainWindow::createMenus() {
     AppendMenuW(menuBar_, MF_POPUP, reinterpret_cast<UINT_PTR>(fileMenu_), trw(Str::MenuFile).c_str());
     AppendMenuW(menuBar_, MF_POPUP, reinterpret_cast<UINT_PTR>(viewMenu_), trw(Str::MenuView).c_str());
     AppendMenuW(menuBar_, MF_POPUP, reinterpret_cast<UINT_PTR>(pluginMenu_),
-                formatW(Str::MenuPluginBarFmt, trw(Str::PluginStatusSearching)).c_str());
+                trw(Str::MenuPlugin).c_str());
     AppendMenuW(menuBar_, MF_POPUP, reinterpret_cast<UINT_PTR>(helpMenu_), trw(Str::MenuHelp).c_str());
     rebuildDeviceMenu();
     setSelectedPluginId(selectedPluginId_);
-    if (!pluginStatus_.empty()) setPluginStatus(pluginStatus_);
 }
 
 void MainWindow::retranslate() {
@@ -406,15 +409,6 @@ void MainWindow::notifySettingsChanged() {
     if (callbacks_.onSettingsChanged) callbacks_.onSettingsChanged(settings_);
 }
 
-void MainWindow::setPluginStatus(std::string status) {
-    pluginStatus_ = std::move(status);
-    if (!menuBar_ || !pluginMenu_) return;
-    const std::wstring label = formatW(Str::MenuPluginBarFmt, fromUtf8(pluginStatus_));
-    ModifyMenuW(menuBar_, 2, MF_BYPOSITION | MF_POPUP,
-                reinterpret_cast<UINT_PTR>(pluginMenu_), label.c_str());
-    if (hwnd_) DrawMenuBar(hwnd_);
-}
-
 void MainWindow::setSelectedPluginId(std::string pluginId) {
     selectedPluginId_ = std::move(pluginId);
     settings_.selectedPluginId = selectedPluginId_;
@@ -493,7 +487,7 @@ void MainWindow::openPluginInstallPage(const std::string& pluginId) {
         hwnd_, L"open", fromUtf8(definition->installUrl).c_str(), nullptr, nullptr, SW_SHOWNORMAL));
     if (result <= 32) {
         MessageBoxW(hwnd_, trw(Str::MsgInstallPageOpenFailed).c_str(),
-                    trw(Str::DialogTitleBrowserFailed).c_str(), MB_OK | MB_ICONERROR);
+                    trw(Str::DialogTitleBrowserFailed).c_str(), MB_OK);
     }
 }
 
@@ -502,7 +496,7 @@ void MainWindow::openExternalUrl(const wchar_t* url) {
         ShellExecuteW(hwnd_, L"open", url, nullptr, nullptr, SW_SHOWNORMAL));
     if (result <= 32) {
         MessageBoxW(hwnd_, trw(Str::MsgDefaultBrowserOpenFailed).c_str(), trw(Str::AppName).c_str(),
-                    MB_OK | MB_ICONERROR);
+                    MB_OK);
     }
 }
 
@@ -513,7 +507,7 @@ void MainWindow::showAboutDialog() {
         L"\n\nGitHub: " + kProjectUrl +
         L"\nMIT License, Copyright (c) 2026 subProject\n\n"
         L"VST is a registered trademark of Steinberg Media Technologies GmbH.";
-    MessageBoxW(hwnd_, text.c_str(), trw(Str::MenuAbout).c_str(), MB_OK | MB_ICONINFORMATION);
+    MessageBoxW(hwnd_, text.c_str(), trw(Str::MenuAbout).c_str(), MB_OK);
 }
 
 void MainWindow::showCreditsDialog() {
@@ -523,7 +517,7 @@ void MainWindow::showCreditsDialog() {
         text += L"\n" + localizedPluginName(definition) + L"\n" +
                 fromUtf8(definition.inspiration) + L"\n";
     }
-    MessageBoxW(hwnd_, text.c_str(), trw(Str::MenuCredits).c_str(), MB_OK | MB_ICONINFORMATION);
+    MessageBoxW(hwnd_, text.c_str(), trw(Str::MenuCredits).c_str(), MB_OK);
 }
 
 void MainWindow::scheduleClose(unsigned milliseconds) {
@@ -593,6 +587,12 @@ void MainWindow::handleCommand(UINT command) {
         } else if (command >= kCommandPluginWebsiteBase &&
                    command < kCommandPluginWebsiteBase + catalog.size()) {
             openPluginInstallPage(catalog[command - kCommandPluginWebsiteBase].id);
+        } else if (command >= kCommandPluginPropertiesBase &&
+                   command < kCommandPluginPropertiesBase + catalog.size()) {
+            const auto& definition = catalog[command - kCommandPluginPropertiesBase];
+            if (callbacks_.onPluginPropertiesRequested) {
+                callbacks_.onPluginPropertiesRequested(definition.id);
+            }
         }
     }
 }

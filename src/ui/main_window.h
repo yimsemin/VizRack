@@ -20,6 +20,7 @@ struct MainWindowCallbacks {
     std::function<void(const std::string& pluginId)> onPluginSelection;
     std::function<void(const std::string& pluginId, const std::filesystem::path& path)>
         onPluginPathSelected;
+    std::function<void(const std::string& pluginId)> onPluginPropertiesRequested;
     std::function<void(const Settings& settings)> onSettingsChanged;
     std::function<void()> onResume;
 };
@@ -34,7 +35,6 @@ public:
     HWND handle() const noexcept { return hwnd_; }
     HWND pluginParent() const noexcept { return pluginParent_; }
 
-    void setPluginStatus(std::string status);
     void setSelectedPluginId(std::string pluginId);
     void postCaptureStatus(const CaptureStatus& status);
     void setEditorResizeHandler(std::function<void(int, int)> handler);
@@ -87,7 +87,6 @@ private:
     Settings settings_;
     MainWindowCallbacks callbacks_;
     CaptureStatus captureStatus_;
-    std::string pluginStatus_;
     std::string selectedPluginId_;
     std::function<void(int, int)> editorResizeHandler_;
     std::function<std::pair<int, int>(int, int)> editorConstraintHandler_;

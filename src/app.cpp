@@ -225,6 +225,9 @@ bool App::initialize(std::string& error) {
         [this](const std::string& pluginId, const std::filesystem::path& path) {
             selectPluginPath(pluginId, path);
         };
+    callbacks.onPluginPropertiesRequested = [this](const std::string& pluginId) {
+        showPluginProperties(pluginId);
+    };
     callbacks.onSettingsChanged = [this](const Settings& settings) {
         mergeMainWindowSettings(settings_, settings);
         applyOverlayVisibility();
@@ -253,9 +256,6 @@ bool App::initialize(std::string& error) {
     });
     window_->setEditorScaleHandler([this](float scale) { vstHost_.setEditorContentScale(scale); });
 
-    if (!portableWritable_) {
-        window_->setPluginStatus(tr(Str::StatusPortableReadOnly));
-    }
     loadInitialPlugin();
 
     captureStarted_ = capture_.start(
@@ -290,7 +290,7 @@ int App::run(int commandShow) {
     }
     if (!portableWritable_) {
         MessageBoxW(window_->handle(), fromUtf8(paths_.writeError).c_str(),
-                    trw(Str::DialogTitlePortableStorage).c_str(), MB_OK | MB_ICONWARNING);
+                    trw(Str::DialogTitlePortableStorage).c_str(), MB_OK);
     }
     if (pluginSelectionNeeded_ && !smokeTest) {
         const auto* definition = findPluginDefinition(settings_.selectedPluginId);
@@ -299,7 +299,7 @@ int App::run(int commandShow) {
             std::vformat(trw(Str::DialogBodyPluginRequiredFmt), std::make_wformat_args(displayName));
         const int choice = MessageBoxW(
             window_->handle(), message.c_str(), trw(Str::DialogTitlePluginRequired).c_str(),
-            MB_YESNOCANCEL | MB_ICONINFORMATION);
+            MB_YESNOCANCEL);
         if (choice == IDYES && definition) {
             window_->openPluginInstallPage(definition->id);
         } else if (choice == IDNO && definition) {
@@ -321,7 +321,8 @@ void App::loadInitialPlugin() {
         std::string error;
         if (!activateBuiltInPlugin(*definition, error)) {
             logger_.error(definition->displayName + " activation failed: " + error);
-            window_->setPluginStatus(error);
+            MessageBoxW(window_->handle(), fromUtf8(error).c_str(),
+                        trw(Str::DialogTitleBuiltinStartFailed).c_str(), MB_OK);
             return;
         }
         commitPluginSelection(*definition);
@@ -334,14 +335,12 @@ void App::loadInitialPlugin() {
     const auto inspection = findSupportedPlugin(*definition, savedPath);
     if (!inspection.compatible) {
         logger_.warning(definition->displayName + " discovery failed: " + inspection.error);
-        window_->setPluginStatus(inspection.error);
         pluginSelectionNeeded_ = true;
         return;
     }
     std::string error;
     if (!activatePlugin(*definition, inspection.descriptor, error)) {
         logger_.error(definition->displayName + " activation failed: " + error);
-        window_->setPluginStatus(error);
         pluginSelectionNeeded_ = true;
         return;
     }
@@ -462,7 +461,6 @@ bool App::startBuiltInPlugin(const PluginDefinition& definition, std::string& er
     } else if (definition.id == "builtin-starguitar") {
         starGuitar_.setInspiration(definition.inspiration);
     }
-    window_->setPluginStatus(toUtf8(MainWindow::localizedPluginName(definition)));
     pluginSelectionNeeded_ = false;
     logger_.info("Built-in visualization activated: id='" + definition.id + "'");
     return true;
@@ -496,10 +494,6 @@ bool App::startPluginInstance(const PluginDefinition& definition,
         vstHost_.unload();
         return false;
     }
-    std::string status = descriptor.name + " " + descriptor.version;
-    const std::string edition = editionForStatus(definition, descriptor);
-    if (!edition.empty()) status += " (" + edition + ")";
-    window_->setPluginStatus(std::move(status));
     pluginSelectionNeeded_ = false;
     return true;
 }
@@ -511,7 +505,7 @@ void App::selectPlugin(const std::string& pluginId) {
         std::string error;
         if (!activateBuiltInPlugin(*definition, error)) {
             MessageBoxW(window_->handle(), fromUtf8(error).c_str(),
-                        trw(Str::DialogTitleBuiltinStartFailed).c_str(), MB_OK | MB_ICONERROR);
+                        trw(Str::DialogTitleBuiltinStartFailed).c_str(), MB_OK);
             return;
         }
         commitPluginSelection(*definition);
@@ -525,13 +519,13 @@ void App::selectPlugin(const std::string& pluginId) {
     if (!inspection.compatible) {
         logger_.warning(definition->displayName + " selection failed: " + inspection.error);
         MessageBoxW(window_->handle(), fromUtf8(inspection.error).c_str(),
-                    trw(Str::DialogTitleSupportedPluginMissing).c_str(), MB_OK | MB_ICONERROR);
+                    trw(Str::DialogTitleSupportedPluginMissing).c_str(), MB_OK);
         return;
     }
     std::string error;
     if (!activatePlugin(*definition, inspection.descriptor, error)) {
         MessageBoxW(window_->handle(), fromUtf8(error).c_str(),
-                    trw(Str::DialogTitleVst3LoadFailed).c_str(), MB_OK | MB_ICONERROR);
+                    trw(Str::DialogTitleVst3LoadFailed).c_str(), MB_OK);
         return;
     }
     commitPluginSelection(*definition, &inspection.descriptor);
@@ -544,16 +538,40 @@ void App::selectPluginPath(const std::string& pluginId, const std::filesystem::p
     if (!inspection.compatible) {
         logger_.warning("Manual plug-in selection rejected: " + inspection.error);
         MessageBoxW(window_->handle(), fromUtf8(inspection.error).c_str(),
-                    trw(Str::DialogTitleIncompatibleVst3).c_str(), MB_OK | MB_ICONERROR);
+                    trw(Str::DialogTitleIncompatibleVst3).c_str(), MB_OK);
         return;
     }
     std::string error;
     if (!activatePlugin(*definition, inspection.descriptor, error)) {
         MessageBoxW(window_->handle(), fromUtf8(error).c_str(),
-                    trw(Str::DialogTitleVst3LoadFailed).c_str(), MB_OK | MB_ICONERROR);
+                    trw(Str::DialogTitleVst3LoadFailed).c_str(), MB_OK);
         return;
     }
     commitPluginSelection(*definition, &inspection.descriptor);
+}
+
+void App::showPluginProperties(const std::string& pluginId) {
+    const auto* definition = findPluginDefinition(pluginId);
+    if (!definition || definition->kind != PluginKind::vst3) return;
+    const auto storage = pluginStoragePaths(paths_.plugins, definition->id);
+    std::string warning;
+    const auto savedPath = loadPluginLocation(storage.location, warning);
+    const auto inspection = findSupportedPlugin(*definition, savedPath);
+    const std::wstring title = MainWindow::localizedPluginName(*definition);
+    if (!inspection.compatible) {
+        MessageBoxW(window_->handle(), trw(Str::PluginPropertiesNotFound).c_str(), title.c_str(),
+                    MB_OK);
+        return;
+    }
+    const auto& descriptor = inspection.descriptor;
+    const std::string edition = editionForStatus(*definition, descriptor);
+    std::wstring text =
+        trw(Str::PluginPropertiesVersion) + L": " + fromUtf8(descriptor.version) + L"\n";
+    if (!edition.empty()) {
+        text += trw(Str::PluginPropertiesEdition) + L": " + fromUtf8(edition) + L"\n";
+    }
+    text += trw(Str::PluginPropertiesFile) + L": " + descriptor.modulePath.wstring();
+    MessageBoxW(window_->handle(), text.c_str(), title.c_str(), MB_OK);
 }
 
 void App::commitPluginSelection(const PluginDefinition& definition,

@@ -154,10 +154,21 @@ official URL and an optional `inspiration` string. Discovery checks only the
 selected definition's saved location and search locations, then validates AMD64
 PE, marker and VST3 factory data.
 
-A non-empty `inspiration` ("Inspired by …") marks a homage built-in. It is shown
-after the plug-in status line on activation and listed under Help ▸ Credits, which
-also carries the note that those names stay with their owners and outside
-VizRack's MIT License. `builtin-joydivision` is currently the only such entry.
+A non-empty `inspiration` ("Inspired by …") marks a homage built-in. It is drawn
+under the visualizer's own overlay text on activation and listed under Help ▸
+Credits, which also carries the note that those names stay with their owners
+and outside VizRack's MIT License. `builtin-joydivision` is currently the only
+such entry.
+
+The `Plug-in` menu-bar label is static (`Str::MenuPlugin`) — it used to show
+live activation status ("Plug-in: searching" / the active name), but that
+duplicated what the overlay text already shows once a visualizer is running,
+so it was dropped along with `MainWindow::setPluginStatus`. A `PluginKind::vst3`
+entry's submenu instead gets a **Properties...** item
+(`kCommandPluginPropertiesBase`, `App::showPluginProperties`) that re-runs
+discovery on demand and shows name/version/edition/module path in a dialog —
+this is where `editionForStatus`'s mvMeter2 GPU/noGPU detection surfaces,
+without needing a per-plugin special case in the menu-bar label itself.
 
 The first catalog entry remains `builtin-oscilloscope`, so a fresh portable data
 folder always starts without an external dependency. `builtin-art-visualizer`

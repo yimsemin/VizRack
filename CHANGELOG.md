@@ -26,6 +26,8 @@ ZIP attached. How these notes are written and cut: `docs/RELEASE_NOTES_STYLE.md`
 - **View ▸ Show overlay text** toggles every built-in visualizer's title,
   tagline and right-click hint off at once — useful for recording or
   streaming without the on-screen text. Persisted in settings.
+- **Properties...** in a VST3 entry's submenu shows its detected version,
+  edition (e.g. mvMeter2's GPU/noGPU build) and module path on demand.
 
 ### Changed
 
@@ -53,6 +55,13 @@ ZIP attached. How these notes are written and cut: `docs/RELEASE_NOTES_STYLE.md`
   every built-in visualizer's own state now lives behind the right-click menu
   only, matching the four built-ins that never had a click action. Art
   Visualizer's keyboard shortcuts (`Space`, arrows, `1`–`6`, `C`) still work.
+- The `Plug-in` menu-bar label is a fixed name again instead of live status
+  text ("Plug-in: searching" / the active plug-in's name) — the overlay text
+  already shows the active visualizer, so the label was redundant chatter.
+- **No dialog plays a sound anymore.** Every `MessageBoxW` in the app relied
+  on an icon flag that also triggers Windows' alert beep; all of them
+  (errors included) are silent now, since a beep while listening to music
+  is exactly what this app should not do.
 
 ### Fixed
 
