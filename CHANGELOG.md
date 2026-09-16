@@ -26,6 +26,8 @@ ZIP attached. How these notes are written and cut: `docs/RELEASE_NOTES_STYLE.md`
 - **View ▸ Show overlay text** toggles every built-in visualizer's title,
   tagline and right-click hint off at once — useful for recording or
   streaming without the on-screen text. Persisted in settings.
+- **Properties...** in a VST3 entry's submenu shows its detected version,
+  edition (e.g. mvMeter2's GPU/noGPU build) and module path on demand.
 
 ### Changed
 
@@ -53,6 +55,21 @@ ZIP attached. How these notes are written and cut: `docs/RELEASE_NOTES_STYLE.md`
   every built-in visualizer's own state now lives behind the right-click menu
   only, matching the four built-ins that never had a click action. Art
   Visualizer's keyboard shortcuts (`Space`, arrows, `1`–`6`, `C`) still work.
+- The `Plug-in` menu-bar label is a fixed name again instead of live status
+  text ("Plug-in: searching" / the active plug-in's name) — the overlay text
+  already shows the active visualizer, so the label was redundant chatter.
+- **No dialog plays a sound anymore.** Every `MessageBoxW` in the app relied
+  on an icon flag that also triggers Windows' alert beep; all of them
+  (errors included) are silent now, since a beep while listening to music
+  is exactly what this app should not do.
+- Retitled **View ▸ Show overlay text** to **화면 안내 문구 표시** in Korean —
+  "오버레이" read as an unnecessary loanword.
+- Reworded five built-in visualizers' bottom-left tagline into a softer,
+  more conversational Korean sentence instead of a stiff noun phrase (English
+  captions are unchanged, per the stylized-caption policy):
+  Art Visualizer "음악에 맞춰 움직여요", Campfire "잔잔히 타오르는 모닥불",
+  Rhythm Ripple "박자마다 번지는 물결", Star Guitar "리듬을 타고 흐르는 풍경",
+  Classic Cascade/Joy Division "시간을 타고 흐르는 소리".
 
 ### Fixed
 
