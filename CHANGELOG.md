@@ -23,11 +23,17 @@ ZIP attached. How these notes are written and cut: `docs/RELEASE_NOTES_STYLE.md`
   an ordinary beat — it travels a smooth constant-speed arc, marks only its
   start and end with a ripple (never re-bursting while held), lasts up to 5
   seconds, and several can be held at once.
-- **View ▸ Show overlay text** toggles every built-in visualizer's title,
-  tagline and right-click hint off at once — useful for recording or
-  streaming without the on-screen text. Persisted in settings.
+- **View ▸ Show overlay text** (화면 안내 문구 표시) toggles every built-in
+  visualizer's title, tagline and right-click hint off at once — useful for
+  recording or streaming without the on-screen text. Persisted in settings.
 - **Properties...** in a VST3 entry's submenu shows its detected version,
   edition (e.g. mvMeter2's GPU/noGPU build) and module path on demand.
+- **Oscilloscope 120 FPS.** A fourth frame-rate option alongside 15/30/60, for
+  displays that can show it smoother than this machine's own monitor might.
+- **Star Guitar marks a silence gap with one big building.** A full second of
+  silence sends one oversized (2x) building through the near layer as a
+  visual cue for a track/section change — the only place a building appears
+  in that layer.
 
 ### Changed
 
@@ -62,14 +68,27 @@ ZIP attached. How these notes are written and cut: `docs/RELEASE_NOTES_STYLE.md`
   on an icon flag that also triggers Windows' alert beep; all of them
   (errors included) are silent now, since a beep while listening to music
   is exactly what this app should not do.
-- Retitled **View ▸ Show overlay text** to **화면 안내 문구 표시** in Korean —
-  "오버레이" read as an unnecessary loanword.
-- Reworded five built-in visualizers' bottom-left tagline into a softer,
-  more conversational Korean sentence instead of a stiff noun phrase (English
-  captions are unchanged, per the stylized-caption policy):
-  Art Visualizer "음악에 맞춰 움직여요", Campfire "잔잔히 타오르는 모닥불",
-  Rhythm Ripple "박자마다 번지는 물결", Star Guitar "리듬을 타고 흐르는 풍경",
-  Classic Cascade/Joy Division "시간을 타고 흐르는 소리".
+- Reworded five built-in visualizers' bottom-left tagline into a softer, more
+  conversational Korean sentence instead of a stiff noun phrase, and updated
+  four of the five English taglines to match that Korean meaning instead of
+  an unrelated phrase left over from before the Korean was reworded
+  (Rhythm Ripple's English was already equivalent, so it's unchanged):
+  Art Visualizer "음악에 맞춰 움직여요" / "MOVES WITH THE MUSIC", Campfire
+  "잔잔히 타오르는 모닥불" / "A QUIETLY BURNING CAMPFIRE", Rhythm Ripple
+  "박자마다 번지는 물결" / "ONE BEAT, ONE RIPPLE", Star Guitar "리듬을 타고
+  흐르는 풍경" / "A LANDSCAPE FLOWING WITH THE RHYTHM", Classic
+  Cascade/Joy Division "시간을 타고 흐르는 소리" / "SOUND FLOWING THROUGH
+  TIME".
+- **Star Guitar's two sky sub-bands moved from 6-8/8-12kHz to 6-10/10-16kHz**
+  (the higher one from >12kHz to >16kHz) and their cooldowns lengthened
+  slightly, after both were observed spawning in visible clumps during dense
+  hi-hat/cymbal passages. The higher band's object is now a diagonal
+  (45-degree-rotated) variant of the star instead of a UFO — it was hard to
+  tune down to a reasonable spawn rate and wasn't going to be reused
+  elsewhere. Pine and tree also got more distinct canopy colors and a
+  sharper pine taper so the two silhouettes read apart at a glance, and each
+  building now gets its own lit-window ratio instead of sharing one fixed
+  42%.
 
 ### Fixed
 
@@ -77,6 +96,19 @@ ZIP attached. How these notes are written and cut: `docs/RELEASE_NOTES_STYLE.md`
   the fuel bed the flame itself is anchored to, so it visibly floated just
   above where the fire actually starts. It now anchors to the same point as
   the flame.
+- **Campfire's stars no longer glow below the fire line.** All 48 stars share
+  one rotation around a pole below the sky, so without a per-star phase
+  offset they swept past the horizon as one synchronized clump — visibly
+  lighting up the ground while the sky briefly looked empty. Each star now
+  starts at its own random point along its orbit, and anything that would
+  still dip below the horizon fades out instead of rendering there.
+- **Prism Tunnel's outermost ring no longer pops.** It was at peak
+  brightness right before wrapping back to a small, dim ring each lap; it now
+  fades out over the last stretch of its travel instead of cutting off.
+- **Star Guitar's near layer no longer spawns a plain building as ambient
+  filler.** It now falls back to a pine tree, matching the layer's two real
+  object types (signal marker, pine) — see
+  `docs/STAR_GUITAR_FREQUENCY_BANDS.md`.
 
 ## [0.4.0] - 2026-09-15
 
