@@ -21,9 +21,7 @@ The application intentionally has no generic VST scanner.
 | `MainWindow` | Win32 frame, title/menu state and visualization child parent |
 | `WasapiCapture` | Loopback capture, format conversion, device events and reconnect |
 | `StereoFrameRing` | Fixed-capacity SPSC audio transfer |
-| `builtin::OscilloscopeEngine` | Platform-neutral L/R waveform and circular history geometry |
-| `builtin::ArtVisualizerEngine` | Platform-neutral analysis and six-scene/six-palette geometry |
-| `builtin::CampfireEngine` | Platform-neutral beat analysis and procedural flame, ember, log and night-sky geometry |
+| `builtin::*Engine` | Platform-neutral analysis and scene geometry, one per built-in visualizer — see the "Code ownership" table in `docs/BUILTIN_VISUALIZER_CORE.md` for the current list and what each owns |
 | `builtin::DrawList` | Minimal renderer-neutral primitive and point buffer contract |
 | Built-in `*View` adapters | Win32 input, timers, menus and text overlays |
 | `GdiDrawListRenderer` / `GdiBackBuffer` | GDI+ command translation and size-stable back buffering |

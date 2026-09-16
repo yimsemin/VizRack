@@ -24,10 +24,17 @@ keeps going even after you close VizRack.
   high bands and the stereo movement of the music
 - **Oscilloscope** — left/right channel waveforms and the last ~15 seconds of the
   level history
+- **Campfire** — a calm fire whose embers lift on transients and whose flames
+  lean with the stereo image
+- **Classic Cascade / Joy Division** — a time-depth spectrum cascade, drawn as
+  either a filled 3D surface or a Joy Division-style hidden-line ridge stack
+- **Star Guitar** — a rhythmic, horizontally-scrolling parallax landscape driven
+  by the music's frequency bands
+- **Rhythm Ripple** — rain falling on a still puddle in time with the beat
 - **Optional external visualizers** — install mvMeter2 or AnSpec to switch to the
   metering screen you prefer
 - **Window settings for listening** — always on top, hidden border, opacity and a
-  15 / 30 / 60 FPS control
+  15 / 30 / 60 / 120 FPS control
 
 ## Getting started
 

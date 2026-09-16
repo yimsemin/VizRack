@@ -49,10 +49,10 @@ so never add a JS/TS copy of an engine.
   the same. Engines take bounded sample batches, do no I/O, and reuse their
   buffers — no steady-state per-frame heap growth (there are regression tests).
 
-Engines: `oscilloscope_engine`, `art_visualizer_engine` (six scenes + palettes),
-`campfire_engine`, `spectrum3d_engine` (one engine backs `builtin-spectrum3d` and
-`builtin-joydivision` via a fixed `style`). Detail:
-`docs/BUILTIN_VISUALIZER_CORE.md`, `docs/ARCHITECTURE.md`.
+The current list of engines and what each owns is the "Code ownership" table in
+`docs/BUILTIN_VISUALIZER_CORE.md` — that table is the one place it's written
+down; don't re-enumerate it here or anywhere else, just link to it. Broader
+component context: `docs/ARCHITECTURE.md`.
 
 ## Localization
 
@@ -79,8 +79,8 @@ commit.
 
 ## UI conventions for a new built-in visualizer
 
-When adding a new built-in visualizer, follow the pattern the existing six
-engines share (`docs/ARCHITECTURE.md` ▸ UI conventions for the details):
+When adding a new built-in visualizer, follow the pattern the existing seven
+share (`docs/ARCHITECTURE.md` ▸ UI conventions for the details):
 
 - **Menu**: add one `PluginKind::builtIn` catalog entry. It appears as a single
   clickable item directly under Plug-in — no submenu, no confirmation step, since
@@ -98,6 +98,12 @@ engines share (`docs/ARCHITECTURE.md` ▸ UI conventions for the details):
 - **Left click is never a control**: all per-visualizer state (scene, palette,
   sensitivity, …) lives behind the right-click menu only. `WM_LBUTTONDOWN` may
   set focus; it must not change what is drawn.
+- **Register the engine**: add one row to the "Code ownership" table in
+  `docs/BUILTIN_VISUALIZER_CORE.md` — that table is the single place the
+  engine list is written down (see "The portability boundary" above), so this
+  is the only doc edit adding an engine requires. Also add a bullet to that
+  doc's "shared surface" list if the new engine owns any option/animation
+  rule worth calling out, mirroring the existing entries' style.
 
 ## Dialogs never make noise
 
