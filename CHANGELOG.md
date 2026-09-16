@@ -54,6 +54,13 @@ ZIP attached. How these notes are written and cut: `docs/RELEASE_NOTES_STYLE.md`
   only, matching the four built-ins that never had a click action. Art
   Visualizer's keyboard shortcuts (`Space`, arrows, `1`–`6`, `C`) still work.
 
+### Fixed
+
+- Campfire's glowing coal bed sat at the back-rim reference line instead of
+  the fuel bed the flame itself is anchored to, so it visibly floated just
+  above where the fire actually starts. It now anchors to the same point as
+  the flame.
+
 ## [0.4.0] - 2026-09-15
 
 _A rhythmic pixel-art landscape that reacts to the music's frequency
