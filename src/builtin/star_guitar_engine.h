@@ -35,10 +35,7 @@ enum class StarGuitarObjectType : uint8_t {
     buildingA,
     buildingB,
     buildingC,
-    waterTower, // currently unmapped by any band; kept for a future remap
     signalMarker,
-    bird,
-    plane,
     star,
     ufo,
 };
@@ -158,12 +155,8 @@ private:
                  float scale) const;
     void drawBuilding(DrawList& output, float baseX, float groundY, float unit,
                       StarGuitarObjectType variant, uint32_t seed, float scale) const;
-    void drawWaterTower(DrawList& output, float baseX, float groundY, float unit, uint32_t seed,
-                        float scale);
     void drawSignalMarker(DrawList& output, float baseX, float groundY, float unit,
                           float scale) const;
-    void drawBird(DrawList& output, float baseX, float baseY, float unit, float scale) const;
-    void drawPlane(DrawList& output, float baseX, float baseY, float unit, float scale) const;
     void drawStar(DrawList& output, float baseX, float baseY, float unit, float scale) const;
     void drawUfo(DrawList& output, float baseX, float baseY, float unit, float scale) const;
 
@@ -182,9 +175,8 @@ private:
     std::array<float, kBandCount> bandCooldown_{};
     std::array<Peak, kBandCount> bandPeak_{};        // this frame's result, set by analyzeSamples()
 
-    float overallLevel_{}; // mean of all 8 band targets this frame, for songEnergy_/silence gate
+    float overallLevel_{}; // mean of all 8 band targets this frame, for the silence gate
 
-    float songEnergy_{};     // slow (several-second) macro loudness average
     float silenceSeconds_{}; // time the overall signal has stayed below the silence floor
 
     std::array<Layer, kLayerCount> layers_{};

@@ -644,15 +644,18 @@ void CampfireEngine::addFlameTongue(DrawList& output, float centerX, float baseY
     output.addFillPolygon(output.appendPoints(scratch_), value);
 }
 
+float CampfireEngine::flameIntensity() const noexcept {
+    const float responseScale =
+        static_cast<float>(options_.flameResponse) / 80.0f;
+    return 1.0f + (lowLevel_ * 0.12f + midLevel_ * 0.04f + beatLevel_ * 0.22f) *
+                      responseScale;
+}
+
 void CampfireEngine::drawFlames(DrawList& output, float centerX, float baseY,
                                 float flameHeight, float extent) {
     const float naturalPulse =
         0.96f + smoothNoise(time_ * 2.15f, 0x4a39b70du) * 0.06f;
-    const float responseScale =
-        static_cast<float>(options_.flameResponse) / 80.0f;
-    const float audioHeight =
-        1.0f + (lowLevel_ * 0.12f + midLevel_ * 0.04f + beatLevel_ * 0.22f) *
-                   responseScale;
+    const float audioHeight = flameIntensity();
     const float height =
         flameHeight * naturalPulse * audioHeight * fireScale_;
     const float halfWidth =
@@ -762,12 +765,8 @@ void CampfireEngine::buildFrame(float width, float height, DrawList& output) {
 CampfireFrameInfo CampfireEngine::frameInfo() const noexcept {
     const float particleActivity =
         clampUnit(activityLevel_ * 0.35f + highLevel_ * 0.45f + beatLevel_ * 0.65f);
-    const float responseScale =
-        static_cast<float>(options_.flameResponse) / 80.0f;
     return {lowLevel_, midLevel_, highLevel_, stereoLevel_, beatLevel_,
-            particleActivity,
-            1.0f + (lowLevel_ * 0.12f + midLevel_ * 0.04f + beatLevel_ * 0.22f) *
-                       responseScale,
+            particleActivity, flameIntensity(),
             fireScale_, quietSeconds_,
             meteorActive_ && meteorLifetime_ > 0.0f
                 ? std::sin(clampUnit(meteorAge_ / meteorLifetime_) * kPi)

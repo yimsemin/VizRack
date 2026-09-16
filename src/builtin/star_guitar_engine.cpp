@@ -199,8 +199,6 @@ void StarGuitarEngine::update(size_t sampleCount, float frameSeconds) noexcept {
         bandPeak_ = {};
     }
 
-    songEnergy_ = frameFollow(songEnergy_, clampUnit(overallLevel_), 0.02f, 0.015f, frameScale);
-
     // Silence gate: below this the track has effectively stopped (or a long
     // gap is playing), so every spawn source goes quiet instead of
     // continuing to produce scenery.
@@ -306,7 +304,6 @@ void StarGuitarEngine::reset() noexcept {
     bandCooldown_ = {};
     bandPeak_ = {};
     overallLevel_ = 0.0f;
-    songEnergy_ = 0.0f;
     silenceSeconds_ = 0.0f;
     spawnSerial_ = 0;
     randomState_ = 0x9f2c86adu;
@@ -553,44 +550,6 @@ void StarGuitarEngine::drawBuilding(DrawList& output, float baseX, float groundY
     }
 }
 
-void StarGuitarEngine::drawWaterTower(DrawList& output, float baseX, float groundY, float unit,
-                                      uint32_t seed, float scale) {
-    const Color body = color(0x0d1218);
-    const float legHeight = unit * 6.0f * scale;
-    const float tankHalfWidth = unit * 3.4f * scale;
-    const float tankHeight = unit * 3.4f * scale;
-    const float tankY = groundY - legHeight - tankHeight;
-
-    // Four blocky support legs.
-    constexpr std::array<float, 4> legOffsets{-2.6f, -1.1f, 1.1f, 2.6f};
-    for (const float offset : legOffsets) {
-        output.addFillRectangle(baseX + offset * unit * scale - unit * 0.22f, groundY - legHeight,
-                                unit * 0.44f, legHeight, body);
-    }
-
-    // Tank body as an axis-aligned blocky octagon (a stepped silhouette
-    // instead of a smooth ellipse), built from a small fixed point set.
-    scratch_.clear();
-    const float inset = tankHalfWidth * 0.32f;
-    scratch_.push_back({baseX - tankHalfWidth + inset, tankY});
-    scratch_.push_back({baseX + tankHalfWidth - inset, tankY});
-    scratch_.push_back({baseX + tankHalfWidth, tankY + inset});
-    scratch_.push_back({baseX + tankHalfWidth, tankY + tankHeight - inset});
-    scratch_.push_back({baseX + tankHalfWidth - inset, tankY + tankHeight});
-    scratch_.push_back({baseX - tankHalfWidth + inset, tankY + tankHeight});
-    scratch_.push_back({baseX - tankHalfWidth, tankY + tankHeight - inset});
-    scratch_.push_back({baseX - tankHalfWidth, tankY + inset});
-    output.addFillPolygon(output.appendPoints(scratch_), body);
-
-    // A small conical cap made of two shrinking blocks (kept blocky/axis
-    // aligned per the pixel-art constraint).
-    output.addFillRectangle(baseX - tankHalfWidth * 0.6f, tankY - unit * 0.7f * scale,
-                            tankHalfWidth * 1.2f, unit * 0.7f * scale, body);
-    output.addFillRectangle(baseX - tankHalfWidth * 0.28f, tankY - unit * 1.2f * scale,
-                            tankHalfWidth * 0.56f, unit * 0.5f * scale, body);
-    (void)seed;
-}
-
 void StarGuitarEngine::drawSignalMarker(DrawList& output, float baseX, float groundY, float unit,
                                         float scale) const {
     // A bright, high-contrast trackside signal: deliberately unlike the dark
@@ -605,30 +564,6 @@ void StarGuitarEngine::drawSignalMarker(DrawList& output, float baseX, float gro
     const Color lamp = color(0xe0a63a, 235);
     output.addFillRectangle(baseX - lampSize * 0.5f, groundY - postHeight - lampSize * 0.85f,
                             lampSize, lampSize, lamp);
-}
-
-void StarGuitarEngine::drawBird(DrawList& output, float baseX, float baseY, float unit,
-                                float scale) const {
-    // A small chevron silhouette built from two blocky wing rectangles.
-    const Color body = color(0x0c1017, 220);
-    const float wingWidth = unit * 1.6f * scale;
-    const float wingHeight = unit * 0.5f * scale;
-    output.addFillRectangle(baseX - wingWidth, baseY - wingHeight * 0.5f, wingWidth,
-                            wingHeight, body);
-    output.addFillRectangle(baseX, baseY - wingHeight * 0.5f, wingWidth, wingHeight, body);
-}
-
-void StarGuitarEngine::drawPlane(DrawList& output, float baseX, float baseY, float unit,
-                                 float scale) const {
-    const Color body = color(0x0c1017, 230);
-    const float fuselageLength = unit * 5.0f * scale;
-    const float fuselageHeight = unit * 0.6f * scale;
-    output.addFillRectangle(baseX - fuselageLength * 0.5f, baseY - fuselageHeight * 0.5f,
-                            fuselageLength, fuselageHeight, body);
-    const float wingWidth = unit * 1.0f * scale;
-    const float wingHeight = unit * 2.2f * scale;
-    output.addFillRectangle(baseX - wingWidth * 0.5f, baseY - wingHeight * 0.5f, wingWidth,
-                            wingHeight, body);
 }
 
 void StarGuitarEngine::drawStar(DrawList& output, float baseX, float baseY, float unit,
@@ -707,9 +642,6 @@ void StarGuitarEngine::buildFrame(float width, float height, DrawList& output) {
                 // upper part of the sky, kept well clear of the skyline.
                 const float skyY = height * (0.06f + hash01(instance.seed) * 0.30f);
                 switch (instance.type) {
-                    case StarGuitarObjectType::plane:
-                        drawPlane(output, screenX, skyY, unit, scale);
-                        break;
                     case StarGuitarObjectType::star:
                         drawStar(output, screenX, skyY, unit, scale);
                         break;
@@ -717,7 +649,6 @@ void StarGuitarEngine::buildFrame(float width, float height, DrawList& output) {
                         drawUfo(output, screenX, skyY, unit, scale);
                         break;
                     default:
-                        drawBird(output, screenX, skyY, unit, scale);
                         break;
                 }
                 continue;
@@ -732,9 +663,6 @@ void StarGuitarEngine::buildFrame(float width, float height, DrawList& output) {
                     break;
                 case StarGuitarObjectType::pine:
                     drawPine(output, screenX, groundY, unit, instance.seed, scale);
-                    break;
-                case StarGuitarObjectType::waterTower:
-                    drawWaterTower(output, screenX, groundY, unit, instance.seed, scale);
                     break;
                 case StarGuitarObjectType::signalMarker:
                     drawSignalMarker(output, screenX, groundY, unit, scale);

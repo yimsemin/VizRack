@@ -82,6 +82,7 @@ private:
     void drawLogs(DrawList& output, float centerX, float baseY, float extent);
     void drawForegroundLogs(DrawList& output, float centerX, float baseY,
                             float extent);
+    float flameIntensity() const noexcept;
     void drawFlames(DrawList& output, float centerX, float baseY,
                     float flameHeight, float extent);
     void drawEmbers(DrawList& output, float centerX, float baseY,
