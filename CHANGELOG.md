@@ -62,6 +62,14 @@ ZIP attached. How these notes are written and cut: `docs/RELEASE_NOTES_STYLE.md`
   on an icon flag that also triggers Windows' alert beep; all of them
   (errors included) are silent now, since a beep while listening to music
   is exactly what this app should not do.
+- Retitled **View ▸ Show overlay text** to **화면 안내 문구 표시** in Korean —
+  "오버레이" read as an unnecessary loanword.
+- Reworded five built-in visualizers' bottom-left tagline into a softer,
+  more conversational Korean sentence instead of a stiff noun phrase (English
+  captions are unchanged, per the stylized-caption policy):
+  Art Visualizer "음악에 맞춰 움직여요", Campfire "잔잔히 타오르는 모닥불",
+  Rhythm Ripple "박자마다 번지는 물결", Star Guitar "리듬을 타고 흐르는 풍경",
+  Classic Cascade/Joy Division "시간을 타고 흐르는 소리".
 
 ### Fixed
 
