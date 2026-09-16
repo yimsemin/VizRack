@@ -14,7 +14,7 @@ const std::vector<PluginDefinition>& pluginCatalog() {
             "",
             "",
             "",
-            "Built-in",
+            "",
             {},
             "",
             "",

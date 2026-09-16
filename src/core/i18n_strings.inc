@@ -125,7 +125,7 @@ VIZRACK_STR(HintRightClickOptions, "RIGHT CLICK: OPTIONS", "우클릭: 옵션")
 VIZRACK_STR(ScopeTitleHistory,   "Oscilloscope · Time history", "오실로스코프 · 시간 기록")
 VIZRACK_STR(ScopeTitleWaveform,  "Oscilloscope · Instant waveform", "오실로스코프 · 순간 파형")
 VIZRACK_STR(ScopeHintRightClick, "Right-click: display settings", "우클릭: 표시 설정")
-VIZRACK_STR(ScopePlaySomeAudio,  "Try playing some system audio", "시스템 소리를 재생해 보세요")
+VIZRACK_STR(ScopePlaySomeAudio,  "Play some audio to see it here", "시스템 소리를 재생해 보세요")
 VIZRACK_STR(ScopeMenuModeWaveform,  "Instant waveform", "순간 파형")
 VIZRACK_STR(ScopeMenuModeHistory,   "Time history (~15 s)", "시간 기록 (약 15초)")
 VIZRACK_STR(ScopeMenuScaleSmall,    "Small (50%)", "작게 (50%)")
@@ -140,7 +140,7 @@ VIZRACK_STR(ScopeMenuLineStability, "Line stabilization", "선 안정화")
 VIZRACK_STR(ScopeMenuFrameRate,     "Frame rate", "프레임 속도")
 
 // ── Campfire view ──────────────────────────────────────────────────────────
-VIZRACK_STR(CampfireTagline, "NATURAL FLAME  /  GENTLE AUDIO REACTION", "잔잔히 타오르는 모닥불")
+VIZRACK_STR(CampfireTagline, "A QUIETLY BURNING CAMPFIRE", "잔잔히 타오르는 모닥불")
 VIZRACK_STR(CampfireMenuFlameResponse,  "Flame audio reaction", "불꽃 음악 반응")
 VIZRACK_STR(CampfireMenuStarSpeed,      "Star drift speed", "별 이동 속도")
 VIZRACK_STR(CampfireMenuStarBrightness, "Star base brightness", "별 평소 밝기")
@@ -149,22 +149,26 @@ VIZRACK_STR(CampfireMenuSparkAmount,    "Spark amount", "불티 양")
 VIZRACK_STR(CampfireMenuSparkIntensity, "Spark intensity", "불티 강도")
 
 // ── Star Guitar view ───────────────────────────────────────────────────────
-VIZRACK_STR(StarGuitarTagline, "RHYTHM SEQUENCER LANDSCAPE", "리듬을 타고 흐르는 풍경")
-VIZRACK_STR(StarGuitarMenuLowSensitivity,     "Low sensitivity (<300Hz)", "저역 민감도 (<300Hz)")
-VIZRACK_STR(StarGuitarMenuMidSensitivity,     "Mid sensitivity (300Hz-4kHz)", "중역 민감도 (300Hz~4kHz)")
-VIZRACK_STR(StarGuitarMenuTrebleSensitivity,  "Treble sensitivity (4-8kHz)", "고역 민감도 (4~8kHz)")
-VIZRACK_STR(StarGuitarMenuAirSensitivity,     "Air sensitivity (>8kHz)", "에어 민감도 (>8kHz)")
+VIZRACK_STR(StarGuitarTagline, "A LANDSCAPE FLOWING WITH THE RHYTHM", "리듬을 타고 흐르는 풍경")
+// {} placeholders are filled at the call site from
+// StarGuitarEngine::kBandCutoffsHz (see StarGuitarView::showOptionsMenu),
+// not written here, so these can't drift from the engine's actual band
+// split the way a hardcoded range could.
+VIZRACK_STR(StarGuitarMenuLowSensitivity,     "Low sensitivity (<{}Hz)", "저역 민감도 (<{}Hz)")
+VIZRACK_STR(StarGuitarMenuMidSensitivity,     "Mid sensitivity ({}Hz-{}kHz)", "중역 민감도 ({}Hz~{}kHz)")
+VIZRACK_STR(StarGuitarMenuTrebleSensitivity,  "Treble sensitivity ({}-{}kHz)", "고역 민감도 ({}~{}kHz)")
+VIZRACK_STR(StarGuitarMenuAirSensitivity,     "Air sensitivity (>{}kHz)", "에어 민감도 (>{}kHz)")
 VIZRACK_STR(RhythmRippleTagline, "ONE BEAT, ONE RIPPLE", "박자마다 번지는 물결")
 VIZRACK_STR(RhythmRippleMenuSensitivity,      "Sensitivity", "민감도")
 VIZRACK_STR(RhythmRippleMenuLongNoteSensitivity, "Long note sensitivity", "롱노트 민감도")
 
 // ── Art visualizer view ────────────────────────────────────────────────────
-VIZRACK_STR(ArtTagline,     "AUDIO REACTIVE", "음악에 맞춰 움직여요")
+VIZRACK_STR(ArtTagline,     "MOVES WITH THE MUSIC", "음악에 맞춰 움직여요")
 VIZRACK_STR(ArtMenuScene,   "Scene", "장면")
 VIZRACK_STR(ArtMenuPalette, "Color palette", "색상 팔레트")
 
 // ── 3D spectrum view ───────────────────────────────────────────────────────
-VIZRACK_STR(Spectrum3dTagline,    "TIME-DEPTH SPECTRUM", "시간을 타고 흐르는 소리")
+VIZRACK_STR(Spectrum3dTagline,    "SOUND FLOWING THROUGH TIME", "시간을 타고 흐르는 소리")
 VIZRACK_STR(SpectrumMenuPalette,  "Color palette", "색상 팔레트")
 VIZRACK_STR(SpectrumMenuRotation, "Rotation (quarter view)", "회전 (쿼터뷰)")
 VIZRACK_STR(SpectrumMenuTilt,     "Tilt / perspective", "기울기 / 원근")
