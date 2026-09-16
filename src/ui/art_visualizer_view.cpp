@@ -3,6 +3,7 @@
 #include "core/audio_ring.h"
 #include "core/i18n.h"
 #include "core/utf.h"
+#include "ui/overlay_font.h"
 
 #include <windowsx.h>
 
@@ -115,9 +116,8 @@ void ArtVisualizerView::updateSamples() {
 void ArtVisualizerView::drawOverlay(HDC dc, float width, float height) const {
     const auto info = engine_.frameInfo();
     Gdiplus::Graphics graphics(dc);
-    Gdiplus::Font title(L"Segoe UI", 13.0f, Gdiplus::FontStyleBold, Gdiplus::UnitPixel);
-    Gdiplus::Font smallFont(L"Segoe UI", 10.0f, Gdiplus::FontStyleRegular,
-                            Gdiplus::UnitPixel);
+    Gdiplus::Font title = overlayTitleFont();
+    Gdiplus::Font smallFont = overlaySmallFont();
     Gdiplus::SolidBrush bright(Gdiplus::Color(220, 225, 242, 247));
     Gdiplus::SolidBrush dim(Gdiplus::Color(145, 158, 181, 191));
     const std::wstring sceneName = fromUtf8(std::string(info.sceneName));
@@ -129,9 +129,10 @@ void ArtVisualizerView::drawOverlay(HDC dc, float width, float height) const {
     right.SetAlignment(Gdiplus::StringAlignmentFar);
     graphics.DrawString(status.c_str(), -1, &smallFont,
                         {width - 218.0f, 16.0f, 200.0f, 20.0f}, &right, &dim);
-    graphics.DrawString(L"AUDIO REACTIVE / BUILT-IN", -1, &smallFont,
-                        {18.0f, height - 27.0f}, &dim);
-    graphics.DrawString(L"CLICK: SCENE  ·  RIGHT CLICK: OPTIONS", -1, &smallFont,
+    const std::wstring tagline = trw(Str::ArtTagline);
+    graphics.DrawString(tagline.c_str(), -1, &smallFont, {18.0f, height - 27.0f}, &dim);
+    const std::wstring hint = trw(Str::HintClickSceneRightClickOptions);
+    graphics.DrawString(hint.c_str(), -1, &smallFont,
                         {width - 300.0f, height - 27.0f, 282.0f, 18.0f}, &right, &dim);
 }
 

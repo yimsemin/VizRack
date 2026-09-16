@@ -63,17 +63,6 @@ std::wstring stateName(CaptureState state) {
     return trw(Str::CaptureUnknown);
 }
 
-std::wstring localizedPluginName(const PluginDefinition& definition) {
-    if (definition.id == "builtin-oscilloscope") return trw(Str::PluginNameOscilloscope);
-    if (definition.id == "builtin-art-visualizer") return trw(Str::PluginNameArtVisualizer);
-    if (definition.id == "builtin-campfire") return trw(Str::PluginNameCampfire);
-    if (definition.id == "builtin-spectrum3d") return trw(Str::PluginNameSpectrum3d);
-    if (definition.id == "builtin-joydivision") return trw(Str::PluginNameJoyDivision);
-    if (definition.id == "builtin-starguitar") return trw(Str::PluginNameStarGuitar);
-    if (definition.id == "builtin-rhythmripple") return trw(Str::PluginNameRhythmRipple);
-    return fromUtf8(definition.displayName);
-}
-
 std::wstring formatW(Str id, const std::wstring& argument) {
     return std::vformat(trw(id), std::make_wformat_args(argument));
 }
@@ -119,6 +108,17 @@ std::filesystem::path pickPath(HWND owner, const std::wstring& pluginName, bool 
 }
 
 } // namespace
+
+std::wstring MainWindow::localizedPluginName(const PluginDefinition& definition) {
+    if (definition.id == "builtin-oscilloscope") return trw(Str::PluginNameOscilloscope);
+    if (definition.id == "builtin-art-visualizer") return trw(Str::PluginNameArtVisualizer);
+    if (definition.id == "builtin-campfire") return trw(Str::PluginNameCampfire);
+    if (definition.id == "builtin-spectrum3d") return trw(Str::PluginNameSpectrum3d);
+    if (definition.id == "builtin-joydivision") return trw(Str::PluginNameJoyDivision);
+    if (definition.id == "builtin-starguitar") return trw(Str::PluginNameStarGuitar);
+    if (definition.id == "builtin-rhythmripple") return trw(Str::PluginNameRhythmRipple);
+    return fromUtf8(definition.displayName);
+}
 
 MainWindow::MainWindow(HINSTANCE instance, Settings settings, MainWindowCallbacks callbacks)
     : instance_(instance), settings_(std::move(settings)), callbacks_(std::move(callbacks)),
@@ -181,52 +181,56 @@ void MainWindow::show(int commandShow) {
 
 void MainWindow::createMenus() {
     menuBar_ = CreateMenu();
-    settingsMenu_ = CreatePopupMenu();
+    fileMenu_ = CreatePopupMenu();
+    viewMenu_ = CreatePopupMenu();
     deviceMenu_ = CreatePopupMenu();
     opacityMenu_ = CreatePopupMenu();
     languageMenu_ = CreatePopupMenu();
     pluginMenu_ = CreatePopupMenu();
+    AppendMenuW(fileMenu_, MF_STRING, kCommandExit, trw(Str::MenuExit).c_str());
+
     AppendMenuW(deviceMenu_, MF_STRING, kCommandFollowDefault, trw(Str::MenuFollowDefault).c_str());
     AppendMenuW(deviceMenu_, MF_SEPARATOR, 0, nullptr);
-    AppendMenuW(settingsMenu_, MF_POPUP, reinterpret_cast<UINT_PTR>(deviceMenu_),
+    AppendMenuW(viewMenu_, MF_POPUP, reinterpret_cast<UINT_PTR>(deviceMenu_),
                 trw(Str::MenuOutputDevice).c_str());
-    AppendMenuW(settingsMenu_, MF_SEPARATOR, 0, nullptr);
-    AppendMenuW(settingsMenu_, MF_STRING, kCommandAlwaysOnTop, trw(Str::MenuAlwaysOnTop).c_str());
-    AppendMenuW(settingsMenu_, MF_STRING, kCommandBorderless, trw(Str::MenuBorderless).c_str());
+    AppendMenuW(viewMenu_, MF_SEPARATOR, 0, nullptr);
+    AppendMenuW(viewMenu_, MF_STRING, kCommandAlwaysOnTop, trw(Str::MenuAlwaysOnTop).c_str());
+    AppendMenuW(viewMenu_, MF_STRING, kCommandBorderless, trw(Str::MenuBorderless).c_str());
     for (size_t index = 0; index < std::size(kOpacityValues); ++index) {
         const std::wstring label = std::to_wstring(kOpacityValues[index]) + L"%";
         AppendMenuW(opacityMenu_, MF_STRING, kCommandOpacityBase + index, label.c_str());
     }
-    AppendMenuW(settingsMenu_, MF_POPUP, reinterpret_cast<UINT_PTR>(opacityMenu_),
+    AppendMenuW(viewMenu_, MF_POPUP, reinterpret_cast<UINT_PTR>(opacityMenu_),
                 trw(Str::MenuOpacity).c_str());
     for (size_t index = 0; index < std::size(kLanguageTokens); ++index) {
         const bool active = settings_.uiLanguage == kLanguageTokens[index];
         AppendMenuW(languageMenu_, MF_STRING | (active ? MF_CHECKED : MF_UNCHECKED),
                     kCommandLanguageBase + index, trw(kLanguageLabels[index]).c_str());
     }
-    AppendMenuW(settingsMenu_, MF_POPUP, reinterpret_cast<UINT_PTR>(languageMenu_),
+    AppendMenuW(viewMenu_, MF_POPUP, reinterpret_cast<UINT_PTR>(languageMenu_),
                 trw(Str::MenuLanguage).c_str());
-    AppendMenuW(settingsMenu_, MF_SEPARATOR, 0, nullptr);
-    AppendMenuW(settingsMenu_, MF_STRING, kCommandExit, trw(Str::MenuExit).c_str());
 
     const auto& catalog = pluginCatalog();
     for (size_t index = 0; index < catalog.size(); ++index) {
         const auto& definition = catalog[index];
+        if (definition.kind == PluginKind::builtIn) {
+            // Nothing to configure before use, so the name itself is the
+            // activation control — no submenu, no confirmation step.
+            AppendMenuW(pluginMenu_, MF_STRING, kCommandPluginSelectBase + index,
+                        localizedPluginName(definition).c_str());
+            continue;
+        }
         HMENU entryMenu = CreatePopupMenu();
         AppendMenuW(entryMenu, MF_STRING, kCommandPluginSelectBase + index,
-                    trw(definition.kind == PluginKind::builtIn ? Str::MenuPluginUse
-                                                              : Str::MenuPluginUseAutoDetect)
-                        .c_str());
-        if (definition.kind == PluginKind::vst3) {
-            AppendMenuW(entryMenu, MF_SEPARATOR, 0, nullptr);
-            AppendMenuW(entryMenu, MF_STRING, kCommandPluginFileBase + index,
-                        trw(Str::MenuPluginPickFile).c_str());
-            AppendMenuW(entryMenu, MF_STRING, kCommandPluginFolderBase + index,
-                        trw(Str::MenuPluginPickFolder).c_str());
-            AppendMenuW(entryMenu, MF_SEPARATOR, 0, nullptr);
-            AppendMenuW(entryMenu, MF_STRING, kCommandPluginWebsiteBase + index,
-                        trw(Str::MenuPluginInstallPage).c_str());
-        }
+                    trw(Str::MenuPluginUseAutoDetect).c_str());
+        AppendMenuW(entryMenu, MF_SEPARATOR, 0, nullptr);
+        AppendMenuW(entryMenu, MF_STRING, kCommandPluginFileBase + index,
+                    trw(Str::MenuPluginPickFile).c_str());
+        AppendMenuW(entryMenu, MF_STRING, kCommandPluginFolderBase + index,
+                    trw(Str::MenuPluginPickFolder).c_str());
+        AppendMenuW(entryMenu, MF_SEPARATOR, 0, nullptr);
+        AppendMenuW(entryMenu, MF_STRING, kCommandPluginWebsiteBase + index,
+                    trw(Str::MenuPluginInstallPage).c_str());
         AppendMenuW(pluginMenu_, MF_POPUP, reinterpret_cast<UINT_PTR>(entryMenu),
                     localizedPluginName(definition).c_str());
     }
@@ -236,8 +240,8 @@ void MainWindow::createMenus() {
     AppendMenuW(helpMenu_, MF_STRING, kCommandCredits, trw(Str::MenuCredits).c_str());
     AppendMenuW(helpMenu_, MF_STRING, kCommandAbout, trw(Str::MenuAbout).c_str());
 
-    AppendMenuW(menuBar_, MF_POPUP, reinterpret_cast<UINT_PTR>(settingsMenu_),
-                trw(Str::MenuSettings).c_str());
+    AppendMenuW(menuBar_, MF_POPUP, reinterpret_cast<UINT_PTR>(fileMenu_), trw(Str::MenuFile).c_str());
+    AppendMenuW(menuBar_, MF_POPUP, reinterpret_cast<UINT_PTR>(viewMenu_), trw(Str::MenuView).c_str());
     AppendMenuW(menuBar_, MF_POPUP, reinterpret_cast<UINT_PTR>(pluginMenu_),
                 formatW(Str::MenuPluginBarFmt, trw(Str::PluginStatusSearching)).c_str());
     AppendMenuW(menuBar_, MF_POPUP, reinterpret_cast<UINT_PTR>(helpMenu_), trw(Str::MenuHelp).c_str());
@@ -278,9 +282,9 @@ void MainWindow::rebuildDeviceMenu() {
 
 void MainWindow::showContextMenu(POINT point) {
     rebuildDeviceMenu();
-    CheckMenuItem(settingsMenu_, kCommandAlwaysOnTop,
+    CheckMenuItem(viewMenu_, kCommandAlwaysOnTop,
                   MF_BYCOMMAND | (settings_.alwaysOnTop ? MF_CHECKED : MF_UNCHECKED));
-    CheckMenuItem(settingsMenu_, kCommandBorderless,
+    CheckMenuItem(viewMenu_, kCommandBorderless,
                   MF_BYCOMMAND | (settings_.borderless ? MF_CHECKED : MF_UNCHECKED));
     for (size_t index = 0; index < std::size(kOpacityValues); ++index) {
         CheckMenuItem(opacityMenu_, kCommandOpacityBase + static_cast<UINT>(index),
@@ -288,7 +292,15 @@ void MainWindow::showContextMenu(POINT point) {
                                           ? MF_CHECKED
                                           : MF_UNCHECKED));
     }
-    TrackPopupMenu(settingsMenu_, TPM_RIGHTBUTTON, point.x, point.y, 0, hwnd_, nullptr);
+    // The menu bar is hidden while borderless, so this is the only route to
+    // Exit; splice it onto the View popup for the call and detach it again
+    // (RemoveMenu, not DeleteMenu — fileMenu_ still owns the item).
+    const int exitPosition = GetMenuItemCount(viewMenu_);
+    AppendMenuW(viewMenu_, MF_SEPARATOR, 0, nullptr);
+    AppendMenuW(viewMenu_, MF_STRING, kCommandExit, trw(Str::MenuExit).c_str());
+    TrackPopupMenu(viewMenu_, TPM_RIGHTBUTTON, point.x, point.y, 0, hwnd_, nullptr);
+    RemoveMenu(viewMenu_, exitPosition + 1, MF_BYPOSITION);
+    RemoveMenu(viewMenu_, exitPosition, MF_BYPOSITION);
 }
 
 void MainWindow::applyWindowOptions() {
@@ -393,7 +405,7 @@ void MainWindow::setPluginStatus(std::string status) {
     pluginStatus_ = std::move(status);
     if (!menuBar_ || !pluginMenu_) return;
     const std::wstring label = formatW(Str::MenuPluginBarFmt, fromUtf8(pluginStatus_));
-    ModifyMenuW(menuBar_, 1, MF_BYPOSITION | MF_POPUP,
+    ModifyMenuW(menuBar_, 2, MF_BYPOSITION | MF_POPUP,
                 reinterpret_cast<UINT_PTR>(pluginMenu_), label.c_str());
     if (hwnd_) DrawMenuBar(hwnd_);
 }
@@ -403,12 +415,16 @@ void MainWindow::setSelectedPluginId(std::string pluginId) {
     settings_.selectedPluginId = selectedPluginId_;
     const auto& catalog = pluginCatalog();
     for (size_t index = 0; index < catalog.size(); ++index) {
+        const bool checked = catalog[index].id == selectedPluginId_;
+        const UINT command = kCommandPluginSelectBase + static_cast<UINT>(index);
+        if (catalog[index].kind == PluginKind::builtIn) {
+            // Direct item on pluginMenu_ (no submenu) — see createMenus().
+            CheckMenuItem(pluginMenu_, command, MF_BYCOMMAND | (checked ? MF_CHECKED : MF_UNCHECKED));
+            continue;
+        }
         HMENU entryMenu = GetSubMenu(pluginMenu_, static_cast<int>(index));
         if (!entryMenu) continue;
-        CheckMenuItem(entryMenu, kCommandPluginSelectBase + static_cast<UINT>(index),
-                      MF_BYCOMMAND | (catalog[index].id == selectedPluginId_
-                                          ? MF_CHECKED
-                                          : MF_UNCHECKED));
+        CheckMenuItem(entryMenu, command, MF_BYCOMMAND | (checked ? MF_CHECKED : MF_UNCHECKED));
     }
     updateWindowTitle();
 }

@@ -48,6 +48,8 @@ private:
     GdiDrawListRenderer renderer_;
     GdiBackBuffer backBuffer_;
     OptionsChangedCallback optionsChanged_;
+    HFONT titleFont_{};
+    HFONT smallFont_{};
 };
 
 } // namespace vizrack

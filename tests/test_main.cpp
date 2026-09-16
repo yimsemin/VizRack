@@ -178,7 +178,7 @@ void testPluginCatalogAndStorage(const std::filesystem::path& directory) {
     CHECK(catalog.front().id == "builtin-oscilloscope");
     if (builtIn) {
         CHECK(builtIn->kind == vizrack::PluginKind::builtIn);
-        CHECK(builtIn->displayName == "Built-in Oscilloscope");
+        CHECK(builtIn->displayName == "Oscilloscope");
         CHECK(builtIn->installUrl.empty());
         CHECK(builtIn->searchLocations.empty());
     }
@@ -186,7 +186,7 @@ void testPluginCatalogAndStorage(const std::filesystem::path& directory) {
     CHECK(art != nullptr);
     if (art) {
         CHECK(art->kind == vizrack::PluginKind::builtIn);
-        CHECK(art->displayName == "Built-in Art Visualizer");
+        CHECK(art->displayName == "Art Visualizer");
         CHECK(art->installUrl.empty());
         CHECK(art->searchLocations.empty());
     }
@@ -194,7 +194,7 @@ void testPluginCatalogAndStorage(const std::filesystem::path& directory) {
     CHECK(campfire != nullptr);
     if (campfire) {
         CHECK(campfire->kind == vizrack::PluginKind::builtIn);
-        CHECK(campfire->displayName == "Built-in Campfire");
+        CHECK(campfire->displayName == "Campfire");
         CHECK(campfire->editionLabel == "Natural Flame / Audio Reactive");
         CHECK(campfire->installUrl.empty());
         CHECK(campfire->searchLocations.empty());
@@ -203,7 +203,7 @@ void testPluginCatalogAndStorage(const std::filesystem::path& directory) {
     CHECK(spectrum3d != nullptr);
     if (spectrum3d) {
         CHECK(spectrum3d->kind == vizrack::PluginKind::builtIn);
-        CHECK(spectrum3d->displayName == "Built-in 3D Spectrum");
+        CHECK(spectrum3d->displayName == "Classic Cascade");
         CHECK(spectrum3d->installUrl.empty());
         CHECK(spectrum3d->searchLocations.empty());
     }
@@ -211,7 +211,7 @@ void testPluginCatalogAndStorage(const std::filesystem::path& directory) {
     CHECK(joyDivision != nullptr);
     if (joyDivision) {
         CHECK(joyDivision->kind == vizrack::PluginKind::builtIn);
-        CHECK(joyDivision->displayName == "Built-in Joy Division");
+        CHECK(joyDivision->displayName == "Joy Division");
         CHECK(joyDivision->inspiration == "Inspired by Joy Division");
         CHECK(joyDivision->installUrl.empty());
         CHECK(joyDivision->searchLocations.empty());
@@ -220,7 +220,7 @@ void testPluginCatalogAndStorage(const std::filesystem::path& directory) {
     CHECK(starGuitar != nullptr);
     if (starGuitar) {
         CHECK(starGuitar->kind == vizrack::PluginKind::builtIn);
-        CHECK(starGuitar->displayName == "Built-in Star Guitar");
+        CHECK(starGuitar->displayName == "Star Guitar");
         CHECK(starGuitar->inspiration ==
               "Inspired by The Chemical Brothers / Michel Gondry's \"Star Guitar\"");
         CHECK(starGuitar->installUrl.empty());
@@ -230,7 +230,7 @@ void testPluginCatalogAndStorage(const std::filesystem::path& directory) {
     CHECK(rhythmRipple != nullptr);
     if (rhythmRipple) {
         CHECK(rhythmRipple->kind == vizrack::PluginKind::builtIn);
-        CHECK(rhythmRipple->displayName == "Built-in Rhythm Ripple");
+        CHECK(rhythmRipple->displayName == "Rhythm Ripple");
         CHECK(rhythmRipple->inspiration.empty());
         CHECK(rhythmRipple->installUrl.empty());
         CHECK(rhythmRipple->searchLocations.empty());
