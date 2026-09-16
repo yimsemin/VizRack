@@ -540,7 +540,8 @@ void CampfireEngine::drawLogs(DrawList& output, float centerX, float baseY, floa
 }
 
 void CampfireEngine::drawForegroundLogs(DrawList& output, float centerX,
-                                         float baseY, float extent) {
+                                         float baseY, float flameBaseY,
+                                         float extent) {
     addSilhouetteLog(output, centerX + extent * 0.040f,
                      baseY - extent * 0.068f, extent * 0.31f,
                      extent * 0.025f, -1.99f, 0x6ad21583u, color(0x000000));
@@ -557,7 +558,7 @@ void CampfireEngine::drawForegroundLogs(DrawList& output, float centerX,
         const float x =
             centerX + (hash01(coal * 71u + 13u) - 0.5f) * extent * 0.20f + wander;
         const float y =
-            baseY + extent * (0.004f + hash01(coal * 31u + 19u) * 0.020f);
+            flameBaseY + extent * (0.004f + hash01(coal * 31u + 19u) * 0.020f);
         const float size =
             extent * (0.0045f + hash01(coal * 53u + 7u) * 0.0055f);
         const float pulse =
@@ -758,7 +759,7 @@ void CampfireEngine::buildFrame(float width, float height, DrawList& output) {
     drawSmoke(output, centerX, flameBaseY, flameHeight * fireScale_, extent);
     drawLogs(output, centerX, baseY, extent);
     drawFlames(output, centerX, flameBaseY, flameHeight, extent);
-    drawForegroundLogs(output, centerX, baseY, extent);
+    drawForegroundLogs(output, centerX, baseY, flameBaseY, extent);
     drawEmbers(output, centerX, flameBaseY, flameHeight, extent);
 }
 
