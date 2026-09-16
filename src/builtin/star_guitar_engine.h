@@ -37,7 +37,7 @@ enum class StarGuitarObjectType : uint8_t {
     buildingC,
     signalMarker,
     star,
-    ufo,
+    starDiagonal, // same star, arms rotated 45 degrees -- the air group's second sky object
 };
 
 // A "Star Guitar" style rhythmic landscape, referencing the Chemical
@@ -70,9 +70,15 @@ public:
     // silently starve it of new spawns until old ones scroll off.
     static constexpr size_t kLayerCapacity = 56;
     // Eight frequency sub-bands, low to high -- see
-    // docs/STAR_GUITAR_FREQUENCY_BANDS.md for the cutoffs and what each
-    // drives.
+    // docs/STAR_GUITAR_FREQUENCY_BANDS.md for what each drives.
     static constexpr size_t kBandCount = 8;
+    // The seven cutoffs (Hz) splitting the eight sub-bands above -- the one
+    // place these numbers are written down. Every UI label or doc that needs
+    // to state a band's range reads this array rather than repeating the
+    // numbers, so they cannot drift out of sync with the actual filters (see
+    // analyzeSamples() in the .cpp, which uses this same array).
+    static constexpr std::array<float, kBandCount - 1> kBandCutoffsHz{
+        80.0f, 300.0f, 1000.0f, 4000.0f, 6000.0f, 10000.0f, 16000.0f};
 
     StarGuitarEngine();
 
@@ -157,8 +163,8 @@ private:
                       StarGuitarObjectType variant, uint32_t seed, float scale) const;
     void drawSignalMarker(DrawList& output, float baseX, float groundY, float unit,
                           float scale) const;
-    void drawStar(DrawList& output, float baseX, float baseY, float unit, float scale) const;
-    void drawUfo(DrawList& output, float baseX, float baseY, float unit, float scale) const;
+    void drawStar(DrawList& output, float baseX, float baseY, float unit, float scale,
+                 bool diagonal) const;
 
     std::array<float, kMaxSamples> left_{};
     std::array<float, kMaxSamples> right_{};
@@ -178,6 +184,7 @@ private:
     float overallLevel_{}; // mean of all 8 band targets this frame, for the silence gate
 
     float silenceSeconds_{}; // time the overall signal has stayed below the silence floor
+    bool silenceBuildingSpawned_{}; // edge-trigger guard for the silence-transition building
 
     std::array<Layer, kLayerCount> layers_{};
     uint32_t spawnSerial_{};

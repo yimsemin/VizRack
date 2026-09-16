@@ -25,12 +25,12 @@ constexpr float kGrowInSeconds = 0.22f;
 // typical real hit, so it reads as background rather than competing with one.
 constexpr float kAmbientSizeScale = 0.6f;
 
-// Eight sub-band cutoffs (Hz), low to high -- see
-// docs/STAR_GUITAR_FREQUENCY_BANDS.md. Band i is the residual between
-// filter i-1 and filter i (band 0 is everything below the first cutoff;
-// the last band is everything above the last cutoff).
-constexpr std::array<float, StarGuitarEngine::kBandCount - 1> kBandCutoffsHz{
-    80.0f, 300.0f, 1000.0f, 4000.0f, 6000.0f, 8000.0f, 12000.0f};
+// Band i is the residual between filter i-1 and filter i (band 0 is
+// everything below the first cutoff; the last band is everything above the
+// last cutoff). Cutoffs themselves live in StarGuitarEngine::kBandCutoffsHz
+// (the header) so the UI's sensitivity-menu labels can read the same array
+// instead of repeating the numbers -- see
+// docs/STAR_GUITAR_FREQUENCY_BANDS.md.
 // Per-band RMS-to-0..1 gain: higher bands carry less raw energy in a typical
 // mix, so they get progressively more gain to land in a comparable range.
 constexpr std::array<float, StarGuitarEngine::kBandCount> kBandGain{
@@ -38,7 +38,11 @@ constexpr std::array<float, StarGuitarEngine::kBandCount> kBandGain{
 // Per-band minimum spacing between peaks: higher bands can legitimately
 // retrigger faster (a hi-hat pattern is quicker than a kick pattern).
 constexpr std::array<float, StarGuitarEngine::kBandCount> kBandCooldownSeconds{
-    0.32f, 0.26f, 0.22f, 0.20f, 0.18f, 0.16f, 0.13f, 0.10f};
+    // The air pair (indices 6,7 -- star/its diagonal variant) got longer
+    // cooldowns than a straight-line extrapolation would give: dense
+    // hi-hat/cymbal passages were retriggering fast enough to spawn them in
+    // visible clumps.
+    0.32f, 0.26f, 0.22f, 0.20f, 0.18f, 0.16f, 0.22f, 0.19f};
 // Per-band noise floor: a peak below this absolute level is ignored even if
 // its relative rise would otherwise qualify (avoids firing on near-silence).
 constexpr std::array<float, StarGuitarEngine::kBandCount> kBandFloor{
@@ -137,7 +141,7 @@ float sizeFromMagnitude(float magnitude) noexcept {
 StarGuitarEngine::StarGuitarEngine() {
     scratch_.reserve(16);
 
-    // Far (slowest/smallest, driven by the treble group 4-8kHz): distant
+    // Far (slowest/smallest, driven by the treble group 4-10kHz): distant
     // silhouettes that loom and linger the longest.
     layers_[kFarLayer].speed = 90.0f;
     layers_[kFarLayer].depthScale = 0.55f;
@@ -158,7 +162,7 @@ StarGuitarEngine::StarGuitarEngine() {
     layers_[kNearLayer].baseIntervalSeconds = 1.8f;
     layers_[kNearLayer].jitterSeconds = 1.2f;
 
-    // Sky (driven by the air group 8kHz+): no ambient fallback -- it should
+    // Sky (driven by the air group 10kHz+): no ambient fallback -- it should
     // only ever appear on an actual air-band peak.
     layers_[kSkyLayer].speed = 55.0f;
     layers_[kSkyLayer].depthScale = 0.5f;
@@ -211,6 +215,23 @@ void StarGuitarEngine::update(size_t sampleCount, float frameSeconds) noexcept {
     }
     const bool audible = silenceSeconds_ < kSilenceHoldSeconds;
 
+    // A full second of silence reads as a track/section change, not just a
+    // gap between hits -- send one oversized building through the near layer
+    // as a visual "beat" for that transition. Edge-triggered on
+    // silenceSeconds_ crossing the threshold so it fires once per gap, not
+    // every frame the gap continues.
+    constexpr float kSilenceBuildingSeconds = 1.0f;
+    constexpr float kSilenceBuildingSizeScale = 2.0f;
+    if (silenceSeconds_ >= kSilenceBuildingSeconds) {
+        if (!silenceBuildingSpawned_) {
+            spawnInstance(layers_[kNearLayer], StarGuitarObjectType::buildingB,
+                         kSilenceBuildingSizeScale);
+            silenceBuildingSpawned_ = true;
+        }
+    } else {
+        silenceBuildingSpawned_ = false;
+    }
+
     for (auto& layer : layers_) {
         for (auto& instance : layer.objects) {
             if (!instance.active) continue;
@@ -247,7 +268,10 @@ void StarGuitarEngine::update(size_t sampleCount, float frameSeconds) noexcept {
         nearGotPeak = true;
     }
     if (!nearGotPeak) {
-        spawnAmbient(layers_[kNearLayer], StarGuitarObjectType::buildingB, safeSeconds);
+        // Near layer's ambient filler must stay one of its two real object
+        // types (see docs/STAR_GUITAR_FREQUENCY_BANDS.md) -- a building here
+        // was a bug, not a design choice.
+        spawnAmbient(layers_[kNearLayer], StarGuitarObjectType::pine, safeSeconds);
     }
 
     // Mid layer <- mid group (300Hz-1kHz spawns a tree, 1-4kHz a pole).
@@ -269,7 +293,7 @@ void StarGuitarEngine::update(size_t sampleCount, float frameSeconds) noexcept {
     }
 
     // Far layer <- treble group (4-6kHz spawns a stepped building silhouette,
-    // 6-8kHz a plain building).
+    // 6-10kHz a plain building).
     bool farGotPeak = false;
     if (bandPeak_[kBandTreble0].fired) {
         spawnInstance(layers_[kFarLayer], StarGuitarObjectType::buildingC,
@@ -285,14 +309,15 @@ void StarGuitarEngine::update(size_t sampleCount, float frameSeconds) noexcept {
         spawnAmbient(layers_[kFarLayer], StarGuitarObjectType::buildingB, safeSeconds);
     }
 
-    // Sky <- air group (8-12kHz spawns a star, >12kHz a UFO). No ambient
-    // fallback: the sky only ever reflects an actual air-band peak.
+    // Sky <- air group (10-16kHz spawns a star, >16kHz its 45-degree-rotated
+    // variant). No ambient fallback: the sky only ever reflects an actual
+    // air-band peak.
     if (bandPeak_[kBandAir0].fired) {
         spawnInstance(layers_[kSkyLayer], StarGuitarObjectType::star,
                      sizeFromMagnitude(bandPeak_[kBandAir0].magnitude));
     }
     if (bandPeak_[kBandAir1].fired) {
-        spawnInstance(layers_[kSkyLayer], StarGuitarObjectType::ufo,
+        spawnInstance(layers_[kSkyLayer], StarGuitarObjectType::starDiagonal,
                      sizeFromMagnitude(bandPeak_[kBandAir1].magnitude));
     }
 }
@@ -305,6 +330,7 @@ void StarGuitarEngine::reset() noexcept {
     bandPeak_ = {};
     overallLevel_ = 0.0f;
     silenceSeconds_ = 0.0f;
+    silenceBuildingSpawned_ = false;
     spawnSerial_ = 0;
     randomState_ = 0x9f2c86adu;
     for (auto& layer : layers_) {
@@ -460,7 +486,9 @@ void StarGuitarEngine::drawTree(DrawList& output, float baseX, float groundY, fl
     // circle, keeping the silhouette axis-aligned like the rest of the scene.
     const float canopyHeight = unit * (4.5f + hash01(seed) * 2.0f) * scale;
     const float canopyWidth = unit * (4.0f + hash01(seed ^ 0x27d4eb2fu) * 2.2f) * scale;
-    const Color canopy = color(0x0e1c12);
+    // A warmer, olive-leaning green -- distinct from pine's cooler, bluer
+    // canopy at a glance even as a small silhouette.
+    const Color canopy = color(0x1c2712);
     constexpr int tiers = 3;
     for (int tier = 0; tier < tiers; ++tier) {
         const float tierFraction = static_cast<float>(tier) / static_cast<float>(tiers);
@@ -486,11 +514,14 @@ void StarGuitarEngine::drawPine(DrawList& output, float baseX, float groundY, fl
 
     const float canopyHeight = unit * (6.5f + hash01(seed) * 2.5f) * scale;
     const float canopyWidth = unit * (3.0f + hash01(seed ^ 0x9e3779b9u) * 1.2f) * scale;
-    const Color canopy = color(0x0a1a12);
+    // A cooler, teal-leaning green -- distinct from tree's warmer, olive
+    // canopy -- plus a sharper taper (below) so the top tier reads as a
+    // near-point spire rather than another flat-topped block.
+    const Color canopy = color(0x0a2020);
     constexpr int tiers = 5;
     for (int tier = 0; tier < tiers; ++tier) {
         const float tierFraction = static_cast<float>(tier) / static_cast<float>(tiers);
-        const float tierWidth = canopyWidth * (1.0f - tierFraction * 0.8f);
+        const float tierWidth = canopyWidth * (1.0f - tierFraction * 0.92f);
         const float tierHeight = canopyHeight / static_cast<float>(tiers);
         const float tierY =
             groundY - trunkHeight - canopyHeight + tierHeight * static_cast<float>(tier);
@@ -535,11 +566,15 @@ void StarGuitarEngine::drawBuilding(DrawList& output, float baseX, float groundY
     const int rows = std::max(1, static_cast<int>(heightUnits / 2.0f));
     const float cellWidth = bodyWidth / static_cast<float>(columns);
     const float cellHeight = bodyHeight / static_cast<float>(rows);
+    // Each building also gets its own lit-window ratio (not just which
+    // individual windows are lit), so some buildings read as mostly dark and
+    // others as mostly lit rather than every building sharing one fixed 42%.
+    const float litRatio = 0.22f + hash01(seed ^ 0x68e31da4u) * 0.40f;
     for (int row = 0; row < rows; ++row) {
         for (int column = 0; column < columns; ++column) {
             const uint32_t litHash =
                 hashCombine(seed, static_cast<uint32_t>(row * 17 + column));
-            if (hash01(litHash) > 0.42f) continue;
+            if (hash01(litHash) > litRatio) continue;
             const float windowX =
                 baseX - bodyWidth * 0.5f + cellWidth * (static_cast<float>(column) + 0.28f);
             const float windowY =
@@ -567,36 +602,25 @@ void StarGuitarEngine::drawSignalMarker(DrawList& output, float baseX, float gro
 }
 
 void StarGuitarEngine::drawStar(DrawList& output, float baseX, float baseY, float unit,
-                                float scale) const {
+                                float scale, bool diagonal) const {
     const Color glow = color(0xdce8ff, 220);
     const float armThickness = unit * 0.35f * scale;
     const float armLength = unit * 1.6f * scale;
-    output.addFillRectangle(baseX - armLength * 0.5f, baseY - armThickness * 0.5f, armLength,
-                            armThickness, glow);
-    output.addFillRectangle(baseX - armThickness * 0.5f, baseY - armLength * 0.5f,
-                            armThickness, armLength, glow);
-}
-
-void StarGuitarEngine::drawUfo(DrawList& output, float baseX, float baseY, float unit,
-                               float scale) const {
-    // A flat, wide blocky saucer with a small dome and an under-glow --
-    // built entirely from rectangles, kept in the same crisp-block style as
-    // the rest of the scene.
-    const Color hull = color(0x2a2f3a, 235);
-    const float hullWidth = unit * 4.5f * scale;
-    const float hullHeight = unit * 0.9f * scale;
-    output.addFillRectangle(baseX - hullWidth * 0.5f, baseY - hullHeight * 0.5f, hullWidth,
-                            hullHeight, hull);
-
-    const Color dome = color(0x8fd6ff, 210);
-    const float domeWidth = unit * 2.0f * scale;
-    const float domeHeight = unit * 1.0f * scale;
-    output.addFillRectangle(baseX - domeWidth * 0.5f, baseY - hullHeight * 0.5f - domeHeight,
-                            domeWidth, domeHeight, dome);
-
-    const Color glow = color(0x8fd6ff, 110);
-    output.addFillRectangle(baseX - hullWidth * 0.35f, baseY + hullHeight * 0.5f,
-                            hullWidth * 0.7f, unit * 0.3f * scale, glow);
+    if (!diagonal) {
+        output.addFillRectangle(baseX - armLength * 0.5f, baseY - armThickness * 0.5f, armLength,
+                                armThickness, glow);
+        output.addFillRectangle(baseX - armThickness * 0.5f, baseY - armLength * 0.5f,
+                                armThickness, armLength, glow);
+        return;
+    }
+    // The air group's second sky object: the same star, its two arms simply
+    // rotated 45 degrees into an X -- a small, deliberately close variant
+    // rather than a distinct new shape.
+    const float half = armLength * 0.5f;
+    output.addLine(baseX - half, baseY - half, baseX + half, baseY + half, glow, armThickness,
+                   true);
+    output.addLine(baseX - half, baseY + half, baseX + half, baseY - half, glow, armThickness,
+                   true);
 }
 
 void StarGuitarEngine::buildFrame(float width, float height, DrawList& output) {
@@ -643,10 +667,10 @@ void StarGuitarEngine::buildFrame(float width, float height, DrawList& output) {
                 const float skyY = height * (0.06f + hash01(instance.seed) * 0.30f);
                 switch (instance.type) {
                     case StarGuitarObjectType::star:
-                        drawStar(output, screenX, skyY, unit, scale);
+                        drawStar(output, screenX, skyY, unit, scale, false);
                         break;
-                    case StarGuitarObjectType::ufo:
-                        drawUfo(output, screenX, skyY, unit, scale);
+                    case StarGuitarObjectType::starDiagonal:
+                        drawStar(output, screenX, skyY, unit, scale, true);
                         break;
                     default:
                         break;

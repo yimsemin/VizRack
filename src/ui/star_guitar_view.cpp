@@ -9,6 +9,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <format>
 #include <utility>
 
 namespace vizrack {
@@ -183,15 +184,30 @@ void StarGuitarView::showOptionsMenu(POINT point) {
         point = {rect.left + 24, rect.top + 48};
     }
     const auto options = engine_.options();
+
+    // Band-range numbers for the four menu labels below come straight from
+    // the engine's own kBandCutoffsHz -- the one place those numbers are
+    // written down -- rather than being repeated as literal text here, so a
+    // future band re-tune can't leave a menu label stating a stale range.
+    const auto& cutoffs = builtin::StarGuitarEngine::kBandCutoffsHz;
+    const int lowUpperHz = static_cast<int>(cutoffs[1]);
+    const int midUpperKhz = static_cast<int>(cutoffs[3] / 1000.0f);
+    const int trebleUpperKhz = static_cast<int>(cutoffs[5] / 1000.0f);
+    const std::wstring lowLabel =
+        std::vformat(trw(Str::StarGuitarMenuLowSensitivity), std::make_wformat_args(lowUpperHz));
+    const std::wstring midLabel = std::vformat(trw(Str::StarGuitarMenuMidSensitivity),
+                                               std::make_wformat_args(lowUpperHz, midUpperKhz));
+    const std::wstring trebleLabel = std::vformat(
+        trw(Str::StarGuitarMenuTrebleSensitivity), std::make_wformat_args(midUpperKhz, trebleUpperKhz));
+    const std::wstring airLabel = std::vformat(trw(Str::StarGuitarMenuAirSensitivity),
+                                               std::make_wformat_args(trebleUpperKhz));
+
     HMENU menu = CreatePopupMenu();
-    appendValueMenu(menu, trw(Str::StarGuitarMenuLowSensitivity).c_str(), kLowSensitivityCommand,
-                    options.lowSensitivity);
-    appendValueMenu(menu, trw(Str::StarGuitarMenuMidSensitivity).c_str(), kMidSensitivityCommand,
-                    options.midSensitivity);
-    appendValueMenu(menu, trw(Str::StarGuitarMenuTrebleSensitivity).c_str(),
-                    kTrebleSensitivityCommand, options.trebleSensitivity);
-    appendValueMenu(menu, trw(Str::StarGuitarMenuAirSensitivity).c_str(), kAirSensitivityCommand,
-                    options.airSensitivity);
+    appendValueMenu(menu, lowLabel.c_str(), kLowSensitivityCommand, options.lowSensitivity);
+    appendValueMenu(menu, midLabel.c_str(), kMidSensitivityCommand, options.midSensitivity);
+    appendValueMenu(menu, trebleLabel.c_str(), kTrebleSensitivityCommand,
+                    options.trebleSensitivity);
+    appendValueMenu(menu, airLabel.c_str(), kAirSensitivityCommand, options.airSensitivity);
 
     const UINT command = TrackPopupMenu(menu, TPM_RETURNCMD | TPM_RIGHTBUTTON, point.x, point.y,
                                         0, hwnd_, nullptr);
