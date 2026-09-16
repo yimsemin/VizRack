@@ -62,11 +62,12 @@ and `src/main.cpp` resolves through `core/i18n` — add a
 `trw(Str::Id)` / `tr`. Never write a raw user-facing `L"..."` in a menu, dialog,
 overlay or the window title — this includes each built-in visualizer's overlay
 caption (its title, tagline and control hint), which are equally in scope: reuse
-`Str::HintRightClickOptions` / `Str::HintClickSceneRightClickOptions` /
-`Str::HintClickPaletteRightClickOptions` for the standard "right-click: options"
-family of hints instead of inventing a new string per engine. Diagnostics (logger
-and `error`/status strings from `src/core`, `src/platform`, `src/vst`) stay
-English. The one exception is scene/palette names sourced from `src/builtin/`
+`Str::HintRightClickOptions` ("RIGHT CLICK: OPTIONS") for that hint instead of
+inventing a new string per engine — every built-in visualizer's own state
+(scene, palette, style, sensitivity, …) is right-click-menu-only, never a left
+click on the canvas, so this is the one hint every engine needs. Diagnostics
+(logger and `error`/status strings from `src/core`, `src/platform`, `src/vst`)
+stay English. The one exception is scene/palette names sourced from `src/builtin/`
 engine code (e.g. art visualizer scene names, spectrum3d style/palette names) —
 those stay English because they live in the portable core, which must not depend
 on `core/i18n` (see the portability boundary above). Mechanism:
@@ -90,6 +91,13 @@ engines share (`docs/ARCHITECTURE.md` ▸ UI conventions for the details):
   stylized title (a plugin display name drawn in caps) with `overlayCaps()`.
 - **Overlay strings**: every caption goes through `core/i18n` (see Localization
   above) — reuse the shared hint strings where the control scheme matches.
+- **Overlay visibility**: keep a `showOverlay_` member (default `true`), a
+  `setShowOverlay(bool)` setter, and skip the `drawOverlay` call in `paint()`
+  when it is false, so `Settings::showOverlayText` (View ▸ Show overlay text)
+  can hide it. Wire the setter into `App::applyOverlayVisibility`.
+- **Left click is never a control**: all per-visualizer state (scene, palette,
+  sensitivity, …) lives behind the right-click menu only. `WM_LBUTTONDOWN` may
+  set focus; it must not change what is drawn.
 
 ## Keep the EXE small
 

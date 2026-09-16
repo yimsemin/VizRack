@@ -37,7 +37,7 @@ VizRack runs on an **x64 PC with Windows 10 version 1703 or newer, or Windows
 1. Extract `VizRack-win-x64.zip` completely into a local folder of your choice.
 2. Run `VizRack.exe` from the extracted folder.
 3. Play music or video as usual.
-4. Choose `Plug-in > Art Visualizer` and click the screen to change scenes.
+4. Choose `Plug-in > Art Visualizer` and press `Space` to change scenes.
 
 To keep your settings, do not run it from inside the ZIP or place it in a
 write-restricted folder such as `C:\Program Files`.
@@ -49,15 +49,15 @@ Choose `More info > Run anyway` only when you trust where the file came from.
 
 | Action | Result |
 | --- | --- |
-| Click the screen or `Space` | Next art scene |
+| `Space` | Next art scene |
 | Arrow keys or number `1`–`6` | Select a scene |
 | `C` | Next palette |
 | Right-click | Current screen and window settings |
 | `F10` or tap `Alt` | Open the menu while the border is hidden |
 
-The `View` menu changes always-on-top, hidden border, opacity, the output
-device and the UI language. By default VizRack follows the Windows default
-output device automatically. `Exit` is under `File`.
+The `View` menu changes always-on-top, hidden border, overlay text visibility,
+opacity, the output device and the UI language. By default VizRack follows the
+Windows default output device automatically. `Exit` is under `File`.
 
 ## Optional external visualizers
 

@@ -23,6 +23,9 @@ ZIP attached. How these notes are written and cut: `docs/RELEASE_NOTES_STYLE.md`
   an ordinary beat — it travels a smooth constant-speed arc, marks only its
   start and end with a ripple (never re-bursting while held), lasts up to 5
   seconds, and several can be held at once.
+- **View ▸ Show overlay text** toggles every built-in visualizer's title,
+  tagline and right-click hint off at once — useful for recording or
+  streaming without the on-screen text. Persisted in settings.
 
 ### Changed
 
@@ -43,10 +46,13 @@ ZIP attached. How these notes are written and cut: `docs/RELEASE_NOTES_STYLE.md`
 - Renamed the `builtin-spectrum3d` catalog entry from "3D Spectrum" to
   "Classic Cascade" so its menu name matches the on-screen title it shares
   with its sibling `builtin-joydivision` ("Joy Division").
-- Retranslated a couple of Korean overlay strings that read as awkward
-  loanwords: oscilloscope's history mode is now "시간 기록" (was "시간
-  히스토리"), and the 3D-style plug-ins' click hint is now "팔레트 변경" (was
-  "팔레트 전환").
+- Retranslated an awkward Korean loanword: oscilloscope's history mode is now
+  "시간 기록" (was "시간 히스토리").
+- **Left click on the canvas no longer changes anything.** Art Visualizer
+  (scene) and Classic Cascade/Joy Division (palette) used to cycle on click;
+  every built-in visualizer's own state now lives behind the right-click menu
+  only, matching the four built-ins that never had a click action. Art
+  Visualizer's keyboard shortcuts (`Space`, arrows, `1`–`6`, `C`) still work.
 
 ## [0.4.0] - 2026-09-15
 

@@ -17,6 +17,7 @@ struct Settings {
     bool alwaysOnTop{false};
     bool borderless{false};
     int opacityPercent{100};
+    bool showOverlayText{true};
     int oscilloscopeFps{60};
     int oscilloscopeScalePercent{70};
     int oscilloscopeSmoothing{1};

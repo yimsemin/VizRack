@@ -113,12 +113,24 @@ before a module is even found.
 Every built-in visualizer's overlay text (title + tagline + control hint) draws
 with `overlayTitleFont()` / `overlaySmallFont()` from `src/ui/overlay_font.h` —
 "Segoe UI" (the Windows system font, so no licensing to track and Korean
-renders through the OS's own font-linking fallback) at a shared 12px-bold /
-9px-regular pair. A stylized title (a plugin's display name rendered in caps)
+renders through the OS's own font-linking fallback) at a shared 16px-bold /
+12px-regular pair. A stylized title (a plugin's display name rendered in caps)
 goes through `overlayCaps()` so the look survives translation. The
 oscilloscope view predates GDI+ overlay drawing and stays on plain GDI
 (`gdi_draw_list_renderer.h`), so it matches family and size with two cached
-`HFONT`s created in `attach()` instead of a `Gdiplus::Font`.
+`HFONT`s created in `attach()` instead of a `Gdiplus::Font`. `Settings::showOverlayText`
+(View ▸ Show overlay text) toggles all of it off at once; each view keeps a
+`showOverlay_` flag and skips its `drawOverlay` call when it is false, so a
+plugin's own drawing (waveform, particles, spectrum surface, …) still renders.
+
+A left click on the canvas never changes a built-in visualizer's own state
+(scene, palette, style, sensitivity, …) — every one of those is right-click-menu
+only, so `Str::HintRightClickOptions` is the single hint every engine shows.
+Art Visualizer and Classic Cascade/Joy Division used to cycle their scene/palette
+on left click; that was removed for consistency with the other built-ins, which
+never had a click action. A left click still moves keyboard focus to the view
+(`WM_LBUTTONDOWN` → `SetFocus`), and Art Visualizer's keyboard shortcuts (`Space`,
+arrows, `1`–`6`, `C`) are unchanged.
 
 ## Audio capture and recovery
 

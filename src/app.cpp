@@ -81,6 +81,7 @@ void mergeMainWindowSettings(Settings& destination, const Settings& source) {
     destination.alwaysOnTop = source.alwaysOnTop;
     destination.borderless = source.borderless;
     destination.opacityPercent = source.opacityPercent;
+    destination.showOverlayText = source.showOverlayText;
 }
 
 std::string editionForStatus(const PluginDefinition& definition,
@@ -226,6 +227,7 @@ bool App::initialize(std::string& error) {
         };
     callbacks.onSettingsChanged = [this](const Settings& settings) {
         mergeMainWindowSettings(settings_, settings);
+        applyOverlayVisibility();
         saveSettingsNow();
     };
     callbacks.onResume = [this] {
@@ -234,6 +236,7 @@ bool App::initialize(std::string& error) {
     };
     window_ = std::make_unique<MainWindow>(instance_, settings_, std::move(callbacks));
     if (!window_->create(error)) return false;
+    applyOverlayVisibility();
     window_->setEditorConstraintHandler([this](int width, int height) {
         if (builtInViewActive()) return std::pair{width, height};
         return vstHost_.constrainEditorSize(width, height);
@@ -607,6 +610,16 @@ void App::detachBuiltInViews() {
     starGuitar_.detach();
     rhythmRipple_.detach();
     activeBuiltInPluginId_.clear();
+}
+
+void App::applyOverlayVisibility() {
+    oscilloscope_.setShowOverlay(settings_.showOverlayText);
+    artVisualizer_.setShowOverlay(settings_.showOverlayText);
+    campfire_.setShowOverlay(settings_.showOverlayText);
+    spectrum3d_.setShowOverlay(settings_.showOverlayText);
+    joyDivision_.setShowOverlay(settings_.showOverlayText);
+    starGuitar_.setShowOverlay(settings_.showOverlayText);
+    rhythmRipple_.setShowOverlay(settings_.showOverlayText);
 }
 
 void App::shutdown() {

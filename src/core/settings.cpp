@@ -141,6 +141,7 @@ SettingsLoadResult loadSettings(const std::filesystem::path& path) {
     if (auto value = readInt(json, "opacityPercent")) {
         result.value.opacityPercent = std::clamp(*value, 25, 100);
     }
+    if (auto value = readBool(json, "showOverlayText")) result.value.showOverlayText = *value;
     if (auto value = readInt(json, "oscilloscopeFps");
         value && (*value == 15 || *value == 30 || *value == 60)) {
         result.value.oscilloscopeFps = *value;
@@ -242,6 +243,7 @@ bool saveSettings(const std::filesystem::path& path, const Settings& settings, s
            << "  \"alwaysOnTop\": " << (settings.alwaysOnTop ? "true" : "false") << ",\n"
            << "  \"borderless\": " << (settings.borderless ? "true" : "false") << ",\n"
            << "  \"opacityPercent\": " << std::clamp(settings.opacityPercent, 25, 100) << ",\n"
+           << "  \"showOverlayText\": " << (settings.showOverlayText ? "true" : "false") << ",\n"
            << "  \"oscilloscopeFps\": " << settings.oscilloscopeFps << ",\n"
            << "  \"oscilloscopeScalePercent\": " << settings.oscilloscopeScalePercent << ",\n"
            << "  \"oscilloscopeSmoothing\": " << std::clamp(settings.oscilloscopeSmoothing, 0, 2) << ",\n"

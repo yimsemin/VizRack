@@ -120,6 +120,12 @@ void Spectrum3dView::setSampleRate(uint32_t sampleRate) noexcept {
     engine_.setSampleRate(sampleRate);
 }
 
+void Spectrum3dView::setShowOverlay(bool show) {
+    if (showOverlay_ == show) return;
+    showOverlay_ = show;
+    if (hwnd_) InvalidateRect(hwnd_, nullptr, FALSE);
+}
+
 void Spectrum3dView::updateSamples() {
     ring_.discardOlderThan(builtin::Spectrum3dEngine::kMaxSamples);
     auto left = engine_.inputLeft();
@@ -145,9 +151,9 @@ void Spectrum3dView::drawOverlay(HDC dc, float width, float height) const {
                         {width - 218.0f, 16.0f, 200.0f, 20.0f}, &right, &dim);
     const std::wstring tagline = trw(Str::Spectrum3dTagline);
     graphics.DrawString(tagline.c_str(), -1, &smallFont, {18.0f, height - 27.0f}, &dim);
-    const std::wstring hint = trw(Str::HintClickPaletteRightClickOptions);
+    const std::wstring hint = trw(Str::HintRightClickOptions);
     graphics.DrawString(hint.c_str(), -1, &smallFont,
-                        {width - 300.0f, height - 27.0f, 282.0f, 18.0f}, &right, &dim);
+                        {width - 208.0f, height - 27.0f, 190.0f, 18.0f}, &right, &dim);
     if (!inspiration_.empty()) {
         const std::wstring inspiration = fromUtf8(inspiration_);
         graphics.DrawString(inspiration.c_str(), -1, &smallFont, {18.0f, 34.0f}, &dim);
@@ -169,7 +175,7 @@ void Spectrum3dView::paint() {
     HDC dc = buffered ? backBuffer_.dc() : target;
     engine_.buildFrame(static_cast<float>(width), static_cast<float>(height), drawList_);
     renderer_.render(dc, drawList_);
-    drawOverlay(dc, static_cast<float>(width), static_cast<float>(height));
+    if (showOverlay_) drawOverlay(dc, static_cast<float>(width), static_cast<float>(height));
     if (buffered) backBuffer_.present(target, width, height);
     EndPaint(hwnd_, &paint);
 }
@@ -260,7 +266,6 @@ LRESULT Spectrum3dView::proc(UINT message, WPARAM wParam, LPARAM lParam) {
         case WM_PAINT: paint(); return 0;
         case WM_ERASEBKGND: return 1;
         case WM_LBUTTONDOWN: SetFocus(hwnd_); return 0;
-        case WM_LBUTTONUP: changePalette(1); return 0;
         case WM_CONTEXTMENU:
             SetFocus(hwnd_);
             showOptionsMenu({GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)});

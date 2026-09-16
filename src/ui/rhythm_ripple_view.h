@@ -33,6 +33,7 @@ public:
     void detach();
     void resize(int width, int height);
     void setSampleRate(uint32_t sampleRate) noexcept;
+    void setShowOverlay(bool show);
     bool active() const noexcept { return hwnd_ != nullptr; }
 
 private:
@@ -52,6 +53,7 @@ private:
     GdiBackBuffer backBuffer_;
     std::chrono::steady_clock::time_point lastUpdate_{};
     OptionsChangedCallback optionsChanged_;
+    bool showOverlay_{true};
 };
 
 } // namespace vizrack

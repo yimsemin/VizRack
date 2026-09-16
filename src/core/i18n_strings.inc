@@ -41,6 +41,7 @@ VIZRACK_STR(MenuOutputDevice,      "Output device", "출력 장치")
 VIZRACK_STR(MenuFollowDefault,     "Follow the Windows default output", "Windows 기본 출력 자동 추적")
 VIZRACK_STR(MenuAlwaysOnTop,       "Always on top", "항상 위")
 VIZRACK_STR(MenuBorderless,        "Hide window border", "창 테두리 숨김")
+VIZRACK_STR(MenuShowOverlayText,   "Show overlay text", "오버레이 텍스트 표시")
 VIZRACK_STR(MenuOpacity,           "Opacity", "투명도")
 VIZRACK_STR(MenuLanguage,          "Language", "언어")
 VIZRACK_STR(MenuLanguageAuto,      "Automatic", "자동")
@@ -112,10 +113,8 @@ VIZRACK_STR(DialogBodyPluginRequiredFmt,
     "[아니요] 이미 설치한 .vst3 파일 직접 선택\n"
     "[취소] 나중에 플러그인 메뉴에서 선택")
 
-// ── Shared overlay hints (right-click / click control captions) ────────────
-VIZRACK_STR(HintRightClickOptions,             "RIGHT CLICK: OPTIONS", "우클릭: 옵션")
-VIZRACK_STR(HintClickSceneRightClickOptions,   "CLICK: SCENE  ·  RIGHT CLICK: OPTIONS", "클릭: 장면 전환  ·  우클릭: 옵션")
-VIZRACK_STR(HintClickPaletteRightClickOptions, "CLICK: PALETTE  ·  RIGHT CLICK: OPTIONS", "클릭: 팔레트 변경  ·  우클릭: 옵션")
+// ── Shared overlay hints (right-click control captions) ─────────────────────
+VIZRACK_STR(HintRightClickOptions, "RIGHT CLICK: OPTIONS", "우클릭: 옵션")
 
 // ── Oscilloscope view ──────────────────────────────────────────────────────
 VIZRACK_STR(ScopeTitleHistory,   "Oscilloscope · Time history", "오실로스코프 · 시간 기록")
