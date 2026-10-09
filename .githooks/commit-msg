@@ -1,15 +1,19 @@
 #!/bin/sh
-# 커밋 메시지에서 AI 생성 표식과 Claude co-author 트레일러를 제거한다.
-# 권고가 아니라 하드 게이트다. commit -m / 에디터 / amend / cherry-pick / revert
-# 등 모든 경로에서 실행된다(--no-verify 로만 우회). 줄 전체가 트레일러일 때만
-# 지우고, 본문에서 이 문자열을 예시로 언급하는 줄은 건드리지 않는다.
+# 1) 커밋 메시지에서 AI 생성 표식과 co-author 트레일러를 제거한다.
+# 2) 제목 형식(`type(scope): 요약`, 72자 이내, 마침표 없음)을 검사한다.
+# 권고가 아니라 하드 게이트다. commit -m / 에디터 / amend / cherry-pick 등
+# 모든 경로에서 실행된다(--no-verify 로만 우회). 줄 전체가 표식일 때만 지우고,
+# 본문에서 문자열을 예시로 언급하는 줄은 건드리지 않는다. Node 등 런타임이 필요 없다.
 # 활성화: git config core.hooksPath .githooks
 msg_file="$1"
 [ -f "$msg_file" ] || exit 0
 tmp="$(mktemp)" || exit 0
+vendors='claude|anthropic|openai|chatgpt|codex|copilot|cursor|gemini'
 grep -vaiE \
-  -e '^[[:space:]]*co-authored-by:[[:space:]]*claude([[:space:]]|<|$)' \
-  -e '^[[:space:]]*(🤖[[:space:]]*)?generated (with|by) \[?claude( code)?\]?' \
+  -e "^[[:space:]]*co-authored-by:.*($vendors)" \
+  -e "^[[:space:]]*(assisted|authored|generated)-by:.*($vendors)" \
+  -e "^[[:space:]]*(🤖[[:space:]]*)?generated (with|by) .*($vendors)" \
+  -e '^[[:space:]]*🤖' \
   "$msg_file" > "$tmp" || true
 awk '
   { lines[NR] = $0 }
@@ -20,4 +24,15 @@ awk '
   }
 ' "$tmp" > "$msg_file"
 rm -f "$tmp"
+
+subject="$(grep -v '^#' "$msg_file" | sed -n '/[^[:space:]]/{p;q;}')"
+[ -n "$subject" ] || exit 0
+printf '%s' "$subject" | grep -qE '^(Merge |Release |Revert "|(fixup|squash|amend)! )' && exit 0
+
+fail() { echo "커밋 제목 형식 오류: $1" >&2; echo "  제목: $subject" >&2; echo "  형식: <type>(<선택 scope>): <요약>  예) feat(login): 로그인 화면 추가" >&2; exit 1; }
+printf '%s' "$subject" | grep -qE '^(feat|fix|perf|refactor|docs|test|build|ci|chore|style|revert)(\([a-z0-9._-]+\))?!?: [^[:space:]]' \
+  || fail "type 접두어가 필요하다 (feat fix perf refactor docs test build ci chore style revert)"
+len="$(printf '%s' "$subject" | LC_ALL=C tr -d '\200-\277' | LC_ALL=C wc -c | tr -d ' ')"
+[ "$len" -le 72 ] || fail "제목은 72자 이내여야 한다(현재 ${len}자)"
+printf '%s' "$subject" | grep -qE '(\.|。)$' && fail "제목 끝에 마침표를 찍지 않는다"
 exit 0

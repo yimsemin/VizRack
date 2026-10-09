@@ -1,3 +1,5 @@
+@AGENTS.md
+
 # VizRack
 
 Portable Windows visualizer. It reads the current render endpoint through WASAPI
