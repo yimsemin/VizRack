@@ -313,6 +313,11 @@ void MainWindow::showContextMenu(POINT point) {
 
 void MainWindow::applyWindowOptions() {
     if (!hwnd_) return;
+    // Dropping WS_MAXIMIZEBOX/WS_THICKFRAME on a maximized window strands it in
+    // a maximized state it can no longer leave; restore first.
+    if (IsZoomed(hwnd_) && (settings_.borderless || !externalResizeEnabled_)) {
+        ShowWindow(hwnd_, SW_RESTORE);
+    }
     LONG_PTR style = GetWindowLongPtrW(hwnd_, GWL_STYLE);
     if (settings_.borderless) {
         style &= ~(WS_CAPTION | WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_SYSMENU);
@@ -715,6 +720,9 @@ LRESULT MainWindow::proc(UINT message, WPARAM wParam, LPARAM lParam) {
         }
         case kPluginResizeMessage: {
             std::unique_ptr<PluginSize> size(reinterpret_cast<PluginSize*>(lParam));
+            // A plugin-driven size is meaningless on a maximized window and would
+            // leave it half-maximized; return to the normal state first.
+            if (IsZoomed(hwnd_)) ShowWindow(hwnd_, SW_RESTORE);
             RECT client{0, 0, size->width, size->height};
             const DWORD style = static_cast<DWORD>(GetWindowLongPtrW(hwnd_, GWL_STYLE));
             const DWORD exStyle = static_cast<DWORD>(GetWindowLongPtrW(hwnd_, GWL_EXSTYLE));

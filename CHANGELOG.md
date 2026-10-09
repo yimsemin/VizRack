@@ -109,6 +109,9 @@ ZIP attached. How these notes are written and cut: `docs/RELEASE_NOTES_STYLE.md`
   filler.** It now falls back to a pine tree, matching the layer's two real
   object types (signal marker, pine) — see
   `docs/STAR_GUITAR_FREQUENCY_BANDS.md`.
+- **Selecting a fixed-size plug-in (e.g. mvMeter2) while maximized no longer
+  breaks the window.** The window now returns to its normal state first, so it
+  resizes cleanly, draws correctly and can be dragged and resized afterwards.
 
 ## [0.4.0] - 2026-09-15
 
