@@ -2,8 +2,8 @@
 
 ## Steinberg VST 3 SDK
 
-This project uses the Steinberg VST 3 SDK, pinned to tag `v3.8.0_build_66`
-(`9fad9770f2ae8542ab1a548a68c1ad1ac690abe0`) and obtained at build time from
+This project uses the Steinberg VST 3 SDK, pinned to tag `v3.8.1_build_84`
+(`3cdf9ca5d1f5b1b21e0a86832aa4abe55607bd96`) and obtained at build time from
 <https://github.com/steinbergmedia/vst3sdk>.
 
 The SDK source tree is not redistributed with this project, but portions of
