@@ -15,9 +15,11 @@ ref is never ambiguous.
 
 Several branches can be in flight at once. Keep them independent:
 
-- **One worktree per branch.** `git worktree add ../vizrack-wt/<slug> -b <type>/<slug> develop`
-  gives each branch its own directory and its own `out/` build tree, so parallel
-  builds never collide. `git worktree remove ../vizrack-wt/<slug>` when the branch
+- **One worktree per branch.** `git worktree add .claude/worktrees/<slug> -b <type>/<slug> develop`
+  gives each branch its own directory (inside the project folder, git-ignored) and its
+  own `out/` build tree, so parallel builds never collide. A new worktree has no
+  `external/vst3sdk`; pass `-DVIZRACK_VST3_SDK_PATH=<main checkout>/external/vst3sdk`
+  to reuse it instead of fetching again. `git worktree remove .claude/worktrees/<slug>` when the branch
   merges.
 - **Branch from a fresh `develop`.** `git fetch origin` first; base the branch on
   `origin/develop`.

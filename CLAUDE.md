@@ -28,7 +28,7 @@ out\build\vs2026-x64\Release\VizRack.exe --smoke-test   # opens, self-closes, ex
 
 - One-time per clone: `git config core.hooksPath .githooks` (commit-message hook).
 - The VST3 SDK builds from the local `external/vst3sdk` checkout (pinned
-  `v3.8.0_build_66`), not FetchContent.
+  `v3.8.1_build_84`), not FetchContent.
 - Tests are one file, `tests/test_main.cpp`, with a hand-rolled `CHECK`. Add a case
   as a function and call it from `main()`.
 - No CI, no clang-tidy/clang-format. Warnings are `/W4 /permissive-` — keep the
