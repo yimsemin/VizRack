@@ -96,7 +96,7 @@ Only after the user gives explicit approval for a version:
    ```powershell
    git checkout main
    git merge --no-ff refs/heads/develop
-   git tag -a refs/tags/vX.Y.Z -m "VizRack vX.Y.Z"
+   git tag -a vX.Y.Z -m "VizRack vX.Y.Z"
    git push origin refs/heads/main refs/tags/vX.Y.Z
    ```
 
