@@ -18,25 +18,11 @@ constexpr float kReferenceHeight = 1080.0f;
 // Keeps a fresh spawn from landing clipped at the very edge of the frame.
 constexpr float kEdgeMargin = 130.0f;
 
-// Broadband onset envelope tuning. A single one-pole low-pass below ~5kHz
-// keeps pure hiss/cymbal wash from dominating the broadband energy the
-// onset detector reacts to, per the visualizer's intent of tracking beats,
-// not high-frequency noise. Gain/floor are tuned generously (and the
-// baseline's attack is deliberately sluggish, see frameFollow calls below)
-// so that at high sensitivity settings rain falls often and readily, rather
-// than the detector self-limiting because its own baseline chases the
-// signal too closely to ever see a "rise" again.
-constexpr float kLowpassCutoffHz = 5000.0f;
+// Maps the chunk's RMS to the 0..1 level the silence gate looks at.
 constexpr float kOnsetGain = 5.5f;
-constexpr float kOnsetFloor = 0.045f;
-// A short fixed cooldown on the raw detector, only to stop the exact same
-// transient from re-firing across consecutive frames -- short enough that
-// genuinely fast, busy rain can still trigger many raindrops per second.
-constexpr float kRawCooldownSeconds = 0.045f;
 
 // Silence gate, same shape as StarGuitarEngine's: below this the source has
-// effectively stopped, so no ripple spawns and onset-interval history is not
-// allowed to accumulate a poisoned gap.
+// effectively stopped, so no ripple spawns.
 constexpr float kSilenceLevel = 0.03f;
 constexpr float kSilenceHoldSeconds = 0.4f;
 
@@ -60,43 +46,36 @@ constexpr float kSplashDistanceFraction = 0.045f; // of the shorter screen dimen
 constexpr float kReboundStartSeconds = 0.16f;
 constexpr float kReboundLifetimeSeconds = 0.14f;
 
-// Long-note sustain detection: every accepted raw onset (the same broadband
-// detector that drops a raindrop) also opens one "is this actually a hold?"
-// candidate window. An ordinary percussive hit's level decays away within a
-// fraction of a second; a genuinely held note (a drone, a sustained chord, a
-// vocal note) keeps the level up near where it started. So the candidate
-// simply watches whether onsetLevel_ stays above a fraction of its own
-// starting peak for kSustainConfirmSeconds -- if it ever dips below that
-// floor first, the candidate is just a raindrop and is dropped; if it stays
-// up long enough, it confirms into a real held note, which then keeps living
-// (no fixed or capped duration) until the level actually falls below that
-// same floor for kSustainReleaseSeconds (or the max duration below is hit,
-// whichever comes first). Because this judges every single onset fresh
-// against its own peak -- never against a slowly-adapting average of the
-// whole song -- it keeps firing evenly throughout a track instead of only
-// near a structural mood change. sustainHoldFractionFromSensitivity's curve
-// controls how forgiving "stays up" is: more sensitive tolerates more decay
-// before disqualifying a candidate (and disqualifies a held note's release
-// less eagerly), so turning longNoteSensitivity up makes long notes both
-// easier to start and slower to end, not just more numerous. A
-// longNoteSensitivity of exactly 0 skips the whole mechanism -- see
-// updateHeldNotes -- which is how the feature is turned off.
-constexpr float kSustainConfirmSeconds = 0.30f;  // must stay up this long to confirm a hold
-constexpr float kSustainReleaseSeconds = 0.30f;  // must stay down this long to end one
-// A hold never lasts longer than this regardless of how long the passage
-// keeps qualifying -- long enough to read as a real sustained gesture, short
-// enough that the visualizer never looks stuck on one hold.
-constexpr float kHeldMaxDurationSeconds = 5.0f;
-
-// Long-note motion: constant forward speed plus one fixed angular velocity
-// chosen at spawn (never re-randomized while held), so the whole path traces
-// a single smooth arc -- one gentle curve, not a wandering, direction-
-// changing wiggle. `kHeldMaxAngularVelocity` is small enough that even a
-// note held for several seconds only sweeps a modest arc, not a full loop.
-constexpr float kHeldSpeed = 240.0f;                    // reference px/s, constant for the note's life
-constexpr float kHeldMaxAngularVelocity = 0.45f;        // radians/second
-constexpr float kHeldEdgeMargin = 110.0f;
-constexpr float kHeldTrailSampleSeconds = 0.05f;        // cadence of trail-curve position sampling
+// Per band: a rectified envelope follower (attack/release in seconds), an
+// absolute envelope floor so near-silence never fires, a refractory time so
+// one hit fires once, a gain mapping the envelope to a 0..1 magnitude, and
+// the ripple's size relative to a mid-band ripple. The low band is slowest
+// because a 50Hz wave is 20ms long and a faster follower would just trace its
+// cycles.
+struct BandTuning {
+    float attackSeconds;
+    float releaseSeconds;
+    float envelopeFloor;
+    float refractorySeconds;
+    float magnitudeGain;
+    float radiusScale;
+};
+constexpr std::array<BandTuning, 3> kBandTuning{{
+    {0.0030f, 0.050f, 0.010f, 0.100f, 3.0f, 1.25f}, // low: kick
+    {0.0015f, 0.030f, 0.008f, 0.070f, 4.0f, 1.00f}, // mid: snare / body
+    {0.0007f, 0.020f, 0.004f, 0.050f, 8.0f, 0.70f}, // high: hats
+}};
+constexpr float kLowSplitHz = 160.0f;
+constexpr float kMidSplitHz = 2200.0f;
+// A band fires when its log envelope is this much above where it was
+// kFluxLagSeconds ago (natural-log units: 0.69 is a doubling).
+constexpr float kFluxLagSeconds = 0.010f;
+constexpr float kEnvelopeLogBias = 1.0e-4f;
+// A fired ripple's magnitude may still grow for this long, so a hit that
+// fires on its first rising block still ends up sized by its real peak.
+constexpr float kMagnitudeRefineSeconds = 0.040f;
+// Back-dating is capped so a long stall never spawns an already-dead ripple.
+constexpr float kMaxBackdateSeconds = 0.10f;
 
 float finiteSample(float value) noexcept {
     return std::isfinite(value) ? value : 0.0f;
@@ -104,13 +83,6 @@ float finiteSample(float value) noexcept {
 
 float clampUnit(float value) noexcept {
     return std::clamp(value, 0.0f, 1.0f);
-}
-
-float frameFollow(float current, float target, float attack, float release,
-                  float frameScale) noexcept {
-    const float base = target > current ? attack : release;
-    const float coefficient = 1.0f - std::pow(1.0f - base, frameScale);
-    return current + (target - current) * coefficient;
 }
 
 uint32_t hashCombine(uint32_t a, uint32_t b) noexcept {
@@ -135,34 +107,18 @@ float easeOutCubic(float t) noexcept {
     return 1.0f - inverse * inverse * inverse;
 }
 
-// The raw (uncalibrated) 0-100 -> threshold curve, identical shape to
-// StarGuitarEngine's rawThresholdFromSensitivity: 0 is very insensitive (a
-// huge relative jump needed), 100 is very sensitive (a small jump is
-// enough).
+// The log-envelope jump (natural-log units) a band needs to fire. 100 reacts
+// to ~+2dB, 0 needs ~+10dB.
 float thresholdFromSensitivity(int sensitivity) noexcept {
     const float t = std::clamp(static_cast<float>(sensitivity), 0.0f, 100.0f) / 100.0f;
-    return 1.05f + (0.09f - 1.05f) * t;
-}
-
-// How much of its own starting peak a long-note candidate (and, later, an
-// already-confirmed hold) must keep for the level to still count as "still
-// sustaining" -- see kSustain* above. Higher sensitivity lowers this fraction
-// (more decay is tolerated before it's judged to have ended), so turning
-// sensitivity up makes long notes both easier to start and slower to end.
-float sustainHoldFractionFromSensitivity(int sensitivity) noexcept {
-    const float t = std::clamp(static_cast<float>(sensitivity), 0.0f, 100.0f) / 100.0f;
-    return 0.80f + (0.32f - 0.80f) * t;
+    return 1.20f + (0.25f - 1.20f) * t;
 }
 
 } // namespace
 
-RhythmRippleEngine::RhythmRippleEngine() {
-    scratch_.reserve(HeldNote::kTrailPointCount);
-}
-
 void RhythmRippleEngine::setOptions(RhythmRippleOptions options) noexcept {
     options.sensitivity = std::clamp(options.sensitivity, 0, 100);
-    options.longNoteSensitivity = std::clamp(options.longNoteSensitivity, 0, 100);
+    options.syncDelayMs = std::clamp(options.syncDelayMs, 0, kMaxSyncDelayMs);
     options_ = options;
 }
 
@@ -176,34 +132,12 @@ void RhythmRippleEngine::update(size_t sampleCount, float frameSeconds) noexcept
     const float safeSeconds = std::isfinite(frameSeconds)
                                   ? std::clamp(frameSeconds, 1.0f / 240.0f, 1.0f / 10.0f)
                                   : 1.0f / 60.0f;
-    const float frameScale = safeSeconds * 60.0f;
-    clockSeconds_ += safeSeconds;
 
-    onsetCooldown_ = std::max(0.0f, onsetCooldown_ - safeSeconds);
-
-    bool rawOnset = false;
-    float rawMagnitude = 0.0f;
-    float rawOnsetX = 0.0f;
-    float rawOnsetY = 0.0f;
     if (sampleCount > 0) {
         sampleCount_ = std::min(sampleCount, kMaxSamples);
-        analyzeSamples(frameScale);
-        const float relativeRise = (onsetLevel_ - onsetBaseline_) / (onsetBaseline_ + 0.05f);
-        const float threshold = thresholdFromSensitivity(options_.sensitivity);
-        if (onsetLevel_ > kOnsetFloor && onsetCooldown_ <= 0.0f && relativeRise > threshold) {
-            rawOnset = true;
-            rawMagnitude = onsetLevel_;
-            onsetCooldown_ = kRawCooldownSeconds;
-            // Picked up front (rather than inside spawnRippleAt) so a long
-            // note releasing on this same frame can share this exact spot --
-            // see updateHeldNotes.
-            rawOnsetX = kEdgeMargin + nextRandom() * (kReferenceWidth - kEdgeMargin * 2.0f);
-            rawOnsetY = kEdgeMargin + nextRandom() * (kReferenceHeight - kEdgeMargin * 2.0f);
-        }
+        analyzeSamples(safeSeconds);
     } else {
-        onsetBaseline_ *= std::pow(0.985f, frameScale);
-        onsetLevel_ *= std::pow(0.96f, frameScale);
-        overallLevel_ *= std::pow(0.96f, frameScale);
+        overallLevel_ *= std::pow(0.96f, safeSeconds * 60.0f);
     }
 
     if (overallLevel_ < kSilenceLevel) {
@@ -211,72 +145,128 @@ void RhythmRippleEngine::update(size_t sampleCount, float frameSeconds) noexcept
     } else {
         silenceSeconds_ = 0.0f;
     }
-    const bool audible = silenceSeconds_ < kSilenceHoldSeconds;
 
     for (auto& ripple : ripples_) {
         if (!ripple.active) continue;
         ripple.age += safeSeconds;
         if (ripple.age >= kRippleLifetimeSeconds) ripple.active = false;
     }
-
-    // Runs every frame regardless of the silence gate below, so a held note
-    // still winds down (via its own sustain-level release debounce) rather
-    // than freezing mid-drift the instant the source goes silent.
-    updateHeldNotes(safeSeconds, rawOnset, rawMagnitude, rawOnsetX, rawOnsetY);
-
-    if (!audible) return;
-
-    // Rain does not pace itself against a beat estimate -- every accepted
-    // onset (already throttled by the raw cooldown above) drops exactly one
-    // raindrop, and several can be falling in close succession during a busy
-    // passage.
-    if (!rawOnset) return;
-    spawnRippleAt(rawOnsetX, rawOnsetY, rawMagnitude);
 }
 
 void RhythmRippleEngine::reset() noexcept {
     sampleCount_ = 0;
-    lowpassFilter_ = 0.0f;
-    onsetLevel_ = 0.0f;
-    onsetBaseline_ = 0.0f;
-    onsetCooldown_ = 0.0f;
     overallLevel_ = 0.0f;
     silenceSeconds_ = 0.0f;
-    clockSeconds_ = 0.0f;
     ripples_ = {};
     nextRippleSlot_ = 0;
     spawnSerial_ = 0;
+    spawnedCount_ = 0;
+    lastSpawnStartAge_ = 0.0f;
     randomState_ = 0xc2b2ae35u;
-    sustainCandidateActive_ = false;
-    sustainCandidatePeakLevel_ = 0.0f;
-    sustainCandidateElapsedSeconds_ = 0.0f;
-    heldNotes_ = {};
-    nextHeldSlot_ = 0;
+    lowStage1_ = 0.0f;
+    lowStage2_ = 0.0f;
+    midLowpass_ = 0.0f;
+    blockFill_ = 0;
+    bands_ = {};
 }
 
-void RhythmRippleEngine::analyzeSamples(float frameScale) noexcept {
+void RhythmRippleEngine::analyzeSamples(float safeSeconds) noexcept {
     const float rate = static_cast<float>(sampleRate_.load(std::memory_order_acquire));
-    const float coefficient = 1.0f - std::exp(-2.0f * kPi * kLowpassCutoffHz / rate);
+    const float lowCoefficient = 1.0f - std::exp(-2.0f * kPi * kLowSplitHz / rate);
+    const float midCoefficient = 1.0f - std::exp(-2.0f * kPi * kMidSplitHz / rate);
+    const float blockSeconds = static_cast<float>(kBlockSamples) / rate;
+    const size_t lagBlocks = std::clamp<size_t>(
+        static_cast<size_t>(kFluxLagSeconds / blockSeconds + 0.5f), 2, kHistoryBlocks - 1);
+    const float threshold = thresholdFromSensitivity(options_.sensitivity);
+    const float syncDelaySeconds = static_cast<float>(options_.syncDelayMs) * 0.001f;
 
-    double energy = 0.0;
-    for (size_t index = 0; index < sampleCount_; ++index) {
-        const float left = finiteSample(left_[index]);
-        const float right = finiteSample(right_[index]);
-        const float mono = (left + right) * 0.5f;
-        lowpassFilter_ += coefficient * (mono - lowpassFilter_);
-        energy += static_cast<double>(lowpassFilter_) * lowpassFilter_;
+    std::array<float, kBandCount> attack{};
+    std::array<float, kBandCount> release{};
+    for (size_t band = 0; band < kBandCount; ++band) {
+        attack[band] = 1.0f - std::exp(-1.0f / (kBandTuning[band].attackSeconds * rate));
+        release[band] = 1.0f - std::exp(-1.0f / (kBandTuning[band].releaseSeconds * rate));
     }
 
-    const float divisor = static_cast<float>(std::max<size_t>(1, sampleCount_));
-    const float target = clampUnit(std::sqrt(static_cast<float>(energy) / divisor) * kOnsetGain);
+    // The silence gate is decided up front from the whole chunk so the first
+    // hit after a silent stretch is not swallowed by the previous frame's
+    // silence counter.
+    double energy = 0.0;
+    for (size_t index = 0; index < sampleCount_; ++index) {
+        const float mono = (finiteSample(left_[index]) + finiteSample(right_[index])) * 0.5f;
+        energy += static_cast<double>(mono) * mono;
+    }
+    overallLevel_ = clampUnit(
+        std::sqrt(static_cast<float>(energy / static_cast<double>(std::max<size_t>(1, sampleCount_)))) *
+        kOnsetGain);
+    const bool gateOpen =
+        overallLevel_ >= kSilenceLevel || silenceSeconds_ + safeSeconds < kSilenceHoldSeconds;
 
-    // The baseline is captured (as onsetBaseline_ before this frame updates
-    // it) so the peak test below compares against where it already was, not
-    // where this frame's own energy just dragged it -- mirrors
-    // StarGuitarEngine::analyzeSamples.
-    onsetBaseline_ = frameFollow(onsetBaseline_, target, 0.035f, 0.02f, frameScale);
-    onsetLevel_ = target;
-    overallLevel_ = target;
+    for (size_t index = 0; index < sampleCount_; ++index) {
+        const float mono = (finiteSample(left_[index]) + finiteSample(right_[index])) * 0.5f;
+        lowStage1_ += lowCoefficient * (mono - lowStage1_);
+        lowStage2_ += lowCoefficient * (lowStage1_ - lowStage2_);
+        midLowpass_ += midCoefficient * (mono - midLowpass_);
+        const std::array<float, kBandCount> signal{lowStage2_, midLowpass_ - lowStage1_,
+                                                   mono - midLowpass_};
+        for (size_t band = 0; band < kBandCount; ++band) {
+            const float rectified = std::fabs(signal[band]);
+            float& envelope = bands_[band].envelope;
+            envelope += (rectified > envelope ? attack[band] : release[band]) * (rectified - envelope);
+        }
+
+        if (++blockFill_ < kBlockSamples) continue;
+        blockFill_ = 0;
+
+        // How long ago (seconds) this block ended, relative to the end of the
+        // chunk -- i.e. to "now". It becomes the ripple's starting age.
+        const float secondsAgo = static_cast<float>(sampleCount_ - 1 - index) / rate;
+
+        for (size_t bandIndex = 0; bandIndex < kBandCount; ++bandIndex) {
+            Band& band = bands_[bandIndex];
+            const BandTuning& tuning = kBandTuning[bandIndex];
+            const float level = std::log(band.envelope + kEnvelopeLogBias);
+            band.refractorySeconds = std::max(0.0f, band.refractorySeconds - blockSeconds);
+            band.refineSeconds = std::max(0.0f, band.refineSeconds - blockSeconds);
+
+            if (band.refineSeconds > 0.0f) {
+                Ripple& refined = ripples_[band.refineSlot];
+                if (refined.active && refined.seed == band.refineSeed) {
+                    const float grown =
+                        clampUnit(0.55f + clampUnit(band.envelope * tuning.magnitudeGain) * 0.6f);
+                    refined.magnitude = std::max(refined.magnitude, grown);
+                }
+            }
+
+            float flux = 0.0f;
+            if (band.historyCount >= lagBlocks) {
+                const size_t reference =
+                    (band.historyNext + kHistoryBlocks - lagBlocks) % kHistoryBlocks;
+                flux = level - band.history[reference];
+            }
+            band.history[band.historyNext] = level;
+            band.historyNext = (band.historyNext + 1) % kHistoryBlocks;
+            band.historyCount = std::min(band.historyCount + 1, kHistoryBlocks);
+
+            if (flux < threshold * 0.5f) band.armed = true;
+            if (!gateOpen || !band.armed || band.refractorySeconds > 0.0f ||
+                flux <= threshold || band.envelope <= tuning.envelopeFloor) {
+                continue;
+            }
+
+            band.armed = false;
+            band.refractorySeconds = tuning.refractorySeconds;
+            const float x = kEdgeMargin + nextRandom() * (kReferenceWidth - kEdgeMargin * 2.0f);
+            const float y = kEdgeMargin + nextRandom() * (kReferenceHeight - kEdgeMargin * 2.0f);
+            const float magnitude = clampUnit(band.envelope * tuning.magnitudeGain);
+            const float startAge = std::min(secondsAgo, kMaxBackdateSeconds) - syncDelaySeconds;
+            const size_t slot = spawnRippleAt(x, y, magnitude, startAge, tuning.radiusScale);
+            if (slot < kMaxRipples) {
+                band.refineSlot = slot;
+                band.refineSeed = ripples_[slot].seed;
+                band.refineSeconds = kMagnitudeRefineSeconds;
+            }
+        }
+    }
 }
 
 float RhythmRippleEngine::nextRandom() noexcept {
@@ -286,124 +276,8 @@ float RhythmRippleEngine::nextRandom() noexcept {
     return static_cast<float>(randomState_ & 0x00ffffffu) / 16777215.0f;
 }
 
-void RhythmRippleEngine::updateHeldNotes(float safeSeconds, bool rawOnset, float rawMagnitude,
-                                         float rawOnsetX, float rawOnsetY) noexcept {
-    if (options_.longNoteSensitivity <= 0) {
-        // Zero sensitivity means the feature is off: end any in-progress
-        // holds immediately and quietly -- this is the user opting out of
-        // the look, not a musical event, so no release burst.
-        for (auto& note : heldNotes_) note.active = false;
-        sustainCandidateActive_ = false;
-        return;
-    }
-
-    const float holdFraction = sustainHoldFractionFromSensitivity(options_.longNoteSensitivity);
-
-    // Opening a candidate: every accepted raw onset is a chance the hit
-    // turns out to be a hold rather than a normal raindrop -- there is no
-    // "only one at a time" rule for held notes themselves, but only one
-    // candidate window is judged at once (a fresh onset while one is already
-    // pending just becomes its own raindrop; it doesn't reopen the window).
-    if (rawOnset && !sustainCandidateActive_) {
-        sustainCandidateActive_ = true;
-        sustainCandidatePeakLevel_ = rawMagnitude;
-        sustainCandidateElapsedSeconds_ = 0.0f;
-    }
-
-    if (sustainCandidateActive_) {
-        const float candidateFloor = sustainCandidatePeakLevel_ * holdFraction;
-        if (onsetLevel_ < candidateFloor) {
-            // Decayed like an ordinary hit -- it already got its raindrop,
-            // nothing more to do.
-            sustainCandidateActive_ = false;
-        } else {
-            sustainCandidateElapsedSeconds_ += safeSeconds;
-            if (sustainCandidateElapsedSeconds_ >= kSustainConfirmSeconds) {
-                sustainCandidateActive_ = false;
-                // Confirmed: claim any free slot (if every slot is already
-                // held, this confirmation is simply dropped).
-                for (size_t attempt = 0; attempt < kMaxHeldNotes; ++attempt) {
-                    const size_t index = (nextHeldSlot_ + attempt) % kMaxHeldNotes;
-                    HeldNote& note = heldNotes_[index];
-                    if (note.active) continue;
-                    nextHeldSlot_ = (index + 1) % kMaxHeldNotes;
-                    ++spawnSerial_;
-                    note.active = true;
-                    note.x = kHeldEdgeMargin + nextRandom() * (kReferenceWidth - kHeldEdgeMargin * 2.0f);
-                    note.y = kHeldEdgeMargin + nextRandom() * (kReferenceHeight - kHeldEdgeMargin * 2.0f);
-                    note.heading = nextRandom() * 2.0f * kPi;
-                    // Fixed for the note's whole life: one gentle, single-
-                    // direction curve rather than a path that keeps changing
-                    // which way it bends.
-                    note.angularVelocity = (nextRandom() - 0.5f) * 2.0f * kHeldMaxAngularVelocity;
-                    note.age = 0.0f;
-                    note.belowThresholdSeconds = 0.0f;
-                    note.releaseFloor = candidateFloor;
-                    note.seed = hashCombine(spawnSerial_, spawnSerial_ * 2654435761u);
-                    note.trail = {};
-                    note.trailCount = 0;
-                    note.trailNext = 0;
-                    note.trailSampleSeconds = 0.0f;
-                    // The start of a hold is marked by exactly one ripple,
-                    // the same "something just happened here" language a
-                    // raindrop's impact uses.
-                    spawnRippleAt(note.x, note.y, 1.0f);
-                    break;
-                }
-            }
-        }
-    }
-
-    for (auto& note : heldNotes_) {
-        if (!note.active) continue;
-        note.age += safeSeconds;
-
-        note.belowThresholdSeconds =
-            onsetLevel_ < note.releaseFloor ? note.belowThresholdSeconds + safeSeconds : 0.0f;
-        if (note.belowThresholdSeconds >= kSustainReleaseSeconds || note.age >= kHeldMaxDurationSeconds) {
-            // The end of a hold is marked by exactly one ripple too -- never
-            // more than the start and end, regardless of how it wandered
-            // along the way. If a raindrop happens to land this same frame,
-            // share its spot so the two ripples visually coincide instead of
-            // landing apart.
-            if (rawOnset) {
-                spawnRippleAt(rawOnsetX, rawOnsetY, 1.0f);
-            } else {
-                spawnRippleAt(note.x, note.y, 1.0f);
-            }
-            note.active = false;
-            continue;
-        }
-
-        // Constant-speed motion along a single fixed-curvature arc: heading
-        // advances linearly (no per-frame retargeting), so the whole path
-        // traces one smooth curve instead of a wandering line.
-        note.heading += note.angularVelocity * safeSeconds;
-        note.x += std::cos(note.heading) * kHeldSpeed * safeSeconds;
-        note.y += std::sin(note.heading) * kHeldSpeed * safeSeconds;
-        // Reflecting the heading off the reference frame's margins (rather
-        // than clamping position) keeps the motion itself smooth even at an
-        // edge.
-        if (note.x < kHeldEdgeMargin || note.x > kReferenceWidth - kHeldEdgeMargin) {
-            note.x = std::clamp(note.x, kHeldEdgeMargin, kReferenceWidth - kHeldEdgeMargin);
-            note.heading = kPi - note.heading;
-        }
-        if (note.y < kHeldEdgeMargin || note.y > kReferenceHeight - kHeldEdgeMargin) {
-            note.y = std::clamp(note.y, kHeldEdgeMargin, kReferenceHeight - kHeldEdgeMargin);
-            note.heading = -note.heading;
-        }
-
-        note.trailSampleSeconds += safeSeconds;
-        if (note.trailSampleSeconds >= kHeldTrailSampleSeconds) {
-            note.trailSampleSeconds = 0.0f;
-            note.trail[note.trailNext] = {note.x, note.y};
-            note.trailNext = (note.trailNext + 1) % HeldNote::kTrailPointCount;
-            note.trailCount = std::min(note.trailCount + 1, HeldNote::kTrailPointCount);
-        }
-    }
-}
-
-void RhythmRippleEngine::spawnRippleAt(float x, float y, float magnitude) noexcept {
+size_t RhythmRippleEngine::spawnRippleAt(float x, float y, float magnitude, float startAge,
+                                         float radiusScale) noexcept {
     for (size_t attempt = 0; attempt < kMaxRipples; ++attempt) {
         const size_t index = (nextRippleSlot_ + attempt) % kMaxRipples;
         Ripple& ripple = ripples_[index];
@@ -413,15 +287,19 @@ void RhythmRippleEngine::spawnRippleAt(float x, float y, float magnitude) noexce
         ripple.active = true;
         ripple.x = x;
         ripple.y = y;
-        ripple.age = 0.0f;
+        ripple.age = startAge;
         ripple.magnitude = clampUnit(0.55f + magnitude * 0.6f);
+        ripple.radiusScale = radiusScale;
         ripple.seed = hashCombine(spawnSerial_, spawnSerial_ * 2246822519u);
-        return;
+        ++spawnedCount_;
+        lastSpawnStartAge_ = startAge;
+        return index;
     }
     // Every slot is still occupied by a still-active ripple -- drop this
     // spawn rather than truncating one mid-lifecycle. This does not violate
-    // "exactly one ripple per accepted onset": the onset was still accepted
-    // and gated exactly once, it simply found no free slot to render into.
+    // "exactly one ripple per accepted hit": the hit was still accepted and
+    // gated exactly once, it simply found no free slot to render into.
+    return kMaxRipples;
 }
 
 void RhythmRippleEngine::drawBackground(DrawList& output, float width, float height) const {
@@ -432,11 +310,11 @@ void RhythmRippleEngine::drawBackground(DrawList& output, float width, float hei
 
 void RhythmRippleEngine::drawRipple(DrawList& output, float screenX, float screenY,
                                     float minDimension, const Ripple& ripple) const {
-    const float maxRadius = minDimension * 0.30f;
+    const float maxRadius = minDimension * 0.30f * ripple.radiusScale;
 
     if (ripple.age < kFlashLifetimeSeconds) {
         const float flashT = ripple.age / kFlashLifetimeSeconds;
-        const float flashRadius = minDimension * (0.02f + 0.05f * flashT);
+        const float flashRadius = minDimension * (0.02f + 0.05f * flashT) * ripple.radiusScale;
         const uint8_t flashAlpha =
             static_cast<uint8_t>(clampUnit((1.0f - flashT) * (1.0f - flashT)) * 235.0f * ripple.magnitude);
         output.addFillEllipse(screenX - flashRadius, screenY - flashRadius, flashRadius * 2.0f,
@@ -500,48 +378,6 @@ void RhythmRippleEngine::drawRipple(DrawList& output, float screenX, float scree
     }
 }
 
-void RhythmRippleEngine::drawHeldNote(DrawList& output, float scaleX, float scaleY,
-                                      float minDimension, const HeldNote& note, float glowLevel) {
-    // The fading arc trail: recent positions drawn as a polyline that fades
-    // from the core back to nothing, so the note's single smooth curve of
-    // travel is visible without it ever re-bursting along the way -- only
-    // its start and end spawn an actual ripple (see updateHeldNotes).
-    if (note.trailCount >= 2) {
-        scratch_.clear();
-        const size_t oldestIndex = (note.trailNext + HeldNote::kTrailPointCount - note.trailCount) %
-                                   HeldNote::kTrailPointCount;
-        for (size_t step = 0; step < note.trailCount; ++step) {
-            const size_t index = (oldestIndex + step) % HeldNote::kTrailPointCount;
-            const Point& point = note.trail[index];
-            scratch_.push_back({point.x * scaleX, point.y * scaleY});
-        }
-        const PointRange range = output.appendPoints(scratch_);
-        // A single polyline command can only carry one color/alpha, so the
-        // "fade toward the tail" read comes from thinning the line and
-        // dimming it overall rather than a true per-segment gradient --
-        // simple, and reads as a trailing curve well enough.
-        const uint8_t alpha = static_cast<uint8_t>(130.0f * clampUnit(0.4f + 0.6f * clampUnit(glowLevel)));
-        output.addPolyline(range, color(0x8fd6ff, alpha), std::max(1.0f, minDimension * 0.006f), true);
-    }
-
-    const float screenX = note.x * scaleX;
-    const float screenY = note.y * scaleY;
-
-    // A continuously visible, gently pulsing core marks where the long note
-    // currently sits.
-    const float pulse = 0.7f + 0.3f * std::sin(note.age * 6.0f + hash01(note.seed) * kPi);
-    const float coreRadius = minDimension * (0.02f + 0.012f * clampUnit(glowLevel) * pulse);
-    const uint8_t coreAlpha = static_cast<uint8_t>(190.0f + 45.0f * pulse);
-    output.addFillEllipse(screenX - coreRadius, screenY - coreRadius, coreRadius * 2.0f,
-                          coreRadius * 2.0f, color(0xfff6d8, coreAlpha));
-
-    // A soft halo around the core, faint and steady, to distinguish the held
-    // note's look from a raindrop's flash-then-ring language at a glance.
-    const float haloRadius = coreRadius * 3.2f;
-    output.addStrokeEllipse(screenX - haloRadius, screenY - haloRadius, haloRadius * 2.0f,
-                            haloRadius * 2.0f, color(0xffe9a8, 90), 2.0f);
-}
-
 void RhythmRippleEngine::buildFrame(float width, float height, DrawList& output) {
     output.reset();
     if (!std::isfinite(width) || !std::isfinite(height) || width <= 0.0f || height <= 0.0f) {
@@ -555,15 +391,10 @@ void RhythmRippleEngine::buildFrame(float width, float height, DrawList& output)
     const float minDimension = std::min(width, height);
 
     for (const auto& ripple : ripples_) {
-        if (!ripple.active) continue;
+        if (!ripple.active || ripple.age < 0.0f) continue;
         const float screenX = ripple.x * scaleX;
         const float screenY = ripple.y * scaleY;
         drawRipple(output, screenX, screenY, minDimension, ripple);
-    }
-
-    for (const auto& note : heldNotes_) {
-        if (!note.active) continue;
-        drawHeldNote(output, scaleX, scaleY, minDimension, note, overallLevel_);
     }
 }
 

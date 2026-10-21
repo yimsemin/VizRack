@@ -10,6 +10,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <format>
 #include <utility>
 
 namespace vizrack {
@@ -18,7 +19,8 @@ namespace {
 constexpr wchar_t kWindowClass[] = L"VizRack.RhythmRipple";
 constexpr UINT_PTR kRefreshTimer = 0x5252; // "RR"
 constexpr UINT kSensitivityCommand = 920;
-constexpr UINT kLongNoteSensitivityCommand = 940;
+constexpr UINT kSyncDelayCommand = 940;  // +n = n * kSyncDelayStepMs
+constexpr int kSyncDelayStepMs = 50;
 
 float elapsedSeconds(std::chrono::steady_clock::time_point& previous) {
     const auto now = std::chrono::steady_clock::now();
@@ -37,6 +39,17 @@ void appendValueMenu(HMENU parent, const wchar_t* label, UINT commandBase, int c
         const std::wstring valueLabel = std::to_wstring(value);
         AppendMenuW(values, MF_STRING | (value == currentValue ? MF_CHECKED : 0),
                     commandBase + static_cast<UINT>(value / 10), valueLabel.c_str());
+    }
+    AppendMenuW(parent, MF_POPUP, reinterpret_cast<UINT_PTR>(values), label);
+}
+
+void appendSyncDelayMenu(HMENU parent, const wchar_t* label, UINT commandBase, int currentMs) {
+    HMENU values = CreatePopupMenu();
+    for (int ms = 0; ms <= builtin::RhythmRippleEngine::kMaxSyncDelayMs; ms += kSyncDelayStepMs) {
+        const std::wstring valueLabel = std::vformat(trw(Str::RhythmRippleSyncDelayValue),
+                                                     std::make_wformat_args(ms));
+        AppendMenuW(values, MF_STRING | (ms == currentMs ? MF_CHECKED : 0),
+                    commandBase + static_cast<UINT>(ms / kSyncDelayStepMs), valueLabel.c_str());
     }
     AppendMenuW(parent, MF_POPUP, reinterpret_cast<UINT_PTR>(values), label);
 }
@@ -181,10 +194,8 @@ void RhythmRippleView::showOptionsMenu(POINT point) {
     HMENU menu = CreatePopupMenu();
     appendValueMenu(menu, trw(Str::RhythmRippleMenuSensitivity).c_str(), kSensitivityCommand,
                     options.sensitivity);
-    // 0 turns long notes off entirely -- there is no separate flag, see
-    // RhythmRippleOptions.
-    appendValueMenu(menu, trw(Str::RhythmRippleMenuLongNoteSensitivity).c_str(),
-                    kLongNoteSensitivityCommand, options.longNoteSensitivity);
+    appendSyncDelayMenu(menu, trw(Str::RhythmRippleMenuSyncDelay).c_str(), kSyncDelayCommand,
+                        options.syncDelayMs);
 
     const UINT command = TrackPopupMenu(menu, TPM_RETURNCMD | TPM_RIGHTBUTTON, point.x, point.y,
                                         0, hwnd_, nullptr);
@@ -193,8 +204,9 @@ void RhythmRippleView::showOptionsMenu(POINT point) {
     if (command >= kSensitivityCommand && command <= kSensitivityCommand + 10) {
         updated.sensitivity = static_cast<int>(command - kSensitivityCommand) * 10;
         changed = true;
-    } else if (command >= kLongNoteSensitivityCommand && command <= kLongNoteSensitivityCommand + 10) {
-        updated.longNoteSensitivity = static_cast<int>(command - kLongNoteSensitivityCommand) * 10;
+    } else if (command >= kSyncDelayCommand &&
+               command <= kSyncDelayCommand + builtin::RhythmRippleEngine::kMaxSyncDelayMs / kSyncDelayStepMs) {
+        updated.syncDelayMs = static_cast<int>(command - kSyncDelayCommand) * kSyncDelayStepMs;
         changed = true;
     }
     DestroyMenu(menu);

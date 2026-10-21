@@ -781,19 +781,19 @@ void testRhythmRippleCore() {
     RhythmRippleEngine engine;
     engine.setOptions(RhythmRippleOptions{});
 
-    // Both sensitivities must clamp to 0-100 independently rather than being
-    // stored out of range.
+    // The sensitivity clamps to 0-100 and the sync delay to 0-300ms rather
+    // than being stored out of range.
     RhythmRippleOptions outOfRange{};
     outOfRange.sensitivity = -30;
-    outOfRange.longNoteSensitivity = -30;
+    outOfRange.syncDelayMs = -5;
     engine.setOptions(outOfRange);
     CHECK(engine.options().sensitivity == 0);
-    CHECK(engine.options().longNoteSensitivity == 0);
+    CHECK(engine.options().syncDelayMs == 0);
     outOfRange.sensitivity = 250;
-    outOfRange.longNoteSensitivity = 250;
+    outOfRange.syncDelayMs = 900;
     engine.setOptions(outOfRange);
     CHECK(engine.options().sensitivity == 100);
-    CHECK(engine.options().longNoteSensitivity == 100);
+    CHECK(engine.options().syncDelayMs == RhythmRippleEngine::kMaxSyncDelayMs);
     engine.setOptions(RhythmRippleOptions{});
 
     engine.setSampleRate(96000);
@@ -807,7 +807,7 @@ void testRhythmRippleCore() {
     DrawList drawList;
     // Feed a repeating "beat" pattern: a loud burst of samples followed by
     // several quiet frames, simulating a steady kick roughly every ~8 frames
-    // at 60fps (~0.13s), exercising the raw onset detector and cooldown.
+    // at 60fps (~0.13s), exercising the band onset detector and refractory time.
     for (int frame = 0; frame < 400; ++frame) {
         const bool beat = (frame % 8) == 0;
         if (beat) {
@@ -833,33 +833,6 @@ void testRhythmRippleCore() {
         engine.buildFrame(1280.0f, 720.0f, drawList);
         checkDrawList(drawList);
     }
-
-    // Long notes are opt-in via longNoteSensitivity > 0: a sustained loud
-    // passage should grow one or more drifting held notes (in addition to
-    // any raindrops) once enabled, and dropping sensitivity back to 0
-    // mid-hold must end them all cleanly rather than leaving stale state or
-    // crashing.
-    RhythmRippleOptions longNotes{};
-    longNotes.longNoteSensitivity = 80;
-    engine.setOptions(longNotes);
-    for (int frame = 0; frame < 90; ++frame) {
-        for (size_t index = 0; index < left.size(); ++index) {
-            const float phase = static_cast<float>(index) * 0.22f;
-            left[index] = std::sin(phase) * 0.6f;
-            right[index] = std::sin(phase * 1.05f) * 0.6f;
-        }
-        engine.update(left.size(), 1.0f / 60.0f);
-        engine.buildFrame(1600.0f, 900.0f, drawList);
-        checkDrawList(drawList);
-    }
-    longNotes.longNoteSensitivity = 0;
-    engine.setOptions(longNotes);
-    for (int frame = 0; frame < 30; ++frame) {
-        engine.update(0, 1.0f / 60.0f);
-        engine.buildFrame(1600.0f, 900.0f, drawList);
-        checkDrawList(drawList);
-    }
-    engine.setOptions(RhythmRippleOptions{});
 
     // Reset returns the engine to its construction-time state.
     engine.reset();
@@ -895,6 +868,187 @@ void testRhythmRippleCore() {
     engine.update(0, std::numeric_limits<float>::quiet_NaN());
     engine.buildFrame(std::numeric_limits<float>::infinity(), 480.0f, stress);
     CHECK(stress.commands().empty());
+}
+
+// Synthetic drum hits at known sample positions, fed through the engine in
+// 60fps chunks. Measures how far the effective ripple start (frame end minus
+// the ripple's start age) lags the true hit, and how many ripples are spawned
+// that belong to no hit.
+struct DetectorTiming {
+    int hits{};
+    int detected{};
+    int extra{};
+    double meanLatencyMs{};
+    double worstLatencyMs{};
+};
+
+enum class Drum { kick, snare, hat };
+
+DetectorTiming measureDetector(Drum drum, bool withBed, bool swellOnly) {
+    using vizrack::RhythmRippleOptions;
+    using vizrack::builtin::RhythmRippleEngine;
+    constexpr double kRate = 48000.0;
+    constexpr size_t kChunk = 800; // one 60fps frame
+    constexpr size_t kTotal = 48000 * 6;
+    constexpr double kPi = 3.14159265358979323846;
+
+    std::vector<float> signal(kTotal, 0.0f);
+    std::vector<size_t> onsets;
+    uint32_t noise = 12345;
+    auto nextNoise = [&noise]() {
+        noise = noise * 1664525u + 1013904223u;
+        return static_cast<float>(noise >> 8) / 8388608.0f - 1.0f;
+    };
+    if (withBed) {
+        for (size_t i = 0; i < kTotal; ++i) {
+            const double t = static_cast<double>(i) / kRate;
+            signal[i] += static_cast<float>(0.07 * std::sin(2 * kPi * 220 * t) +
+                                            0.05 * std::sin(2 * kPi * 330 * t) +
+                                            0.04 * std::sin(2 * kPi * 523 * t));
+        }
+    }
+    if (swellOnly) {
+        for (size_t i = 0; i < kTotal; ++i) {
+            const double t = static_cast<double>(i) / kRate;
+            const double ramp = std::min(1.0, t / 2.0);
+            signal[i] += static_cast<float>(0.4 * ramp * std::sin(2 * kPi * 55 * t));
+        }
+    } else {
+        // 8 hits, 0.55s apart, each at a sample offset that is not a multiple
+        // of the 800-sample chunk so frame quantization shows up.
+        for (int hit = 0; hit < 8; ++hit) {
+            const size_t start = 24000 + static_cast<size_t>(hit) * 26400 + static_cast<size_t>(hit) * 137;
+            onsets.push_back(start);
+            float previousNoise = 0.0f;
+            for (size_t n = 0; n < 12000 && start + n < kTotal; ++n) {
+                const double t = static_cast<double>(n) / kRate;
+                float value = 0.0f;
+                if (drum == Drum::kick) {
+                    const double freq = 45.0 + 75.0 * std::exp(-t / 0.025);
+                    value = static_cast<float>(0.8 * std::exp(-t / 0.080) * std::sin(2 * kPi * freq * t));
+                } else if (drum == Drum::snare) {
+                    value = static_cast<float>(0.45 * nextNoise() * std::exp(-t / 0.040) +
+                                               0.30 * std::exp(-t / 0.060) * std::sin(2 * kPi * 190 * t));
+                } else {
+                    const float current = nextNoise();
+                    value = static_cast<float>(0.35 * (current - previousNoise) * std::exp(-t / 0.015));
+                    previousNoise = current;
+                }
+                signal[start + n] += value;
+            }
+        }
+    }
+
+    RhythmRippleEngine engine;
+    RhythmRippleOptions options{};
+    engine.setOptions(options);
+    engine.setSampleRate(48000);
+    auto left = engine.inputLeft();
+    auto right = engine.inputRight();
+
+    std::vector<double> spawnTimes; // effective ripple start, in seconds
+    uint32_t seenSpawns = 0;
+    for (size_t offset = 0; offset + kChunk <= kTotal; offset += kChunk) {
+        for (size_t i = 0; i < kChunk; ++i) {
+            left[i] = signal[offset + i];
+            right[i] = signal[offset + i];
+        }
+        engine.update(kChunk, 1.0f / 60.0f);
+        const double frameEnd = static_cast<double>(offset + kChunk) / kRate;
+        while (seenSpawns < engine.spawnedRippleCount()) {
+            ++seenSpawns;
+            // Several spawns in one frame all share the same lastSpawnStartAge
+            // only for the newest; the detector spawns at most one
+            // per band per block, so attribute the newest age to the batch.
+            spawnTimes.push_back(frameEnd - static_cast<double>(engine.lastSpawnStartAge()));
+        }
+    }
+
+    DetectorTiming result;
+    result.hits = static_cast<int>(onsets.size());
+    std::vector<bool> used(spawnTimes.size(), false);
+    double latencySum = 0.0;
+    for (const size_t onset : onsets) {
+        const double hitTime = static_cast<double>(onset) / kRate;
+        for (size_t index = 0; index < spawnTimes.size(); ++index) {
+            if (used[index]) continue;
+            const double latency = spawnTimes[index] - hitTime;
+            if (latency >= -0.005 && latency <= 0.15) {
+                used[index] = true;
+                ++result.detected;
+                latencySum += latency;
+                result.worstLatencyMs = std::max(result.worstLatencyMs, latency * 1000.0);
+                break;
+            }
+        }
+    }
+    // Spawns within the 150ms after a hit that are not its first one belong to
+    // that hit's ringing; count only spawns that are far from every hit.
+    for (size_t index = 0; index < spawnTimes.size(); ++index) {
+        bool nearHit = false;
+        for (const size_t onset : onsets) {
+            const double delta = spawnTimes[index] - static_cast<double>(onset) / kRate;
+            if (delta >= -0.005 && delta <= 0.25) nearHit = true;
+        }
+        if (!nearHit) ++result.extra;
+    }
+    result.meanLatencyMs = result.detected > 0 ? latencySum * 1000.0 / result.detected : 0.0;
+    return result;
+}
+
+void testRhythmRippleDetectorTiming() {
+    struct Scenario {
+        Drum drum;
+        bool bed;
+        bool swell;
+    };
+    const Scenario scenarios[] = {
+        {Drum::kick, false, false}, // kick, quiet
+        {Drum::kick, true, false},  // kick over a loud bed
+        {Drum::snare, false, false},
+        {Drum::snare, true, false},
+        {Drum::hat, false, false},
+        {Drum::kick, false, true},  // slow bass swell, no hits at all
+    };
+    for (const auto& scenario : scenarios) {
+        const auto result = measureDetector(scenario.drum, scenario.bed, scenario.swell);
+        if (scenario.swell) {
+            CHECK(result.extra <= 1);
+        } else {
+            CHECK(result.detected == result.hits);
+            CHECK(result.meanLatencyMs <= 8.0);
+            CHECK(result.worstLatencyMs <= 12.0);
+            CHECK(result.extra <= 2);
+        }
+    }
+}
+
+// A sync delay holds the ripple back: right after a hit it must not be drawn
+// yet (start age is negative), and it shows up once the delay has elapsed.
+void testRhythmRippleSyncDelay() {
+    using vizrack::RhythmRippleOptions;
+    using vizrack::builtin::DrawList;
+    using vizrack::builtin::RhythmRippleEngine;
+
+    RhythmRippleEngine engine;
+    RhythmRippleOptions options{};
+    options.syncDelayMs = 200;
+    engine.setOptions(options);
+    engine.setSampleRate(48000);
+    auto left = engine.inputLeft();
+    auto right = engine.inputRight();
+    for (size_t i = 0; i < 800; ++i) {
+        left[i] = right[i] = i > 300 ? 0.8f * std::sin(static_cast<float>(i) * 0.05f) : 0.0f;
+    }
+    DrawList drawList;
+    engine.update(800, 1.0f / 60.0f);
+    CHECK(engine.spawnedRippleCount() > 0);
+    CHECK(engine.lastSpawnStartAge() < -0.15f);
+    engine.buildFrame(1280.0f, 720.0f, drawList);
+    const size_t hiddenCommands = drawList.commands().size();
+    for (int frame = 0; frame < 16; ++frame) engine.update(0, 1.0f / 60.0f);
+    engine.buildFrame(1280.0f, 720.0f, drawList);
+    CHECK(drawList.commands().size() > hiddenCommands);
 }
 
 void testSpectrum3dCore() {
@@ -1168,6 +1322,8 @@ int main() {
     testCampfireCore();
     testStarGuitarCore();
     testRhythmRippleCore();
+    testRhythmRippleDetectorTiming();
+    testRhythmRippleSyncDelay();
     testSpectrum3dCore();
     testOscilloscopeCore();
     testReconnect();

@@ -174,10 +174,10 @@ bool App::initialize(std::string& error) {
             saveSettingsNow();
         });
     rhythmRipple_.configure(
-        {settings_.rhythmRippleSensitivity, settings_.rhythmRippleLongNoteSensitivity},
+        {settings_.rhythmRippleSensitivity, settings_.rhythmRippleSyncDelayMs},
         [this](const RhythmRippleOptions& options) {
             settings_.rhythmRippleSensitivity = options.sensitivity;
-            settings_.rhythmRippleLongNoteSensitivity = options.longNoteSensitivity;
+            settings_.rhythmRippleSyncDelayMs = options.syncDelayMs;
             saveSettingsNow();
         });
     spectrum3d_.configure(

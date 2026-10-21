@@ -160,7 +160,8 @@ VIZRACK_STR(StarGuitarMenuTrebleSensitivity,  "Treble sensitivity ({}-{}kHz)", "
 VIZRACK_STR(StarGuitarMenuAirSensitivity,     "Air sensitivity (>{}kHz)", "에어 민감도 (>{}kHz)")
 VIZRACK_STR(RhythmRippleTagline, "ONE BEAT, ONE RIPPLE", "박자마다 번지는 물결")
 VIZRACK_STR(RhythmRippleMenuSensitivity,      "Sensitivity", "민감도")
-VIZRACK_STR(RhythmRippleMenuLongNoteSensitivity, "Long note sensitivity", "롱노트 민감도")
+VIZRACK_STR(RhythmRippleMenuSyncDelay,        "Sync delay", "싱크 지연")
+VIZRACK_STR(RhythmRippleSyncDelayValue,       "{} ms", "{}ms")
 
 // ── Art visualizer view ────────────────────────────────────────────────────
 VIZRACK_STR(ArtTagline,     "MOVES WITH THE MUSIC", "음악에 맞춰 움직여요")
