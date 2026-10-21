@@ -21,15 +21,15 @@ ZIP attached. How these notes are written and cut: `docs/RELEASE_NOTES_STYLE.md`
   plus presets for rotation, tilt and perspective, kept apart from the palette
   and the trail length / wave height by separators. The view angle is saved with your other settings.
 - **Rhythm Ripple.** A new built-in visualizer: rain falling on a still, dark
-  puddle in time with the music. A broadband onset detector drops one
-  expanding-ring raindrop-ripple at a fully random spot the instant a beat is
-  accepted — several can land in close succession during a busy passage, and
-  a sensitivity option controls how easily a beat is detected. A second,
-  independent long-note sensitivity (0 turns it off) grows a drifting "long
-  note" ripple whenever a hit's level keeps holding instead of decaying like
-  an ordinary beat — it travels a smooth constant-speed arc, marks only its
-  start and end with a ripple (never re-bursting while held), lasts up to 5
-  seconds, and several can be held at once.
+  puddle in time with the music. The sound is split into low, mid and high
+  bands, and a hit in any band drops one expanding-ring raindrop-ripple at a
+  random spot within a few milliseconds — started where in the audio the hit
+  actually began, so it lands on the beat rather than a frame later. A kick
+  makes a large ripple, a hi-hat a small one, and several can land in close
+  succession during a busy passage. Left-click to drop a ripple of your own.
+  The right-click menu has a sensitivity option and a "Sync delay" (0–300 ms)
+  that holds ripples back when your speakers or Bluetooth device play the
+  sound later than VizRack sees it.
 - **View ▸ Show overlay text** (화면 안내 문구 표시) toggles every built-in
   visualizer's title, tagline and right-click hint off at once — useful for
   recording or streaming without the on-screen text. Persisted in settings.

@@ -126,8 +126,9 @@ is reachable through its right-click menu, so `Str::HintRightClickOptions` is th
 hint every engine shows. A mouse gesture may change the same value directly — Classic
 Cascade turns with a left drag (`WM_LBUTTONDOWN` captures the mouse, `WM_MOUSEMOVE` feeds
 yaw/pitch into the engine, `WM_LBUTTONUP` persists) and the wheel changes its perspective —
-but the menu always offers the same value. Elsewhere a left click only moves keyboard focus
-to the view (`WM_LBUTTONDOWN` → `SetFocus`), and Art Visualizer's keyboard shortcuts
+but the menu always offers the same value. Rhythm Ripple's left click drops one extra ripple
+at the cursor (`dropRippleAt`) — an action, not a setting. Elsewhere a left click only moves
+keyboard focus to the view (`WM_LBUTTONDOWN` → `SetFocus`), and Art Visualizer's keyboard shortcuts
 (`Space`, arrows, `1`–`6`, `C`) are unchanged.
 
 ## Audio capture and recovery

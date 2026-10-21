@@ -31,8 +31,9 @@ Only the following, which must behave identically in both products, is shared:
   sub-band-to-object-type-to-depth-layer mapping, ambient-fallback timing and
   the parallax scenery/growth-animation geometry (see
   `docs/STAR_GUITAR_FREQUENCY_BANDS.md`).
-- Rhythm Ripple: broadband onset detection, the independent long-note
-  detector and both ripple types' geometry/animation.
+- Rhythm Ripple: the three-band (low/mid/high) envelope hit detection, the
+  back-dating of a ripple to the hit's position inside the audio chunk, the
+  sync-delay rule, the click-dropped ripple and the ripple geometry/animation.
 - Option defaults and correction of invalid values.
 - The platform-neutral minimal drawing commands.
 
@@ -50,7 +51,7 @@ to the web adapter.
 | `src/builtin/oscilloscope_engine.*` | Waveform, circular history, option correction | Win32/GDI+, WASAPI, VST3, I/O |
 | `src/builtin/spectrum3d_engine.*` | FFT, logarithmic bands, time-axis history, two shapes and palettes | Win32/GDI+, WASAPI, VST3, I/O |
 | `src/builtin/star_guitar_engine.*` | Eight-sub-band peak detection, layer/object mapping, parallax scenery geometry | Win32/GDI+, WASAPI, VST3, I/O |
-| `src/builtin/rhythm_ripple_engine.*` | Onset/long-note detection, ripple geometry and animation | Win32/GDI+, WASAPI, VST3, I/O |
+| `src/builtin/rhythm_ripple_engine.*` | Band onset detection, ripple geometry and animation | Win32/GDI+, WASAPI, VST3, I/O |
 | `src/ui/gdi_draw_list_renderer.*` | Translate shared commands into GDI+ calls | Scene/DSP formulas |
 | `src/ui/gdi_back_buffer.*` | Win32 back buffer rebuilt only on resize | Scene/DSP formulas |
 | `src/ui/*_view.*` | Ring input, timers, menus, keyboard, text overlays | Scene duplication |

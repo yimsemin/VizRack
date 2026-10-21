@@ -16,8 +16,9 @@ namespace vizrack {
 class StereoFrameRing;
 
 // View for the "Rhythm Ripple" built-in visualizer: a thin Win32 adapter
-// mirroring StarGuitarView's/CampfireView's shape. The only tunable option
-// is the single onset-detector sensitivity; see RhythmRippleOptions.
+// mirroring StarGuitarView's/CampfireView's shape. The options are the
+// detector sensitivity and the sync delay (see RhythmRippleOptions); a left
+// click drops one extra ripple at the cursor.
 class RhythmRippleView {
 public:
     using OptionsChangedCallback = std::function<void(const RhythmRippleOptions&)>;

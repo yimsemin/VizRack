@@ -204,8 +204,8 @@ SettingsLoadResult loadSettings(const std::filesystem::path& path) {
     if (auto value = readInt(json, "rhythmRippleSensitivity")) {
         result.value.rhythmRippleSensitivity = std::clamp(*value, 0, 100);
     }
-    if (auto value = readInt(json, "rhythmRippleLongNoteSensitivity")) {
-        result.value.rhythmRippleLongNoteSensitivity = std::clamp(*value, 0, 100);
+    if (auto value = readInt(json, "rhythmRippleSyncDelayMs")) {
+        result.value.rhythmRippleSyncDelayMs = std::clamp(*value, 0, 300);
     }
     if (auto value = readInt(json, "spectrum3dPalette")) {
         result.value.spectrum3dPalette = std::clamp(*value, 0, 5);
@@ -297,8 +297,8 @@ bool saveSettings(const std::filesystem::path& path, const Settings& settings, s
            << std::clamp(settings.starGuitarAirSensitivity, 0, 100) << ",\n"
            << "  \"rhythmRippleSensitivity\": "
            << std::clamp(settings.rhythmRippleSensitivity, 0, 100) << ",\n"
-           << "  \"rhythmRippleLongNoteSensitivity\": "
-           << std::clamp(settings.rhythmRippleLongNoteSensitivity, 0, 100) << ",\n"
+           << "  \"rhythmRippleSyncDelayMs\": "
+           << std::clamp(settings.rhythmRippleSyncDelayMs, 0, 300) << ",\n"
            << "  \"spectrum3dPalette\": " << std::clamp(settings.spectrum3dPalette, 0, 5) << ",\n"
            << "  \"spectrum3dYaw\": " << std::fixed << std::setprecision(1)
            << std::clamp(settings.spectrum3dYaw, -360.0f, 360.0f) << ",\n"
