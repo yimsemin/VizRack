@@ -92,6 +92,9 @@ ZIP attached. How these notes are written and cut: `docs/RELEASE_NOTES_STYLE.md`
 
 ### Fixed
 
+- **View menu check marks are always current.** Opening View from the menu bar
+  no longer shows a stale check for Hide window border, Always on top, Show
+  overlay text or Opacity.
 - Campfire's glowing coal bed sat at the back-rim reference line instead of
   the fuel bed the flame itself is anchored to, so it visibly floated just
   above where the fire actually starts. It now anchors to the same point as
