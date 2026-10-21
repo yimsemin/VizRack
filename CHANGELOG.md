@@ -11,6 +11,10 @@ ZIP attached. How these notes are written and cut: `docs/RELEASE_NOTES_STYLE.md`
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-21
+
+_Rhythm Ripple, a rain-on-water visualizer that lands on the beat, and a freely rotating 3D cascade._
+
 ### Added
 
 - **Classic Cascade is now a freely rotating 3D view.** Drag with the left
@@ -63,7 +67,7 @@ ZIP attached. How these notes are written and cut: `docs/RELEASE_NOTES_STYLE.md`
   with its sibling `builtin-joydivision` ("Joy Division").
 - Retranslated an awkward Korean loanword: oscilloscope's history mode is now
   "시간 기록" (was "시간 히스토리").
-- **Left click on the canvas no longer changes anything.** Art Visualizer
+- **Left click on the canvas no longer changes a setting.** Art Visualizer
   (scene) and Classic Cascade/Joy Division (palette) used to cycle on click;
   every built-in visualizer's own state is now set through the right-click
   menu, matching the four built-ins that never had a click action. Art
@@ -218,7 +222,8 @@ _First public release._
   (Windows x64 VST3) as the picture instead of a built-in. Their audio output is
   discarded; VizRack only ever monitors.
 
-[Unreleased]: https://github.com/yimsemin/VizRack/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/yimsemin/VizRack/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/yimsemin/VizRack/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/yimsemin/VizRack/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/yimsemin/VizRack/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/yimsemin/VizRack/compare/v0.1.0...v0.2.0
