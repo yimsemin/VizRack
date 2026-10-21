@@ -22,6 +22,7 @@
 #include <array>
 #include <cmath>
 #include <filesystem>
+#include <format>
 #include <fstream>
 #include <iostream>
 #include <iterator>
@@ -1311,6 +1312,16 @@ void testI18n() {
     static_cast<void>(vizrack::resolveUiLanguage("auto"));  // must not crash
     CHECK(vizrack::uiLanguageToken(UiLanguage::english) == "en");
     CHECK(vizrack::uiLanguageToken(UiLanguage::korean) == "ko");
+
+    // The sync-delay value label is a format string: it must take exactly one
+    // number in both languages.
+    const int delayMs = 150;
+    vizrack::setUiLanguage(UiLanguage::english);
+    CHECK(std::vformat(vizrack::trw(Str::RhythmRippleSyncDelayValue), std::make_wformat_args(delayMs)) ==
+          L"150 ms");
+    vizrack::setUiLanguage(UiLanguage::korean);
+    CHECK(std::vformat(vizrack::trw(Str::RhythmRippleSyncDelayValue), std::make_wformat_args(delayMs)) ==
+          L"150ms");
 
     vizrack::setUiLanguage(UiLanguage::english);
     CHECK(vizrack::currentUiLanguage() == UiLanguage::english);
