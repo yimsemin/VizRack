@@ -60,6 +60,7 @@ Choose `More info > Run anyway` only when you trust where the file came from.
 | Arrow keys or number `1`–`6` | Select a scene |
 | `C` | Next palette |
 | Right-click | Current screen and window settings |
+| Drag / mouse wheel (Classic Cascade) | Rotate the surface / change perspective |
 | `F10` or tap `Alt` | Open the menu while the border is hidden |
 
 The `View` menu changes always-on-top, hidden border, overlay text visibility,

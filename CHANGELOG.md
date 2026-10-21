@@ -13,6 +13,13 @@ ZIP attached. How these notes are written and cut: `docs/RELEASE_NOTES_STYLE.md`
 
 ### Added
 
+- **Classic Cascade is now a freely rotating 3D view.** Drag with the left
+  mouse button to turn the surface in any direction — all the way around, so the
+  trail also fades out toward you when seen from behind or from below — and use
+  the mouse wheel to change the perspective. The right-click
+  menu offers ready-made angles (Default view, Front, Side, Back, Looking up)
+  plus presets for rotation, tilt and perspective, kept apart from the palette
+  and the trail length / wave height by separators. The view angle is saved with your other settings.
 - **Rhythm Ripple.** A new built-in visualizer: rain falling on a still, dark
   puddle in time with the music. A broadband onset detector drops one
   expanding-ring raindrop-ripple at a fully random spot the instant a beat is
@@ -58,8 +65,8 @@ ZIP attached. How these notes are written and cut: `docs/RELEASE_NOTES_STYLE.md`
   "시간 기록" (was "시간 히스토리").
 - **Left click on the canvas no longer changes anything.** Art Visualizer
   (scene) and Classic Cascade/Joy Division (palette) used to cycle on click;
-  every built-in visualizer's own state now lives behind the right-click menu
-  only, matching the four built-ins that never had a click action. Art
+  every built-in visualizer's own state is now set through the right-click
+  menu, matching the four built-ins that never had a click action. Art
   Visualizer's keyboard shortcuts (`Space`, arrows, `1`–`6`, `C`) still work.
 - The `Plug-in` menu-bar label is a fixed name again instead of live status
   text ("Plug-in: searching" / the active plug-in's name) — the overlay text

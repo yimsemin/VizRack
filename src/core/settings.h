@@ -37,12 +37,12 @@ struct Settings {
     int rhythmRippleSensitivity{50};
     int rhythmRippleLongNoteSensitivity{0};
     int spectrum3dPalette{0};
-    int spectrum3dRotation{50};
-    int spectrum3dTilt{50};
+    float spectrum3dYaw{30.0f};
+    float spectrum3dPitch{22.5f};
+    int spectrum3dPerspective{50};
     int spectrum3dDepth{50};
     int spectrum3dHeight{50};
     int joyDivisionPalette{0};
-    int joyDivisionRotation{50};
     int joyDivisionTilt{50};
     int joyDivisionDepth{50};
     int joyDivisionHeight{50};

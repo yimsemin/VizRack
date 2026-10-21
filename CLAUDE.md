@@ -66,8 +66,8 @@ overlay or the window title — this includes each built-in visualizer's overlay
 caption (its title, tagline and control hint), which are equally in scope: reuse
 `Str::HintRightClickOptions` ("RIGHT CLICK: OPTIONS") for that hint instead of
 inventing a new string per engine — every built-in visualizer's own state
-(scene, palette, style, sensitivity, …) is right-click-menu-only, never a left
-click on the canvas, so this is the one hint every engine needs. Diagnostics
+(scene, palette, style, sensitivity, …) is set through its right-click menu, so
+this is the one hint every engine needs. Diagnostics
 (logger and `error`/status strings from `src/core`, `src/platform`, `src/vst`)
 stay English. The one exception is scene/palette names sourced from `src/builtin/`
 engine code (e.g. art visualizer scene names, spectrum3d style/palette names) —
@@ -97,9 +97,10 @@ share (`docs/ARCHITECTURE.md` ▸ UI conventions for the details):
   `setShowOverlay(bool)` setter, and skip the `drawOverlay` call in `paint()`
   when it is false, so `Settings::showOverlayText` (View ▸ Show overlay text)
   can hide it. Wire the setter into `App::applyOverlayVisibility`.
-- **Left click is never a control**: all per-visualizer state (scene, palette,
-  sensitivity, …) lives behind the right-click menu only. `WM_LBUTTONDOWN` may
-  set focus; it must not change what is drawn.
+- **Right-click sets visualizer state**: every per-visualizer setting (scene,
+  palette, sensitivity, view angle, …) is reachable through its right-click
+  menu. A direct-manipulation gesture (e.g. dragging to rotate) is an extra way
+  to change the same value, never the only way.
 - **Register the engine**: add one row to the "Code ownership" table in
   `docs/BUILTIN_VISUALIZER_CORE.md` — that table is the single place the
   engine list is written down (see "The portability boundary" above), so this

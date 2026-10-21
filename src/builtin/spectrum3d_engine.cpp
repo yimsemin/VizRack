@@ -103,10 +103,16 @@ Spectrum3dEngine::Spectrum3dEngine() {
 void Spectrum3dEngine::setOptions(Spectrum3dOptions options) noexcept {
     options.style = std::clamp(options.style, 0, kStyleCount - 1);
     options.palette = std::clamp(options.palette, 0, kPaletteCount - 1);
-    options.rotation = std::clamp(options.rotation, 0, 100);
     options.tilt = std::clamp(options.tilt, 0, 100);
     options.depth = std::clamp(options.depth, 0, 100);
     options.heightScale = std::clamp(options.heightScale, 0, 100);
+    options.perspective = std::clamp(options.perspective, 0, 100);
+    const Spectrum3dOptions defaults;
+    options.yaw = std::isfinite(options.yaw) ? options.yaw : defaults.yaw;
+    options.pitch = std::isfinite(options.pitch) ? options.pitch : defaults.pitch;
+    options.yaw = std::remainder(options.yaw, 360.0f);
+    if (options.yaw <= -180.0f) options.yaw += 360.0f;
+    options.pitch = std::clamp(options.pitch, -90.0f, 90.0f);
     options_ = options;
 }
 
@@ -262,32 +268,40 @@ void Spectrum3dEngine::drawClassicCascade(DrawList& output, float width, float h
     const size_t span = static_cast<size_t>(10 + options_.depth * 40 / 100);
     const size_t count = std::clamp(span, size_t{2}, historyCount_);
     const float ampScale = 0.40f + 0.011f * static_cast<float>(options_.heightScale);
-    const float yaw = 0.10f + 0.0085f * static_cast<float>(options_.rotation);
-    const float pitch = 0.20f + 0.00385f * static_cast<float>(options_.tilt);
+    const float yaw = options_.yaw * (kPi / 180.0f);
+    const float pitch = options_.pitch * (kPi / 180.0f);
 
-    const float axisX = width * 0.62f;
-    const float axisZ = width * 0.42f;
+    const float axisX = width * 0.54f;
+    const float axisZ = width * 0.37f;
     const float ampHeight = height * 0.24f * ampScale;
-    const float focal = (axisX + axisZ) * 1.45f;
+    const float perspectiveFactor =
+        options_.perspective <= 50
+            ? std::pow(4.0f, static_cast<float>(50 - options_.perspective) / 50.0f)
+            : 1.0f - 0.3f * static_cast<float>(options_.perspective - 50) / 50.0f;
+    const float focal = (axisX + axisZ) * 1.45f * perspectiveFactor;
     const float sinYaw = std::sin(yaw);
     const float cosYaw = std::cos(yaw);
     const float sinPitch = std::sin(pitch);
     const float cosPitch = std::cos(pitch);
     const float originX = width * 0.50f;
-    const float originY = height * 0.72f;
+    const float originY = height * 0.58f;
 
-    // Quarter view: newest slice near the camera at the bottom, history receding up and back.
+    // Orbit camera around the middle of the surface. At the default angles this is the
+    // classic quarter view: newest slice near the camera, history receding up and back.
     const auto project = [&](float t, float value, float zt) noexcept -> Point {
         const float wx = (t - 0.5f) * axisX;
-        const float wz = zt * axisZ - axisZ * 0.35f;
-        const float wy = std::clamp(value, 0.0f, 1.0f) * ampHeight;
+        const float wz = (zt - 0.5f) * axisZ;
+        const float wy = (std::clamp(value, 0.0f, 1.0f) - 0.3f) * ampHeight;
         const float x1 = wx * cosYaw - wz * sinYaw;
         const float z1 = wx * sinYaw + wz * cosYaw;
         const float y2 = wy * cosPitch + z1 * sinPitch;
         const float z2 = z1 * cosPitch - wy * sinPitch;
-        const float persp = focal / std::max(focal * 0.2f, focal + z2);
+        const float persp = focal / std::max(focal * 0.15f, focal + z2);
         return {originX + x1 * persp, originY - y2 * persp};
     };
+    // Slices are drawn farthest first. Which end of the history is farthest depends on
+    // whether the camera sits in front of or behind the surface.
+    const bool oldestFarthest = cosYaw * cosPitch >= 0.0f;
     const auto depthT = [&](size_t depth) noexcept {
         return static_cast<float>(depth) / static_cast<float>(std::max<size_t>(1, count - 1));
     };
@@ -304,7 +318,7 @@ void Spectrum3dEngine::drawClassicCascade(DrawList& output, float width, float h
     // Filled surface strips between consecutive time slices, back-to-front, so the trail
     // reads as a shaded sheet rather than a stack of lines.
     for (size_t step = 0; step + 1 < count; ++step) {
-        const size_t front = count - 1 - step;
+        const size_t front = oldestFarthest ? count - 2 - step : step;
         const size_t back = front + 1;
         const float ztFront = depthT(front);
         const float ztBack = depthT(back);
@@ -328,7 +342,7 @@ void Spectrum3dEngine::drawClassicCascade(DrawList& output, float width, float h
 
     // Rib outlines on top so each time step keeps a crisp leading edge.
     for (size_t step = 0; step < count; ++step) {
-        const size_t depth = count - 1 - step;
+        const size_t depth = oldestFarthest ? count - 1 - step : step;
         const float zt = depthT(depth);
         const float fade = fadeAt(zt);
         const float* slice = sliceFromFront(depth);

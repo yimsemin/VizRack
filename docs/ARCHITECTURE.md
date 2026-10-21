@@ -121,14 +121,14 @@ oscilloscope view predates GDI+ overlay drawing and stays on plain GDI
 `showOverlay_` flag and skips its `drawOverlay` call when it is false, so a
 plugin's own drawing (waveform, particles, spectrum surface, …) still renders.
 
-A left click on the canvas never changes a built-in visualizer's own state
-(scene, palette, style, sensitivity, …) — every one of those is right-click-menu
-only, so `Str::HintRightClickOptions` is the single hint every engine shows.
-Art Visualizer and Classic Cascade/Joy Division used to cycle their scene/palette
-on left click; that was removed for consistency with the other built-ins, which
-never had a click action. A left click still moves keyboard focus to the view
-(`WM_LBUTTONDOWN` → `SetFocus`), and Art Visualizer's keyboard shortcuts (`Space`,
-arrows, `1`–`6`, `C`) are unchanged.
+Every setting of a built-in visualizer (scene, palette, style, sensitivity, view angle, …)
+is reachable through its right-click menu, so `Str::HintRightClickOptions` is the single
+hint every engine shows. A mouse gesture may change the same value directly — Classic
+Cascade turns with a left drag (`WM_LBUTTONDOWN` captures the mouse, `WM_MOUSEMOVE` feeds
+yaw/pitch into the engine, `WM_LBUTTONUP` persists) and the wheel changes its perspective —
+but the menu always offers the same value. Elsewhere a left click only moves keyboard focus
+to the view (`WM_LBUTTONDOWN` → `SetFocus`), and Art Visualizer's keyboard shortcuts
+(`Space`, arrows, `1`–`6`, `C`) are unchanged.
 
 ## Audio capture and recovery
 
@@ -193,10 +193,16 @@ between consecutive time slices plus rib outlines (`CLASSIC CASCADE`).
 `builtin-joydivision` stacks hidden-line ridge curves at full strength (no depth fade)
 inside a centred plot box, with the outer band edges held flat on the baseline, a
 crest-to-trough contrast curve and a deterministic per-slice pen tremble (`JOY
-DIVISION`). Style is fixed per catalog entry. Each style reads the same right-click
-knobs — `rotation`, `tilt`, `depth`, `heightScale` (normalized 0–100, `50` is the
-reference look) and the six-palette choice — through its own response curve; each is an
-additive `spectrum3d*` / `joyDivision*` field in the settings schema.
+DIVISION`). Style is fixed per catalog entry. Both styles read the
+`depth` and `heightScale` knobs (normalized 0–100, `50` is the reference look) and the
+six-palette choice through their own response curves. `joydivision` adds `tilt`;
+Classic Cascade is an orbit camera with float `yaw` (degrees, wrapped to (-180, 180]),
+`pitch` (clamped to [-90, 90]) and `perspective` (0–100, camera distance), so any side of
+the surface, including from behind, can be shown. Slices draw farthest first and the
+order flips when the camera passes behind the surface, so age fading reads as the trail
+vanishing toward the viewer. Each is an additive `spectrum3d*` / `joyDivision*` field in
+the settings schema; the pre-orbit `spectrum3dRotation` / `spectrum3dTilt` knobs are still
+read and converted to yaw / pitch.
 
 The `mvmeter2` definition uses
 TBProAudio/mvMeter2 factory metadata and accepts both the GPU and noGPU x64 modules.
