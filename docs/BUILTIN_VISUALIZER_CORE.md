@@ -21,8 +21,10 @@ Only the following, which must behave identically in both products, is shared:
   time-history buffer, frame-time-based slice advance, the quarter-view
   perspective surface (`CLASSIC CASCADE`) and the non-fading hidden-line ridge
   stack (margins, edge clamping, contrast curve and pen jitter — `JOY DIVISION`),
-  plus the rotation/tilt/depth/height 0–100 options (50 is the reference value;
-  each style has a different response curve) and six palettes.
+  plus the depth/height 0–100 options (50 is the reference value; each style
+  has a different response curve), Joy Division's tilt, the Classic Cascade
+  orbit camera (float yaw/pitch, perspective, back-to-front slice ordering
+  from any side) and six palettes.
 - Shape layout and animation state for the six art scenes.
 - Six palettes and scene names.
 - Star Guitar: the eight-sub-band relative-rise peak detection, the
