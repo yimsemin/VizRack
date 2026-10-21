@@ -239,7 +239,16 @@ LRESULT RhythmRippleView::proc(UINT message, WPARAM wParam, LPARAM lParam) {
             break;
         case WM_PAINT: paint(); return 0;
         case WM_ERASEBKGND: return 1;
-        case WM_LBUTTONDOWN: SetFocus(hwnd_); return 0;
+        case WM_LBUTTONDOWN: {
+            SetFocus(hwnd_);
+            RECT client{};
+            GetClientRect(hwnd_, &client);
+            engine_.dropRippleAt(static_cast<float>(GET_X_LPARAM(lParam)),
+                                 static_cast<float>(GET_Y_LPARAM(lParam)),
+                                 static_cast<float>(client.right), static_cast<float>(client.bottom));
+            InvalidateRect(hwnd_, nullptr, FALSE);
+            return 0;
+        }
         case WM_CONTEXTMENU:
             SetFocus(hwnd_);
             showOptionsMenu({GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)});

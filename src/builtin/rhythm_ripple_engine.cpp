@@ -46,6 +46,9 @@ constexpr float kSplashDistanceFraction = 0.045f; // of the shorter screen dimen
 constexpr float kReboundStartSeconds = 0.16f;
 constexpr float kReboundLifetimeSeconds = 0.14f;
 
+// A click's ripple: a firm, mid-sized hit.
+constexpr float kClickMagnitude = 0.8f;
+
 // Per band: a rectified envelope follower (attack/release in seconds), an
 // absolute envelope floor so near-silence never fires, a refractory time so
 // one hit fires once, a gain mapping the envelope to a 0..1 magnitude, and
@@ -168,6 +171,15 @@ void RhythmRippleEngine::reset() noexcept {
     midLowpass_ = 0.0f;
     blockFill_ = 0;
     bands_ = {};
+}
+
+void RhythmRippleEngine::dropRippleAt(float x, float y, float width, float height) noexcept {
+    if (!std::isfinite(x) || !std::isfinite(y) || !std::isfinite(width) || !std::isfinite(height) ||
+        width <= 0.0f || height <= 0.0f) {
+        return;
+    }
+    spawnRippleAt(std::clamp(x / width, 0.0f, 1.0f) * kReferenceWidth,
+                  std::clamp(y / height, 0.0f, 1.0f) * kReferenceHeight, kClickMagnitude);
 }
 
 void RhythmRippleEngine::analyzeSamples(float safeSeconds) noexcept {

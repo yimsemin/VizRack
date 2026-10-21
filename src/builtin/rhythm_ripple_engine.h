@@ -27,7 +27,7 @@ namespace builtin {
 // random point on the surface -- there is no lane, no single "current beat"
 // position, and no limit to one at a time: a busy passage can and should
 // drop several raindrops in close succession, just like real rain speeding
-// up with the music.
+// up with the music. A click drops one more by hand (dropRippleAt).
 //
 // Hits are found per band, not on the overall level. The signal is split
 // into low (kick), mid (snare/body) and high (hats) bands; each band follows
@@ -56,6 +56,10 @@ public:
     std::span<float> inputRight() noexcept { return right_; }
     void update(size_t sampleCount, float frameSeconds = 1.0f / 60.0f) noexcept;
     void reset() noexcept;
+
+    // Drops one ripple at a point of the render area (pixels within a
+    // width x height surface), immediately and regardless of the sync delay.
+    void dropRippleAt(float x, float y, float width, float height) noexcept;
 
     void buildFrame(float width, float height, DrawList& output);
 

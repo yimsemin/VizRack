@@ -26,7 +26,7 @@ ZIP attached. How these notes are written and cut: `docs/RELEASE_NOTES_STYLE.md`
   random spot within a few milliseconds — started where in the audio the hit
   actually began, so it lands on the beat rather than a frame later. A kick
   makes a large ripple, a hi-hat a small one, and several can land in close
-  succession during a busy passage.
+  succession during a busy passage. Left-click to drop a ripple of your own.
   The right-click menu has a sensitivity option and a "Sync delay" (0–300 ms)
   that holds ripples back when your speakers or Bluetooth device play the
   sound later than VizRack sees it.

@@ -61,6 +61,7 @@ Choose `More info > Run anyway` only when you trust where the file came from.
 | `C` | Next palette |
 | Right-click | Current screen and window settings |
 | Drag / mouse wheel (Classic Cascade) | Rotate the surface / change perspective |
+| Left-click (Rhythm Ripple) | Drop a ripple at the cursor |
 | `F10` or tap `Alt` | Open the menu while the border is hidden |
 
 The `View` menu changes always-on-top, hidden border, overlay text visibility,

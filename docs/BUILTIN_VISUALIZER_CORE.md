@@ -33,7 +33,7 @@ Only the following, which must behave identically in both products, is shared:
   `docs/STAR_GUITAR_FREQUENCY_BANDS.md`).
 - Rhythm Ripple: the three-band (low/mid/high) envelope hit detection, the
   back-dating of a ripple to the hit's position inside the audio chunk, the
-  sync-delay rule and the ripple geometry/animation.
+  sync-delay rule, the click-dropped ripple and the ripple geometry/animation.
 - Option defaults and correction of invalid values.
 - The platform-neutral minimal drawing commands.
 

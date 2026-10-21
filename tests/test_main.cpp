@@ -834,6 +834,25 @@ void testRhythmRippleCore() {
         checkDrawList(drawList);
     }
 
+    // A click drops a ripple at the cursor: it is drawn at once, ignores the
+    // sync delay, and invalid sizes or points are ignored.
+    RhythmRippleEngine clicked;
+    DrawList clickedList;
+    clicked.buildFrame(1280.0f, 720.0f, clickedList);
+    const size_t emptyCommands = clickedList.commands().size();
+    RhythmRippleOptions slow{};
+    slow.syncDelayMs = 300;
+    clicked.setOptions(slow);
+    clicked.dropRippleAt(0.0f, 0.0f, 0.0f, 720.0f); // zero width
+    clicked.dropRippleAt(std::numeric_limits<float>::quiet_NaN(), 10.0f, 1280.0f, 720.0f);
+    CHECK(clicked.spawnedRippleCount() == 0);
+    clicked.dropRippleAt(640.0f, 360.0f, 1280.0f, 720.0f);
+    CHECK(clicked.spawnedRippleCount() == 1);
+    CHECK(clicked.lastSpawnStartAge() == 0.0f);
+    clicked.buildFrame(1280.0f, 720.0f, clickedList);
+    CHECK(clickedList.commands().size() > emptyCommands);
+    checkDrawList(clickedList);
+
     // Reset returns the engine to its construction-time state.
     engine.reset();
     RhythmRippleEngine fresh;
