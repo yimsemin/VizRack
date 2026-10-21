@@ -3,11 +3,14 @@
 #include "core/audio_ring.h"
 #include "core/i18n.h"
 #include "core/utf.h"
+#include "ui/borderless_strip.h"
+#include "ui/overlay_font.h"
 
 #include <windowsx.h>
 
 #include <algorithm>
 #include <chrono>
+#include <format>
 #include <utility>
 
 namespace vizrack {
@@ -114,6 +117,12 @@ void StarGuitarView::setSampleRate(uint32_t sampleRate) noexcept {
     engine_.setSampleRate(sampleRate);
 }
 
+void StarGuitarView::setShowOverlay(bool show) {
+    if (showOverlay_ == show) return;
+    showOverlay_ = show;
+    if (hwnd_) InvalidateRect(hwnd_, nullptr, FALSE);
+}
+
 void StarGuitarView::updateSamples() {
     ring_.discardOlderThan(builtin::StarGuitarEngine::kMaxSamples);
     auto left = engine_.inputLeft();
@@ -124,20 +133,19 @@ void StarGuitarView::updateSamples() {
 }
 
 void StarGuitarView::drawOverlay(HDC dc, float width, float height) const {
-    // Stylized caption; kept English-only like other builtin scene names
-    // (CLAUDE.md ▸ Localization).
     Gdiplus::Graphics graphics(dc);
-    Gdiplus::Font title(L"Segoe UI", 12.0f, Gdiplus::FontStyleBold, Gdiplus::UnitPixel);
-    Gdiplus::Font smallFont(L"Segoe UI", 9.0f, Gdiplus::FontStyleRegular,
-                            Gdiplus::UnitPixel);
+    Gdiplus::Font title = overlayTitleFont();
+    Gdiplus::Font smallFont = overlaySmallFont();
     Gdiplus::SolidBrush bright(Gdiplus::Color(175, 210, 226, 244));
     Gdiplus::SolidBrush dim(Gdiplus::Color(105, 150, 172, 198));
-    graphics.DrawString(L"STAR GUITAR", -1, &title, {18.0f, 14.0f}, &bright);
-    graphics.DrawString(L"RHYTHM SEQUENCER LANDSCAPE", -1, &smallFont,
-                        {18.0f, height - 27.0f}, &dim);
+    const std::wstring name = overlayCaps(trw(Str::PluginNameStarGuitar));
+    graphics.DrawString(name.c_str(), -1, &title, {18.0f, 14.0f}, &bright);
+    const std::wstring tagline = trw(Str::StarGuitarTagline);
+    graphics.DrawString(tagline.c_str(), -1, &smallFont, {18.0f, height - 27.0f}, &dim);
     Gdiplus::StringFormat right;
     right.SetAlignment(Gdiplus::StringAlignmentFar);
-    graphics.DrawString(L"RIGHT CLICK: OPTIONS", -1, &smallFont,
+    const std::wstring hint = trw(Str::HintRightClickOptions);
+    graphics.DrawString(hint.c_str(), -1, &smallFont,
                         {width - 208.0f, height - 27.0f, 190.0f, 18.0f}, &right, &dim);
     if (!inspiration_.empty()) {
         const std::wstring inspiration = fromUtf8(inspiration_);
@@ -160,7 +168,7 @@ void StarGuitarView::paint() {
     HDC dc = buffered ? backBuffer_.dc() : target;
     engine_.buildFrame(static_cast<float>(width), static_cast<float>(height), drawList_);
     renderer_.render(dc, drawList_);
-    drawOverlay(dc, static_cast<float>(width), static_cast<float>(height));
+    if (showOverlay_) drawOverlay(dc, static_cast<float>(width), static_cast<float>(height));
     if (buffered) backBuffer_.present(target, width, height);
     EndPaint(hwnd_, &paint);
 }
@@ -177,15 +185,30 @@ void StarGuitarView::showOptionsMenu(POINT point) {
         point = {rect.left + 24, rect.top + 48};
     }
     const auto options = engine_.options();
+
+    // Band-range numbers for the four menu labels below come straight from
+    // the engine's own kBandCutoffsHz -- the one place those numbers are
+    // written down -- rather than being repeated as literal text here, so a
+    // future band re-tune can't leave a menu label stating a stale range.
+    const auto& cutoffs = builtin::StarGuitarEngine::kBandCutoffsHz;
+    const int lowUpperHz = static_cast<int>(cutoffs[1]);
+    const int midUpperKhz = static_cast<int>(cutoffs[3] / 1000.0f);
+    const int trebleUpperKhz = static_cast<int>(cutoffs[5] / 1000.0f);
+    const std::wstring lowLabel =
+        std::vformat(trw(Str::StarGuitarMenuLowSensitivity), std::make_wformat_args(lowUpperHz));
+    const std::wstring midLabel = std::vformat(trw(Str::StarGuitarMenuMidSensitivity),
+                                               std::make_wformat_args(lowUpperHz, midUpperKhz));
+    const std::wstring trebleLabel = std::vformat(
+        trw(Str::StarGuitarMenuTrebleSensitivity), std::make_wformat_args(midUpperKhz, trebleUpperKhz));
+    const std::wstring airLabel = std::vformat(trw(Str::StarGuitarMenuAirSensitivity),
+                                               std::make_wformat_args(trebleUpperKhz));
+
     HMENU menu = CreatePopupMenu();
-    appendValueMenu(menu, trw(Str::StarGuitarMenuLowSensitivity).c_str(), kLowSensitivityCommand,
-                    options.lowSensitivity);
-    appendValueMenu(menu, trw(Str::StarGuitarMenuMidSensitivity).c_str(), kMidSensitivityCommand,
-                    options.midSensitivity);
-    appendValueMenu(menu, trw(Str::StarGuitarMenuTrebleSensitivity).c_str(),
-                    kTrebleSensitivityCommand, options.trebleSensitivity);
-    appendValueMenu(menu, trw(Str::StarGuitarMenuAirSensitivity).c_str(), kAirSensitivityCommand,
-                    options.airSensitivity);
+    appendValueMenu(menu, lowLabel.c_str(), kLowSensitivityCommand, options.lowSensitivity);
+    appendValueMenu(menu, midLabel.c_str(), kMidSensitivityCommand, options.midSensitivity);
+    appendValueMenu(menu, trebleLabel.c_str(), kTrebleSensitivityCommand,
+                    options.trebleSensitivity);
+    appendValueMenu(menu, airLabel.c_str(), kAirSensitivityCommand, options.airSensitivity);
 
     const UINT command = TrackPopupMenu(menu, TPM_RETURNCMD | TPM_RIGHTBUTTON, point.x, point.y,
                                         0, hwnd_, nullptr);
@@ -234,6 +257,9 @@ LRESULT StarGuitarView::proc(UINT message, WPARAM wParam, LPARAM lParam) {
             SetFocus(hwnd_);
             showOptionsMenu({GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)});
             return 0;
+        case WM_NCHITTEST:
+            if (isInBorderlessDragStrip(hwnd_, lParam)) return HTTRANSPARENT;
+            break;
         case WM_GETDLGCODE: return DLGC_WANTARROWS | DLGC_WANTCHARS;
         case WM_NCDESTROY: {
             const HWND destroyed = hwnd_;

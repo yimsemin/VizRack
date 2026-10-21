@@ -29,6 +29,7 @@ public:
     void detach();
     void resize(int width, int height);
     void setSampleRate(uint32_t sampleRate) noexcept;
+    void setShowOverlay(bool show);
     bool active() const noexcept { return hwnd_ != nullptr; }
 
 private:
@@ -48,6 +49,10 @@ private:
     GdiDrawListRenderer renderer_;
     GdiBackBuffer backBuffer_;
     OptionsChangedCallback optionsChanged_;
+    HFONT titleFont_{};
+    HFONT smallFont_{};
+    bool showOverlay_{true};
+    bool highResTimer_{};
 };
 
 } // namespace vizrack

@@ -8,6 +8,7 @@
 #include "ui/art_visualizer_view.h"
 #include "ui/campfire_view.h"
 #include "ui/oscilloscope_view.h"
+#include "ui/rhythm_ripple_view.h"
 #include "ui/spectrum3d_view.h"
 #include "ui/star_guitar_view.h"
 #include "vst/vst_host.h"
@@ -42,6 +43,7 @@ private:
     void loadInitialPlugin();
     void selectPlugin(const std::string& pluginId);
     void selectPluginPath(const std::string& pluginId, const std::filesystem::path& path);
+    void showPluginProperties(const std::string& pluginId);
     void commitPluginSelection(const PluginDefinition& definition,
                                const PluginDescriptor* descriptor = nullptr);
     void saveCurrentPluginState();
@@ -50,6 +52,7 @@ private:
     bool builtInViewActive() const noexcept;
     const PluginDefinition* activeBuiltInDefinition() const;
     void detachBuiltInViews();
+    void applyOverlayVisibility();
 
     HINSTANCE instance_{};
     PortablePaths paths_;
@@ -63,6 +66,7 @@ private:
     Spectrum3dView spectrum3d_;
     Spectrum3dView joyDivision_;
     StarGuitarView starGuitar_;
+    RhythmRippleView rhythmRipple_;
     WasapiCapture capture_;
     std::unique_ptr<MainWindow> window_;
     std::atomic<uint32_t> sampleRate_{48000};

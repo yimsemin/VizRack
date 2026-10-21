@@ -2,6 +2,7 @@
 
 #include "core/settings.h"
 #include "platform/wasapi_capture.h"
+#include "vst/plugin_catalog.h"
 
 #include <filesystem>
 #include <functional>
@@ -19,6 +20,7 @@ struct MainWindowCallbacks {
     std::function<void(const std::string& pluginId)> onPluginSelection;
     std::function<void(const std::string& pluginId, const std::filesystem::path& path)>
         onPluginPathSelected;
+    std::function<void(const std::string& pluginId)> onPluginPropertiesRequested;
     std::function<void(const Settings& settings)> onSettingsChanged;
     std::function<void()> onResume;
 };
@@ -33,7 +35,6 @@ public:
     HWND handle() const noexcept { return hwnd_; }
     HWND pluginParent() const noexcept { return pluginParent_; }
 
-    void setPluginStatus(std::string status);
     void setSelectedPluginId(std::string pluginId);
     void postCaptureStatus(const CaptureStatus& status);
     void setEditorResizeHandler(std::function<void(int, int)> handler);
@@ -47,6 +48,10 @@ public:
     void scheduleClose(unsigned milliseconds);
     const Settings& settings() const noexcept { return settings_; }
 
+    // The name shown for a catalog entry: its localized display name for a
+    // built-in, or its raw (unlocalized) product name for a VST3.
+    static std::wstring localizedPluginName(const PluginDefinition& definition);
+
 private:
     static LRESULT CALLBACK windowProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam);
     LRESULT proc(UINT message, WPARAM wParam, LPARAM lParam);
@@ -54,6 +59,7 @@ private:
     void createMenus();
     void retranslate();
     void rebuildDeviceMenu();
+    void refreshViewMenuChecks();
     void showContextMenu(POINT point);
     void applyWindowOptions();
     void updateLayout();
@@ -72,7 +78,8 @@ private:
     HWND hwnd_{};
     HWND pluginParent_{};
     HMENU menuBar_{};
-    HMENU settingsMenu_{};
+    HMENU fileMenu_{};
+    HMENU viewMenu_{};
     HMENU deviceMenu_{};
     HMENU opacityMenu_{};
     HMENU pluginMenu_{};
@@ -81,7 +88,6 @@ private:
     Settings settings_;
     MainWindowCallbacks callbacks_;
     CaptureStatus captureStatus_;
-    std::string pluginStatus_;
     std::string selectedPluginId_;
     std::function<void(int, int)> editorResizeHandler_;
     std::function<std::pair<int, int>(int, int)> editorConstraintHandler_;

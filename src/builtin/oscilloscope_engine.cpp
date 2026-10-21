@@ -30,7 +30,9 @@ OscilloscopeEngine::OscilloscopeEngine() {
 }
 
 void OscilloscopeEngine::setOptions(OscilloscopeOptions options) noexcept {
-    options.fps = options.fps == 15 || options.fps == 30 ? options.fps : 60;
+    options.fps = options.fps == 15 || options.fps == 30 || options.fps == 120
+                     ? options.fps
+                     : 60;
     options.scalePercent = options.scalePercent == 50 || options.scalePercent == 100
                                ? options.scalePercent
                                : 70;

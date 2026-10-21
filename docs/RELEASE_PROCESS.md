@@ -15,9 +15,11 @@ ref is never ambiguous.
 
 Several branches can be in flight at once. Keep them independent:
 
-- **One worktree per branch.** `git worktree add ../vizrack-wt/<slug> -b <type>/<slug> develop`
-  gives each branch its own directory and its own `out/` build tree, so parallel
-  builds never collide. `git worktree remove ../vizrack-wt/<slug>` when the branch
+- **One worktree per branch.** `git worktree add .claude/worktrees/<slug> -b <type>/<slug> develop`
+  gives each branch its own directory (inside the project folder, git-ignored) and its
+  own `out/` build tree, so parallel builds never collide. A new worktree has no
+  `external/vst3sdk`; pass `-DVIZRACK_VST3_SDK_PATH=<main checkout>/external/vst3sdk`
+  to reuse it instead of fetching again. `git worktree remove .claude/worktrees/<slug>` when the branch
   merges.
 - **Branch from a fresh `develop`.** `git fetch origin` first; base the branch on
   `origin/develop`.
@@ -108,4 +110,13 @@ Only after the user gives explicit approval for a version:
        out/package/VizRack-win-x64.zip
    ```
 
-8. `git checkout develop` and continue. `develop` is not deleted.
+8. `git checkout develop && git merge --ff-only origin/main && git push origin develop`.
+   `develop` never receives feature work directly, but the version-bump/tag
+   merge commits from step 6 are a fast-forward for `develop` here (they carry
+   no content it doesn't already have) — this brings `vX.Y.Z` into `develop`'s
+   own history. Skipping this step doesn't break anything by itself, but
+   leaves the release tag unreachable from `develop`, which is exactly the
+   failure mode `generate-release-notes.ps1` finds the previous tag by version
+   sort (not `git describe --tags HEAD`) to avoid — do this anyway, since
+   other tooling or a future script change could reasonably assume ordinary
+   `git describe` reachability. `develop` is not deleted.

@@ -3,7 +3,9 @@
 
 #include <algorithm>
 #include <charconv>
+#include <cmath>
 #include <fstream>
+#include <iomanip>
 #include <optional>
 #include <span>
 #include <sstream>
@@ -99,6 +101,17 @@ std::optional<int> readInt(const std::string& json, const std::string& key) {
     return value;
 }
 
+std::optional<float> readFloat(const std::string& json, const std::string& key) {
+    auto start = valueStart(json, key);
+    if (!start) return std::nullopt;
+    const char* begin = json.data() + *start;
+    const char* end = json.data() + json.size();
+    float value{};
+    auto result = std::from_chars(begin, end, value);
+    if (result.ec != std::errc{} || !std::isfinite(value)) return std::nullopt;
+    return value;
+}
+
 } // namespace
 
 SettingsLoadResult loadSettings(const std::filesystem::path& path) {
@@ -141,8 +154,9 @@ SettingsLoadResult loadSettings(const std::filesystem::path& path) {
     if (auto value = readInt(json, "opacityPercent")) {
         result.value.opacityPercent = std::clamp(*value, 25, 100);
     }
+    if (auto value = readBool(json, "showOverlayText")) result.value.showOverlayText = *value;
     if (auto value = readInt(json, "oscilloscopeFps");
-        value && (*value == 15 || *value == 30 || *value == 60)) {
+        value && (*value == 15 || *value == 30 || *value == 60 || *value == 120)) {
         result.value.oscilloscopeFps = *value;
     }
     if (auto value = readInt(json, "oscilloscopeScalePercent");
@@ -187,14 +201,34 @@ SettingsLoadResult loadSettings(const std::filesystem::path& path) {
     if (auto value = readInt(json, "starGuitarAirSensitivity")) {
         result.value.starGuitarAirSensitivity = std::clamp(*value, 0, 100);
     }
+    if (auto value = readInt(json, "rhythmRippleSensitivity")) {
+        result.value.rhythmRippleSensitivity = std::clamp(*value, 0, 100);
+    }
+    if (auto value = readInt(json, "rhythmRippleSyncDelayMs")) {
+        result.value.rhythmRippleSyncDelayMs = std::clamp(*value, 0, 300);
+    }
     if (auto value = readInt(json, "spectrum3dPalette")) {
         result.value.spectrum3dPalette = std::clamp(*value, 0, 5);
     }
+    // Files written before the free orbit camera stored 0..100 rotation / tilt knobs
+    // (yaw 0.10 + 0.0085 * v rad, pitch 0.20 + 0.00385 * v rad); carry them over.
+    constexpr float kRadToDeg = 57.29578f;
     if (auto value = readInt(json, "spectrum3dRotation")) {
-        result.value.spectrum3dRotation = std::clamp(*value, 0, 100);
+        const float knob = static_cast<float>(std::clamp(*value, 0, 100));
+        result.value.spectrum3dYaw = (0.10f + 0.0085f * knob) * kRadToDeg;
     }
     if (auto value = readInt(json, "spectrum3dTilt")) {
-        result.value.spectrum3dTilt = std::clamp(*value, 0, 100);
+        const float knob = static_cast<float>(std::clamp(*value, 0, 100));
+        result.value.spectrum3dPitch = (0.20f + 0.00385f * knob) * kRadToDeg;
+    }
+    if (auto value = readFloat(json, "spectrum3dYaw")) {
+        result.value.spectrum3dYaw = std::clamp(*value, -360.0f, 360.0f);
+    }
+    if (auto value = readFloat(json, "spectrum3dPitch")) {
+        result.value.spectrum3dPitch = std::clamp(*value, -90.0f, 90.0f);
+    }
+    if (auto value = readInt(json, "spectrum3dPerspective")) {
+        result.value.spectrum3dPerspective = std::clamp(*value, 0, 100);
     }
     if (auto value = readInt(json, "spectrum3dDepth")) {
         result.value.spectrum3dDepth = std::clamp(*value, 0, 100);
@@ -204,9 +238,6 @@ SettingsLoadResult loadSettings(const std::filesystem::path& path) {
     }
     if (auto value = readInt(json, "joyDivisionPalette")) {
         result.value.joyDivisionPalette = std::clamp(*value, 0, 5);
-    }
-    if (auto value = readInt(json, "joyDivisionRotation")) {
-        result.value.joyDivisionRotation = std::clamp(*value, 0, 100);
     }
     if (auto value = readInt(json, "joyDivisionTilt")) {
         result.value.joyDivisionTilt = std::clamp(*value, 0, 100);
@@ -236,6 +267,7 @@ bool saveSettings(const std::filesystem::path& path, const Settings& settings, s
            << "  \"alwaysOnTop\": " << (settings.alwaysOnTop ? "true" : "false") << ",\n"
            << "  \"borderless\": " << (settings.borderless ? "true" : "false") << ",\n"
            << "  \"opacityPercent\": " << std::clamp(settings.opacityPercent, 25, 100) << ",\n"
+           << "  \"showOverlayText\": " << (settings.showOverlayText ? "true" : "false") << ",\n"
            << "  \"oscilloscopeFps\": " << settings.oscilloscopeFps << ",\n"
            << "  \"oscilloscopeScalePercent\": " << settings.oscilloscopeScalePercent << ",\n"
            << "  \"oscilloscopeSmoothing\": " << std::clamp(settings.oscilloscopeSmoothing, 0, 2) << ",\n"
@@ -263,13 +295,19 @@ bool saveSettings(const std::filesystem::path& path, const Settings& settings, s
            << std::clamp(settings.starGuitarTrebleSensitivity, 0, 100) << ",\n"
            << "  \"starGuitarAirSensitivity\": "
            << std::clamp(settings.starGuitarAirSensitivity, 0, 100) << ",\n"
+           << "  \"rhythmRippleSensitivity\": "
+           << std::clamp(settings.rhythmRippleSensitivity, 0, 100) << ",\n"
+           << "  \"rhythmRippleSyncDelayMs\": "
+           << std::clamp(settings.rhythmRippleSyncDelayMs, 0, 300) << ",\n"
            << "  \"spectrum3dPalette\": " << std::clamp(settings.spectrum3dPalette, 0, 5) << ",\n"
-           << "  \"spectrum3dRotation\": " << std::clamp(settings.spectrum3dRotation, 0, 100) << ",\n"
-           << "  \"spectrum3dTilt\": " << std::clamp(settings.spectrum3dTilt, 0, 100) << ",\n"
+           << "  \"spectrum3dYaw\": " << std::fixed << std::setprecision(1)
+           << std::clamp(settings.spectrum3dYaw, -360.0f, 360.0f) << ",\n"
+           << "  \"spectrum3dPitch\": " << std::clamp(settings.spectrum3dPitch, -90.0f, 90.0f)
+           << std::defaultfloat << ",\n"
+           << "  \"spectrum3dPerspective\": " << std::clamp(settings.spectrum3dPerspective, 0, 100) << ",\n"
            << "  \"spectrum3dDepth\": " << std::clamp(settings.spectrum3dDepth, 0, 100) << ",\n"
            << "  \"spectrum3dHeight\": " << std::clamp(settings.spectrum3dHeight, 0, 100) << ",\n"
            << "  \"joyDivisionPalette\": " << std::clamp(settings.joyDivisionPalette, 0, 5) << ",\n"
-           << "  \"joyDivisionRotation\": " << std::clamp(settings.joyDivisionRotation, 0, 100) << ",\n"
            << "  \"joyDivisionTilt\": " << std::clamp(settings.joyDivisionTilt, 0, 100) << ",\n"
            << "  \"joyDivisionDepth\": " << std::clamp(settings.joyDivisionDepth, 0, 100) << ",\n"
            << "  \"joyDivisionHeight\": " << std::clamp(settings.joyDivisionHeight, 0, 100) << "\n"

@@ -15,10 +15,14 @@ namespace vizrack {
 struct Spectrum3dOptions {
     int style{0};          // 0 = CLASSIC CASCADE, 1 = JOY DIVISION
     int palette{0};
-    int rotation{50};      // 0..100 quarter-view yaw (CLASSIC CASCADE)
-    int tilt{50};          // 0..100 viewing pitch / perspective strength
+    int tilt{50};          // 0..100 perspective strength (JOY DIVISION)
     int depth{50};         // 0..100 how many history slices stay visible
     int heightScale{50};   // 0..100 magnitude amplitude
+    // CLASSIC CASCADE orbit camera: free turntable yaw, pitch up to straight down / up,
+    // and a camera-distance perspective strength.
+    float yaw{30.0f};      // degrees, wrapped to (-180, 180]
+    float pitch{22.5f};    // degrees, clamped to [-90, 90]
+    int perspective{50};   // 0..100 (0 near-orthographic, 100 strong)
 };
 
 namespace builtin {

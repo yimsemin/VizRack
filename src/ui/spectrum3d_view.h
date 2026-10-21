@@ -16,7 +16,9 @@ namespace vizrack {
 class StereoFrameRing;
 
 // One view class backs both built-in cascade plug-ins; `style` (0 = CLASSIC CASCADE,
-// 1 = JOY DIVISION) is fixed per instance and the palette is the only runtime option.
+// 1 = JOY DIVISION) is fixed per instance. CLASSIC CASCADE is an orbit camera: a left drag
+// turns the surface, the wheel changes perspective, and the right-click menu offers the same
+// values as presets plus a view reset.
 class Spectrum3dView {
 public:
     using OptionsChangedCallback = std::function<void(const Spectrum3dOptions&)>;
@@ -33,6 +35,7 @@ public:
     void resize(int width, int height);
     void setSampleRate(uint32_t sampleRate) noexcept;
     void setInspiration(std::string inspiration) { inspiration_ = std::move(inspiration); }
+    void setShowOverlay(bool show);
     bool active() const noexcept { return hwnd_ != nullptr; }
 
 private:
@@ -44,6 +47,7 @@ private:
     void changePalette(int offset);
     void notifyOptionsChanged();
     void showOptionsMenu(POINT screenPoint);
+    void endDrag();
 
     StereoFrameRing& ring_;
     int style_;
@@ -56,6 +60,9 @@ private:
     GdiBackBuffer backBuffer_;
     std::chrono::steady_clock::time_point lastUpdate_{};
     OptionsChangedCallback optionsChanged_;
+    bool showOverlay_{true};
+    bool dragging_{false};
+    POINT lastDragPoint_{};
 };
 
 } // namespace vizrack

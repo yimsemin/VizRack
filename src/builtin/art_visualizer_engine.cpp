@@ -313,9 +313,18 @@ void ArtVisualizerEngine::drawPrismTunnel(DrawList& output, float width, float h
                                  center.y + std::sin(angle) * radius});
         }
         const auto range = output.appendPoints(scratchA_);
-        output.addStrokePolygon(range,
-                                color(lines[ring % 3], static_cast<uint8_t>(35 + travel * 175.0f)),
-                                0.8f + travel * 2.0f + midLevel_ * 1.5f);
+        // travel wraps 1.0 -> 0.0 each lap; without a fade-out the outermost ring
+        // is at peak alpha right before it snaps back to a small dim ring, which
+        // reads as an abrupt pop instead of a smooth exit.
+        constexpr float kFadeOutStart = 0.82f;
+        const float fadeOut = travel > kFadeOutStart
+            ? clampUnit((1.0f - travel) / (1.0f - kFadeOutStart))
+            : 1.0f;
+        output.addStrokePolygon(
+            range,
+            color(lines[ring % 3],
+                  static_cast<uint8_t>((35 + travel * 175.0f) * fadeOut)),
+            0.8f + travel * 2.0f + midLevel_ * 1.5f);
     }
     const float coreSize = 3.0f + lowLevel_ * 16.0f;
     output.addFillEllipse(center.x - coreSize, center.y - coreSize,

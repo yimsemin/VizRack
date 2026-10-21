@@ -17,6 +17,7 @@ struct Settings {
     bool alwaysOnTop{false};
     bool borderless{false};
     int opacityPercent{100};
+    bool showOverlayText{true};
     int oscilloscopeFps{60};
     int oscilloscopeScalePercent{70};
     int oscilloscopeSmoothing{1};
@@ -33,13 +34,15 @@ struct Settings {
     int starGuitarMidSensitivity{50};
     int starGuitarTrebleSensitivity{50};
     int starGuitarAirSensitivity{50};
+    int rhythmRippleSensitivity{50};
+    int rhythmRippleSyncDelayMs{0};
     int spectrum3dPalette{0};
-    int spectrum3dRotation{50};
-    int spectrum3dTilt{50};
+    float spectrum3dYaw{30.0f};
+    float spectrum3dPitch{22.5f};
+    int spectrum3dPerspective{50};
     int spectrum3dDepth{50};
     int spectrum3dHeight{50};
     int joyDivisionPalette{0};
-    int joyDivisionRotation{50};
     int joyDivisionTilt{50};
     int joyDivisionDepth{50};
     int joyDivisionHeight{50};

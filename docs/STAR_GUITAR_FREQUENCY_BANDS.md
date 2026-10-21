@@ -20,9 +20,9 @@ cutoff):
 | 2 | 300Hz-1kHz | Bass guitar harmonics, low vocals/guitars |
 | 3 | 1-4kHz | Vocals, guitars, keys (most harmonic content) |
 | 4 | 4-6kHz | Snare/clap snap (lower part), pick attack |
-| 5 | 6-8kHz | Snare/clap snap (upper part), vocal sibilance |
-| 6 | 8-12kHz | Hi-hats, cymbals, shimmer |
-| 7 | >12kHz | Air, cymbal shimmer tail, very high transients |
+| 5 | 6-10kHz | Snare/clap snap (upper part), vocal sibilance |
+| 6 | 10-16kHz | Hi-hats, cymbals, shimmer |
+| 7 | >16kHz | Air, cymbal shimmer tail, very high transients |
 
 These are deliberately coarse, hand-picked splits, not a claim of precise
 instrument separation — see "Known limitation" below.
@@ -86,16 +86,24 @@ from more than the two sub-bands in its group:
 | 2 (300Hz-1kHz) | Tree | Mid | Mid |
 | 3 (1-4kHz) | Telephone pole | Mid | Mid |
 | 4 (4-6kHz) | Stepped building silhouette | Far (slowest/smallest) | Treble |
-| 5 (6-8kHz) | Plain building | Far | Treble |
-| 6 (8-12kHz) | Star | Sky | Air |
-| 7 (>12kHz) | UFO | Sky | Air |
+| 5 (6-10kHz) | Plain building | Far | Treble |
+| 6 (10-16kHz) | Star | Sky | Air |
+| 7 (>16kHz) | Star, 45-degree diagonal | Sky | Air |
+
+The air pair's cutoffs were raised from the original 8/12kHz split (and its
+cooldowns lengthened slightly) after this pair was observed spawning in
+visible clumps during dense hi-hat/cymbal passages -- less energy typically
+lives above 16kHz than above 12kHz, so the higher band fires less
+indiscriminately. Band 7's object used to be a UFO; it was replaced with the
+diagonal star variant (`StarGuitarObjectType::starDiagonal`, same
+`drawStar()` with its two arms rotated 45 degrees into an X) because the UFO
+was hard to tune down to a reasonable spawn rate and wasn't going to be
+reused elsewhere.
 
 `pine` and `tree` are deliberately different silhouettes (pine: five
 sharply-tapering tiers reading as a conifer; tree: three broader tiers) so
 the two "tree" spawns stay visually distinguishable even though they share a
-family resemblance. `waterTower`, `bird` and `plane` are currently unmapped
-by any sub-band (kept in the type enum and their draw functions in case a
-future remap reintroduces them).
+family resemblance.
 
 This intentionally **inverts** the original version's depth assignment: low
 frequencies now drive the *nearest* layer (big, fast, close) and the treble
@@ -116,6 +124,14 @@ Sky has no ambient/filler fallback — it only ever reflects an actual air-band
 peak, per the "하늘은 반드시 고역대" requirement from earlier design
 discussion, now generalized: a sub-band with no peaks simply produces
 nothing, rather than falling back to a timer.
+
+Near layer's ambient filler (used when neither low sub-band peaks) is always
+a pine tree — matching the low group's two real object types (signal marker,
+pine). One deliberate exception: a full second of silence (`silenceSeconds_
+>= 1.0`, edge-triggered so it fires once per gap) sends one oversized
+building (`kSilenceBuildingSizeScale`) through the near layer, as a visual
+cue for a track/section change. This is the only place a building appears in
+the near layer.
 
 Every spawn — peak-triggered or an ambient filler on a quiet-passage timer
 (used by near/mid/far, not sky) — animates in with the same grow-from-ground

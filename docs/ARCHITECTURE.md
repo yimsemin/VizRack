@@ -21,9 +21,7 @@ The application intentionally has no generic VST scanner.
 | `MainWindow` | Win32 frame, title/menu state and visualization child parent |
 | `WasapiCapture` | Loopback capture, format conversion, device events and reconnect |
 | `StereoFrameRing` | Fixed-capacity SPSC audio transfer |
-| `builtin::OscilloscopeEngine` | Platform-neutral L/R waveform and circular history geometry |
-| `builtin::ArtVisualizerEngine` | Platform-neutral analysis and six-scene/six-palette geometry |
-| `builtin::CampfireEngine` | Platform-neutral beat analysis and procedural flame, ember, log and night-sky geometry |
+| `builtin::*Engine` | Platform-neutral analysis and scene geometry, one per built-in visualizer — see the "Code ownership" table in `docs/BUILTIN_VISUALIZER_CORE.md` for the current list and what each owns |
 | `builtin::DrawList` | Minimal renderer-neutral primitive and point buffer contract |
 | Built-in `*View` adapters | Win32 input, timers, menus and text overlays |
 | `GdiDrawListRenderer` / `GdiBackBuffer` | GDI+ command translation and size-stable back buffering |
@@ -86,9 +84,52 @@ fails to compile; a `test_main.cpp` case checks every `Str` is non-empty in both
 languages. Format placeholders are `std::format`-style (`{}`) composed with
 `std::vformat`, so a translation can reorder arguments. A diagnostic is
 English-only: the UI localizes just the MessageBox title and shows the English
-detail beneath it.
+detail beneath it. Every built-in visualizer's overlay caption (title, tagline,
+control hint) is localized the same way; the one exception is a scene/palette
+name read from `src/builtin/` engine state, which stays English because the
+core has no `core/i18n` dependency to draw from.
 
 The string rules to follow when adding UI text are in `CLAUDE.md` ▸ Localization.
+
+## UI conventions
+
+The menu bar is `File` (Exit only) · `View` (output device, always-on-top,
+borderless, opacity, language) · `Plug-in` (the catalog) · `Help` — the
+conventional Windows grouping, so Exit lives in File rather than mixed into a
+settings catch-all. The borderless window has no bar; its right-click / F10 /
+Alt context menu is the `View` popup with Exit spliced onto the end for that
+one call (`MainWindow::showContextMenu`), since it is otherwise unreachable
+while borderless.
+
+A `PluginKind::builtIn` catalog entry is a single item directly under
+`Plug-in`: clicking the name activates it immediately (`kCommandPluginSelectBase`).
+There is nothing to configure before use, so a submenu-then-"Use" step would
+just add friction. `PluginKind::vst3` keeps its submenu (`Use (auto-detect)` /
+pick file / pick folder / install page) because those actions are meaningful
+before a module is even found.
+
+Every built-in visualizer's overlay text (title + tagline + control hint) draws
+with `overlayTitleFont()` / `overlaySmallFont()` from `src/ui/overlay_font.h` —
+"Segoe UI" (the Windows system font, so no licensing to track and Korean
+renders through the OS's own font-linking fallback) at a shared 16px-bold /
+12px-regular pair. A stylized title (a plugin's display name rendered in caps)
+goes through `overlayCaps()` so the look survives translation. The
+oscilloscope view predates GDI+ overlay drawing and stays on plain GDI
+(`gdi_draw_list_renderer.h`), so it matches family and size with two cached
+`HFONT`s created in `attach()` instead of a `Gdiplus::Font`. `Settings::showOverlayText`
+(View ▸ Show overlay text) toggles all of it off at once; each view keeps a
+`showOverlay_` flag and skips its `drawOverlay` call when it is false, so a
+plugin's own drawing (waveform, particles, spectrum surface, …) still renders.
+
+Every setting of a built-in visualizer (scene, palette, style, sensitivity, view angle, …)
+is reachable through its right-click menu, so `Str::HintRightClickOptions` is the single
+hint every engine shows. A mouse gesture may change the same value directly — Classic
+Cascade turns with a left drag (`WM_LBUTTONDOWN` captures the mouse, `WM_MOUSEMOVE` feeds
+yaw/pitch into the engine, `WM_LBUTTONUP` persists) and the wheel changes its perspective —
+but the menu always offers the same value. Rhythm Ripple's left click drops one extra ripple
+at the cursor (`dropRippleAt`) — an action, not a setting. Elsewhere a left click only moves
+keyboard focus to the view (`WM_LBUTTONDOWN` → `SetFocus`), and Art Visualizer's keyboard shortcuts
+(`Space`, arrows, `1`–`6`, `C`) are unchanged.
 
 ## Audio capture and recovery
 
@@ -112,10 +153,21 @@ official URL and an optional `inspiration` string. Discovery checks only the
 selected definition's saved location and search locations, then validates AMD64
 PE, marker and VST3 factory data.
 
-A non-empty `inspiration` ("Inspired by …") marks a homage built-in. It is shown
-after the plug-in status line on activation and listed under Help ▸ Credits, which
-also carries the note that those names stay with their owners and outside
-VizRack's MIT License. `builtin-joydivision` is currently the only such entry.
+A non-empty `inspiration` ("Inspired by …") marks a homage built-in. It is drawn
+under the visualizer's own overlay text on activation and listed under Help ▸
+Credits, which also carries the note that those names stay with their owners
+and outside VizRack's MIT License. `builtin-joydivision` is currently the only
+such entry.
+
+The `Plug-in` menu-bar label is static (`Str::MenuPlugin`) — it used to show
+live activation status ("Plug-in: searching" / the active name), but that
+duplicated what the overlay text already shows once a visualizer is running,
+so it was dropped along with `MainWindow::setPluginStatus`. A `PluginKind::vst3`
+entry's submenu instead gets a **Properties...** item
+(`kCommandPluginPropertiesBase`, `App::showPluginProperties`) that re-runs
+discovery on demand and shows name/version/edition/module path in a dialog —
+this is where `editionForStatus`'s mvMeter2 GPU/noGPU detection surfaces,
+without needing a per-plugin special case in the menu-bar label itself.
 
 The first catalog entry remains `builtin-oscilloscope`, so a fresh portable data
 folder always starts without an external dependency. `builtin-art-visualizer`
@@ -142,10 +194,16 @@ between consecutive time slices plus rib outlines (`CLASSIC CASCADE`).
 `builtin-joydivision` stacks hidden-line ridge curves at full strength (no depth fade)
 inside a centred plot box, with the outer band edges held flat on the baseline, a
 crest-to-trough contrast curve and a deterministic per-slice pen tremble (`JOY
-DIVISION`). Style is fixed per catalog entry. Each style reads the same right-click
-knobs — `rotation`, `tilt`, `depth`, `heightScale` (normalized 0–100, `50` is the
-reference look) and the six-palette choice — through its own response curve; each is an
-additive `spectrum3d*` / `joyDivision*` field in the settings schema.
+DIVISION`). Style is fixed per catalog entry. Both styles read the
+`depth` and `heightScale` knobs (normalized 0–100, `50` is the reference look) and the
+six-palette choice through their own response curves. `joydivision` adds `tilt`;
+Classic Cascade is an orbit camera with float `yaw` (degrees, wrapped to (-180, 180]),
+`pitch` (clamped to [-90, 90]) and `perspective` (0–100, camera distance), so any side of
+the surface, including from behind, can be shown. Slices draw farthest first and the
+order flips when the camera passes behind the surface, so age fading reads as the trail
+vanishing toward the viewer. Each is an additive `spectrum3d*` / `joyDivision*` field in
+the settings schema; the pre-orbit `spectrum3dRotation` / `spectrum3dTilt` knobs are still
+read and converted to yaw / pitch.
 
 The `mvmeter2` definition uses
 TBProAudio/mvMeter2 factory metadata and accepts both the GPU and noGPU x64 modules.

@@ -3,6 +3,8 @@
 #include "core/audio_ring.h"
 #include "core/i18n.h"
 #include "core/utf.h"
+#include "ui/borderless_strip.h"
+#include "ui/overlay_font.h"
 
 #include <windowsx.h>
 
@@ -103,6 +105,12 @@ void ArtVisualizerView::setSampleRate(uint32_t sampleRate) noexcept {
     engine_.setSampleRate(sampleRate);
 }
 
+void ArtVisualizerView::setShowOverlay(bool show) {
+    if (showOverlay_ == show) return;
+    showOverlay_ = show;
+    if (hwnd_) InvalidateRect(hwnd_, nullptr, FALSE);
+}
+
 void ArtVisualizerView::updateSamples() {
     ring_.discardOlderThan(builtin::ArtVisualizerEngine::kMaxSamples);
     auto left = engine_.inputLeft();
@@ -115,9 +123,8 @@ void ArtVisualizerView::updateSamples() {
 void ArtVisualizerView::drawOverlay(HDC dc, float width, float height) const {
     const auto info = engine_.frameInfo();
     Gdiplus::Graphics graphics(dc);
-    Gdiplus::Font title(L"Segoe UI", 13.0f, Gdiplus::FontStyleBold, Gdiplus::UnitPixel);
-    Gdiplus::Font smallFont(L"Segoe UI", 10.0f, Gdiplus::FontStyleRegular,
-                            Gdiplus::UnitPixel);
+    Gdiplus::Font title = overlayTitleFont();
+    Gdiplus::Font smallFont = overlaySmallFont();
     Gdiplus::SolidBrush bright(Gdiplus::Color(220, 225, 242, 247));
     Gdiplus::SolidBrush dim(Gdiplus::Color(145, 158, 181, 191));
     const std::wstring sceneName = fromUtf8(std::string(info.sceneName));
@@ -129,10 +136,11 @@ void ArtVisualizerView::drawOverlay(HDC dc, float width, float height) const {
     right.SetAlignment(Gdiplus::StringAlignmentFar);
     graphics.DrawString(status.c_str(), -1, &smallFont,
                         {width - 218.0f, 16.0f, 200.0f, 20.0f}, &right, &dim);
-    graphics.DrawString(L"AUDIO REACTIVE / BUILT-IN", -1, &smallFont,
-                        {18.0f, height - 27.0f}, &dim);
-    graphics.DrawString(L"CLICK: SCENE  ·  RIGHT CLICK: OPTIONS", -1, &smallFont,
-                        {width - 300.0f, height - 27.0f, 282.0f, 18.0f}, &right, &dim);
+    const std::wstring tagline = trw(Str::ArtTagline);
+    graphics.DrawString(tagline.c_str(), -1, &smallFont, {18.0f, height - 27.0f}, &dim);
+    const std::wstring hint = trw(Str::HintRightClickOptions);
+    graphics.DrawString(hint.c_str(), -1, &smallFont,
+                        {width - 208.0f, height - 27.0f, 190.0f, 18.0f}, &right, &dim);
 }
 
 void ArtVisualizerView::paint() {
@@ -150,7 +158,7 @@ void ArtVisualizerView::paint() {
     HDC dc = buffered ? backBuffer_.dc() : target;
     engine_.buildFrame(static_cast<float>(width), static_cast<float>(height), drawList_);
     renderer_.render(dc, drawList_);
-    drawOverlay(dc, static_cast<float>(width), static_cast<float>(height));
+    if (showOverlay_) drawOverlay(dc, static_cast<float>(width), static_cast<float>(height));
     if (buffered) backBuffer_.present(target, width, height);
     EndPaint(hwnd_, &paint);
 }
@@ -237,7 +245,6 @@ LRESULT ArtVisualizerView::proc(UINT message, WPARAM wParam, LPARAM lParam) {
         case WM_PAINT: paint(); return 0;
         case WM_ERASEBKGND: return 1;
         case WM_LBUTTONDOWN: SetFocus(hwnd_); return 0;
-        case WM_LBUTTONUP: changeScene(1); return 0;
         case WM_CONTEXTMENU:
             SetFocus(hwnd_);
             showOptionsMenu({GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)});
@@ -263,6 +270,9 @@ LRESULT ArtVisualizerView::proc(UINT message, WPARAM wParam, LPARAM lParam) {
                 notifyOptionsChanged();
                 return 0;
             }
+            break;
+        case WM_NCHITTEST:
+            if (isInBorderlessDragStrip(hwnd_, lParam)) return HTTRANSPARENT;
             break;
         case WM_GETDLGCODE: return DLGC_WANTARROWS | DLGC_WANTCHARS;
         case WM_NCDESTROY: {

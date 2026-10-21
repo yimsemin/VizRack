@@ -3,10 +3,13 @@
 #include "core/audio_ring.h"
 #include "core/i18n.h"
 #include "core/utf.h"
+#include "ui/borderless_strip.h"
+#include "ui/overlay_font.h"
 
 #include <algorithm>
 #include <string>
 #include <windowsx.h>
+#include <mmsystem.h>
 
 namespace vizrack {
 namespace {
@@ -24,9 +27,10 @@ constexpr UINT kSmoothingStrong = 302;
 constexpr UINT kFps15 = 415;
 constexpr UINT kFps30 = 430;
 constexpr UINT kFps60 = 460;
+constexpr UINT kFps120 = 4120;
 
 int timerInterval(int fps) {
-    return fps == 15 ? 67 : (fps == 30 ? 33 : 16);
+    return fps == 15 ? 67 : (fps == 30 ? 33 : (fps == 120 ? 8 : 16));
 }
 
 void checkMenu(HMENU menu, UINT command, bool checked) {
@@ -76,12 +80,22 @@ bool OscilloscopeView::attach(HINSTANCE instance, HWND parent, std::string& erro
                 formatWindowsError(GetLastError());
         return false;
     }
+    if (engine_.options().fps == 120) {
+        highResTimer_ = timeBeginPeriod(1) == TIMERR_NOERROR;
+    }
     if (!SetTimer(hwnd_, kRefreshTimer, timerInterval(engine_.options().fps), nullptr)) {
         error = "Failed to start the built-in oscilloscope refresh timer.";
+        if (highResTimer_) { timeEndPeriod(1); highResTimer_ = false; }
         DestroyWindow(hwnd_);
         hwnd_ = nullptr;
         return false;
     }
+    titleFont_ = CreateFontW(-static_cast<int>(kOverlayTitleSize), 0, 0, 0, FW_BOLD, FALSE, FALSE,
+                             FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+                             CLEARTYPE_QUALITY, DEFAULT_PITCH, kOverlayFontFamily);
+    smallFont_ = CreateFontW(-static_cast<int>(kOverlaySmallSize), 0, 0, 0, FW_NORMAL, FALSE, FALSE,
+                             FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+                             CLEARTYPE_QUALITY, DEFAULT_PITCH, kOverlayFontFamily);
     return true;
 }
 
@@ -91,6 +105,9 @@ void OscilloscopeView::detach() {
         DestroyWindow(hwnd_);
         hwnd_ = nullptr;
     }
+    if (highResTimer_) { timeEndPeriod(1); highResTimer_ = false; }
+    if (titleFont_) { DeleteObject(titleFont_); titleFont_ = nullptr; }
+    if (smallFont_) { DeleteObject(smallFont_); smallFont_ = nullptr; }
     backBuffer_.reset();
     engine_.reset();
 }
@@ -105,9 +122,20 @@ void OscilloscopeView::setSampleRate(uint32_t sampleRate) noexcept {
     engine_.setSampleRate(sampleRate);
 }
 
+void OscilloscopeView::setShowOverlay(bool show) {
+    if (showOverlay_ == show) return;
+    showOverlay_ = show;
+    if (hwnd_) InvalidateRect(hwnd_, nullptr, FALSE);
+}
+
 void OscilloscopeView::applyTimer() {
     if (!hwnd_) return;
     KillTimer(hwnd_, kRefreshTimer);
+    const bool wantHighRes = engine_.options().fps == 120;
+    if (wantHighRes != highResTimer_) {
+        if (highResTimer_) timeEndPeriod(1);
+        highResTimer_ = wantHighRes && timeBeginPeriod(1) == TIMERR_NOERROR;
+    }
     SetTimer(hwnd_, kRefreshTimer, timerInterval(engine_.options().fps), nullptr);
 }
 
@@ -126,11 +154,12 @@ void OscilloscopeView::drawOverlay(HDC dc, const RECT& client) const {
     const int height = client.bottom;
     const int centers[] = {height / 4, height * 3 / 4};
     SetBkMode(dc, TRANSPARENT);
-    SelectObject(dc, GetStockObject(DEFAULT_GUI_FONT));
+    HFONT previousFont = static_cast<HFONT>(SelectObject(dc, titleFont_));
     SetTextColor(dc, RGB(145, 168, 174));
     const std::wstring title =
         trw(info.options.historyMode ? Str::ScopeTitleHistory : Str::ScopeTitleWaveform);
     TextOutW(dc, 12, 10, title.c_str(), static_cast<int>(title.size()));
+    SelectObject(dc, smallFont_);
     const std::wstring status = std::to_wstring(info.sampleRate) + L" Hz  |  " +
                                 std::to_wstring(info.options.fps) + L" FPS";
     SetTextAlign(dc, TA_RIGHT | TA_TOP);
@@ -148,6 +177,7 @@ void OscilloscopeView::drawOverlay(HDC dc, const RECT& client) const {
         DrawTextW(dc, trw(Str::ScopePlaySomeAudio).c_str(), -1, &textRect,
                   DT_CENTER | DT_VCENTER | DT_SINGLELINE);
     }
+    SelectObject(dc, previousFont);
 }
 
 void OscilloscopeView::paint() {
@@ -165,7 +195,7 @@ void OscilloscopeView::paint() {
     HDC dc = buffered ? backBuffer_.dc() : target;
     engine_.buildFrame(static_cast<float>(width), static_cast<float>(height), drawList_);
     renderer_.render(dc, drawList_);
-    drawOverlay(dc, client);
+    if (showOverlay_) drawOverlay(dc, client);
     if (buffered) backBuffer_.present(target, width, height);
     EndPaint(hwnd_, &paint);
 }
@@ -198,11 +228,14 @@ void OscilloscopeView::showOptionsMenu(POINT point) {
     AppendMenuW(fps, MF_STRING, kFps15, L"15 FPS");
     AppendMenuW(fps, MF_STRING, kFps30, L"30 FPS");
     AppendMenuW(fps, MF_STRING, kFps60, L"60 FPS");
+    AppendMenuW(fps, MF_STRING, kFps120, L"120 FPS");
     checkMenu(mode, options.historyMode ? kModeHistory : kModeWaveform, true);
     checkMenu(scale, options.scalePercent == 50 ? kScaleSmall :
                      (options.scalePercent == 100 ? kScaleLarge : kScaleNormal), true);
     checkMenu(smoothing, kSmoothingOff + static_cast<UINT>(options.smoothing), true);
-    checkMenu(fps, options.fps == 15 ? kFps15 : (options.fps == 30 ? kFps30 : kFps60), true);
+    checkMenu(fps, options.fps == 15 ? kFps15 :
+                   (options.fps == 30 ? kFps30 : (options.fps == 120 ? kFps120 : kFps60)),
+              true);
     AppendMenuW(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(mode), trw(Str::ScopeMenuDisplayMode).c_str());
     AppendMenuW(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(scale), trw(Str::ScopeMenuWaveformSize).c_str());
     AppendMenuW(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(smoothing),
@@ -219,8 +252,12 @@ void OscilloscopeView::showOptionsMenu(POINT point) {
     if (command >= kSmoothingOff && command <= kSmoothingStrong) {
         options.smoothing = static_cast<int>(command - kSmoothingOff);
     }
-    const bool fpsChanged = command == kFps15 || command == kFps30 || command == kFps60;
-    if (fpsChanged) options.fps = command == kFps15 ? 15 : (command == kFps30 ? 30 : 60);
+    const bool fpsChanged =
+        command == kFps15 || command == kFps30 || command == kFps60 || command == kFps120;
+    if (fpsChanged) {
+        options.fps = command == kFps15 ? 15 :
+                      (command == kFps30 ? 30 : (command == kFps120 ? 120 : 60));
+    }
     DestroyMenu(menu);
     if (command) {
         engine_.setOptions(options);
@@ -252,6 +289,9 @@ LRESULT OscilloscopeView::proc(UINT message, WPARAM wParam, LPARAM lParam) {
         case WM_CONTEXTMENU:
             showOptionsMenu({GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)});
             return 0;
+        case WM_NCHITTEST:
+            if (isInBorderlessDragStrip(hwnd_, lParam)) return HTTRANSPARENT;
+            break;
         case WM_NCDESTROY: {
             const HWND destroyed = hwnd_;
             SetWindowLongPtrW(destroyed, GWLP_USERDATA, 0);

@@ -19,7 +19,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int commandShow) {
     const HRESULT com = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
     if (FAILED(com)) {
         MessageBoxW(nullptr, vizrack::trw(vizrack::Str::MsgComInitFailed).c_str(),
-                    vizrack::trw(vizrack::Str::AppName).c_str(), MB_OK | MB_ICONERROR);
+                    vizrack::trw(vizrack::Str::AppName).c_str(), MB_OK);
         return 1;
     }
     int exitCode = 1;
@@ -29,18 +29,18 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int commandShow) {
         if (!app.initialize(error)) {
             MessageBoxW(nullptr, vizrack::fromUtf8(error).c_str(),
                         vizrack::trw(vizrack::Str::DialogTitleStartupFailed).c_str(),
-                        MB_OK | MB_ICONERROR);
+                        MB_OK);
         } else {
             exitCode = app.run(commandShow);
         }
     } catch (const std::exception& exception) {
         MessageBoxW(nullptr, vizrack::fromUtf8(exception.what()).c_str(),
                     vizrack::trw(vizrack::Str::DialogTitleUnhandledError).c_str(),
-                    MB_OK | MB_ICONERROR);
+                    MB_OK);
     } catch (...) {
         MessageBoxW(nullptr, vizrack::trw(vizrack::Str::MsgUnknownError).c_str(),
                     vizrack::trw(vizrack::Str::DialogTitleUnhandledError).c_str(),
-                    MB_OK | MB_ICONERROR);
+                    MB_OK);
     }
     CoUninitialize();
     return exitCode;

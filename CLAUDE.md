@@ -1,3 +1,5 @@
+@AGENTS.md
+
 # VizRack
 
 Portable Windows visualizer. It reads the current render endpoint through WASAPI
@@ -26,7 +28,7 @@ out\build\vs2026-x64\Release\VizRack.exe --smoke-test   # opens, self-closes, ex
 
 - One-time per clone: `git config core.hooksPath .githooks` (commit-message hook).
 - The VST3 SDK builds from the local `external/vst3sdk` checkout (pinned
-  `v3.8.0_build_66`), not FetchContent.
+  `v3.8.1_build_84`), not FetchContent.
 - Tests are one file, `tests/test_main.cpp`, with a hand-rolled `CHECK`. Add a case
   as a function and call it from `main()`.
 - No CI, no clang-tidy/clang-format. Warnings are `/W4 /permissive-` — keep the
@@ -49,10 +51,10 @@ so never add a JS/TS copy of an engine.
   the same. Engines take bounded sample batches, do no I/O, and reuse their
   buffers — no steady-state per-frame heap growth (there are regression tests).
 
-Engines: `oscilloscope_engine`, `art_visualizer_engine` (six scenes + palettes),
-`campfire_engine`, `spectrum3d_engine` (one engine backs `builtin-spectrum3d` and
-`builtin-joydivision` via a fixed `style`). Detail:
-`docs/BUILTIN_VISUALIZER_CORE.md`, `docs/ARCHITECTURE.md`.
+The current list of engines and what each owns is the "Code ownership" table in
+`docs/BUILTIN_VISUALIZER_CORE.md` — that table is the one place it's written
+down; don't re-enumerate it here or anywhere else, just link to it. Broader
+component context: `docs/ARCHITECTURE.md`.
 
 ## Localization
 
@@ -60,14 +62,58 @@ English (default) and Korean. Every user-facing string in `src/ui/`, `src/app.cp
 and `src/main.cpp` resolves through `core/i18n` — add a
 `VIZRACK_STR(Id, "English", "한국어")` row to `src/core/i18n_strings.inc` and use
 `trw(Str::Id)` / `tr`. Never write a raw user-facing `L"..."` in a menu, dialog,
-overlay or the window title. Diagnostics (logger and `error`/status strings from
-`src/core`, `src/platform`, `src/vst`) stay English; scene/palette names and
-stylized overlay captions stay English by design. Mechanism:
+overlay or the window title — this includes each built-in visualizer's overlay
+caption (its title, tagline and control hint), which are equally in scope: reuse
+`Str::HintRightClickOptions` ("RIGHT CLICK: OPTIONS") for that hint instead of
+inventing a new string per engine — every built-in visualizer's own state
+(scene, palette, style, sensitivity, …) is set through its right-click menu, so
+this is the one hint every engine needs. Diagnostics
+(logger and `error`/status strings from `src/core`, `src/platform`, `src/vst`)
+stay English. The one exception is scene/palette names sourced from `src/builtin/`
+engine code (e.g. art visualizer scene names, spectrum3d style/palette names) —
+those stay English because they live in the portable core, which must not depend
+on `core/i18n` (see the portability boundary above). Mechanism:
 `docs/ARCHITECTURE.md` ▸ Localization.
 
 `README.md` is canonical. `README.ko.md` mirrors only the sections its own header
 lists — when you change one of those sections, update `README.ko.md` in the same
 commit.
+
+## UI conventions for a new built-in visualizer
+
+When adding a new built-in visualizer, follow the pattern the existing seven
+share (`docs/ARCHITECTURE.md` ▸ UI conventions for the details):
+
+- **Menu**: add one `PluginKind::builtIn` catalog entry. It appears as a single
+  clickable item directly under Plug-in — no submenu, no confirmation step, since
+  a built-in needs no file/folder to select first. That behavior is generic in
+  `MainWindow::createMenus`; a new built-in gets it for free.
+- **Overlay font**: use `overlayTitleFont()` / `overlaySmallFont()` from
+  `src/ui/overlay_font.h` — never a locally declared `Gdiplus::Font`. Wrap a
+  stylized title (a plugin display name drawn in caps) with `overlayCaps()`.
+- **Overlay strings**: every caption goes through `core/i18n` (see Localization
+  above) — reuse the shared hint strings where the control scheme matches.
+- **Overlay visibility**: keep a `showOverlay_` member (default `true`), a
+  `setShowOverlay(bool)` setter, and skip the `drawOverlay` call in `paint()`
+  when it is false, so `Settings::showOverlayText` (View ▸ Show overlay text)
+  can hide it. Wire the setter into `App::applyOverlayVisibility`.
+- **Right-click sets visualizer state**: every per-visualizer setting (scene,
+  palette, sensitivity, view angle, …) is reachable through its right-click
+  menu. A direct-manipulation gesture (e.g. dragging to rotate) is an extra way
+  to change the same value, never the only way.
+- **Register the engine**: add one row to the "Code ownership" table in
+  `docs/BUILTIN_VISUALIZER_CORE.md` — that table is the single place the
+  engine list is written down (see "The portability boundary" above), so this
+  is the only doc edit adding an engine requires. Also add a bullet to that
+  doc's "shared surface" list if the new engine owns any option/animation
+  rule worth calling out, mirroring the existing entries' style.
+
+## Dialogs never make noise
+
+Every `MessageBoxW` call passes `MB_OK` / `MB_YESNOCANCEL` alone, with **no**
+`MB_ICON*` flag — an icon flag makes Windows play its system alert sound, which
+is jarring while listening to music. This applies to every dialog, present and
+future: error, warning and info alike.
 
 ## Keep the EXE small
 

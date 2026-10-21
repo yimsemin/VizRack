@@ -3,6 +3,8 @@
 #include "core/audio_ring.h"
 #include "core/i18n.h"
 #include "core/utf.h"
+#include "ui/borderless_strip.h"
+#include "ui/overlay_font.h"
 
 #include <windowsx.h>
 
@@ -118,6 +120,12 @@ void CampfireView::setSampleRate(uint32_t sampleRate) noexcept {
     engine_.setSampleRate(sampleRate);
 }
 
+void CampfireView::setShowOverlay(bool show) {
+    if (showOverlay_ == show) return;
+    showOverlay_ = show;
+    if (hwnd_) InvalidateRect(hwnd_, nullptr, FALSE);
+}
+
 void CampfireView::updateSamples() {
     ring_.discardOlderThan(builtin::CampfireEngine::kMaxSamples);
     auto left = engine_.inputLeft();
@@ -129,17 +137,18 @@ void CampfireView::updateSamples() {
 
 void CampfireView::drawOverlay(HDC dc, float width, float height) const {
     Gdiplus::Graphics graphics(dc);
-    Gdiplus::Font title(L"Segoe UI", 12.0f, Gdiplus::FontStyleBold, Gdiplus::UnitPixel);
-    Gdiplus::Font smallFont(L"Segoe UI", 9.0f, Gdiplus::FontStyleRegular,
-                            Gdiplus::UnitPixel);
+    Gdiplus::Font title = overlayTitleFont();
+    Gdiplus::Font smallFont = overlaySmallFont();
     Gdiplus::SolidBrush warm(Gdiplus::Color(175, 244, 220, 188));
     Gdiplus::SolidBrush dim(Gdiplus::Color(105, 188, 165, 145));
-    graphics.DrawString(L"CAMPFIRE", -1, &title, {18.0f, 14.0f}, &warm);
-    graphics.DrawString(L"NATURAL FLAME  /  GENTLE AUDIO REACTION", -1, &smallFont,
-                        {18.0f, height - 27.0f}, &dim);
+    const std::wstring name = overlayCaps(trw(Str::PluginNameCampfire));
+    graphics.DrawString(name.c_str(), -1, &title, {18.0f, 14.0f}, &warm);
+    const std::wstring tagline = trw(Str::CampfireTagline);
+    graphics.DrawString(tagline.c_str(), -1, &smallFont, {18.0f, height - 27.0f}, &dim);
     Gdiplus::StringFormat right;
     right.SetAlignment(Gdiplus::StringAlignmentFar);
-    graphics.DrawString(L"RIGHT CLICK: OPTIONS", -1, &smallFont,
+    const std::wstring hint = trw(Str::HintRightClickOptions);
+    graphics.DrawString(hint.c_str(), -1, &smallFont,
                         {width - 208.0f, height - 27.0f, 190.0f, 18.0f}, &right, &dim);
 }
 
@@ -158,7 +167,7 @@ void CampfireView::paint() {
     HDC dc = buffered ? backBuffer_.dc() : target;
     engine_.buildFrame(static_cast<float>(width), static_cast<float>(height), drawList_);
     renderer_.render(dc, drawList_);
-    drawOverlay(dc, static_cast<float>(width), static_cast<float>(height));
+    if (showOverlay_) drawOverlay(dc, static_cast<float>(width), static_cast<float>(height));
     if (buffered) backBuffer_.present(target, width, height);
     EndPaint(hwnd_, &paint);
 }
@@ -240,6 +249,9 @@ LRESULT CampfireView::proc(UINT message, WPARAM wParam, LPARAM lParam) {
             SetFocus(hwnd_);
             showOptionsMenu({GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)});
             return 0;
+        case WM_NCHITTEST:
+            if (isInBorderlessDragStrip(hwnd_, lParam)) return HTTRANSPARENT;
+            break;
         case WM_GETDLGCODE: return DLGC_WANTARROWS | DLGC_WANTCHARS;
         case WM_NCDESTROY: {
             const HWND destroyed = hwnd_;

@@ -1,7 +1,43 @@
 {
   "attribution": {
     "commit": "",
-    "pr": ""
+    "pr": "",
+    "sessionUrl": true
+  },
+  "env": {
+    "PIP_REQUIRE_VIRTUALENV": "true"
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ -d .githooks ] && git config core.hooksPath .githooks || true"
+          }
+        ]
+      }
+    ]
+  },
+  "permissions": {
+    "ask": [
+      "Bash(npm install -g:*)",
+      "Bash(npm i -g:*)",
+      "Bash(npm install --global:*)",
+      "Bash(npm i --global:*)",
+      "Bash(pnpm add -g:*)",
+      "Bash(pnpm add --global:*)",
+      "Bash(yarn global:*)",
+      "Bash(pip install:*)",
+      "Bash(pip3 install:*)",
+      "Bash(python3 -m pip install:*)",
+      "Bash(sudo:*)"
+    ],
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.local)",
+      "Read(./.env.production)"
+    ]
   },
   "includeCoAuthoredBy": false
 }

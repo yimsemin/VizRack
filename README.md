@@ -24,10 +24,17 @@ keeps going even after you close VizRack.
   high bands and the stereo movement of the music
 - **Oscilloscope** — left/right channel waveforms and the last ~15 seconds of the
   level history
+- **Campfire** — a calm fire whose embers lift on transients and whose flames
+  lean with the stereo image
+- **Classic Cascade / Joy Division** — a time-depth spectrum cascade, drawn as
+  either a filled 3D surface or a Joy Division-style hidden-line ridge stack
+- **Star Guitar** — a rhythmic, horizontally-scrolling parallax landscape driven
+  by the music's frequency bands
+- **Rhythm Ripple** — rain falling on a still puddle in time with the beat
 - **Optional external visualizers** — install mvMeter2 or AnSpec to switch to the
   metering screen you prefer
 - **Window settings for listening** — always on top, hidden border, opacity and a
-  15 / 30 / 60 FPS control
+  15 / 30 / 60 / 120 FPS control
 
 ## Getting started
 
@@ -37,8 +44,7 @@ VizRack runs on an **x64 PC with Windows 10 version 1703 or newer, or Windows
 1. Extract `VizRack-win-x64.zip` completely into a local folder of your choice.
 2. Run `VizRack.exe` from the extracted folder.
 3. Play music or video as usual.
-4. Choose `Plug-in > Built-in Art Visualizer > Use` and click the screen to
-   change scenes.
+4. Choose `Plug-in > Art Visualizer` and press `Space` to change scenes.
 
 To keep your settings, do not run it from inside the ZIP or place it in a
 write-restricted folder such as `C:\Program Files`.
@@ -50,15 +56,17 @@ Choose `More info > Run anyway` only when you trust where the file came from.
 
 | Action | Result |
 | --- | --- |
-| Click the screen or `Space` | Next art scene |
+| `Space` | Next art scene |
 | Arrow keys or number `1`–`6` | Select a scene |
 | `C` | Next palette |
 | Right-click | Current screen and window settings |
+| Drag / mouse wheel (Classic Cascade) | Rotate the surface / change perspective |
+| Left-click (Rhythm Ripple) | Drop a ripple at the cursor |
 | `F10` or tap `Alt` | Open the menu while the border is hidden |
 
-The `Settings` menu changes always-on-top, hidden border, opacity, the output
-device and the UI language. By default VizRack follows the Windows default
-output device automatically.
+The `View` menu changes always-on-top, hidden border, overlay text visibility,
+opacity, the output device and the UI language. By default VizRack follows the
+Windows default output device automatically. `Exit` is under `File`.
 
 ## Optional external visualizers
 
@@ -73,14 +81,16 @@ plug-ins.
 
 After installing the product you need, choose
 `Plug-in > product name > Auto-detect and use`. If it is not found, you can point
-VizRack at the VST 3 file or bundle folder directly from the same menu. External
-plug-ins are not bundled with VizRack.
+VizRack at the VST 3 file or bundle folder directly from the same menu, and
+`Properties...` in that same menu shows its detected version, edition (e.g.
+mvMeter2's GPU/noGPU build) and file path. External plug-ins are not bundled
+with VizRack.
 
 ## When something goes wrong
 
 | Problem | What to check |
 | --- | --- |
-| The screen does not react to the music | Confirm the music is actually playing, then pick the right device under `Settings > Output device`. |
+| The screen does not react to the music | Confirm the music is actually playing, then pick the right device under `View > Output device`. |
 | Settings are not saved | Extract VizRack completely into a writable local folder and run it from there. |
 | An external screen is not found | Confirm you installed the Windows **64-bit VST 3** build of the plug-in, then use auto-detect or pick it manually. |
 | The mvMeter2 GPU screen does not open | Update your graphics driver or use the official noGPU build. |
@@ -140,8 +150,8 @@ structure, including how localization works, is in
 
 Some built-in visualizers take after the work below.
 
-- **Built-in Joy Division** — Inspired by Joy Division
-- **Built-in Star Guitar** — Inspired by The Chemical Brothers / Michel
+- **Joy Division** — Inspired by Joy Division
+- **Star Guitar** — Inspired by The Chemical Brothers / Michel
   Gondry's "Star Guitar"
 
 These names credit the source of inspiration only. The names and works stay with

@@ -3,6 +3,7 @@
 #include "builtin/draw_list.h"
 #include "builtin/oscilloscope_engine.h"
 #include "builtin/spectrum3d_engine.h"
+#include "builtin/rhythm_ripple_engine.h"
 #include "builtin/star_guitar_engine.h"
 #include "core/audio_ring.h"
 #include "core/channel_mapper.h"
@@ -21,6 +22,7 @@
 #include <array>
 #include <cmath>
 #include <filesystem>
+#include <format>
 #include <fstream>
 #include <iostream>
 #include <iterator>
@@ -87,12 +89,12 @@ void testSettings(const std::filesystem::path& directory) {
     original.campfireParticleAmount = 90;
     original.campfireParticleIntensity = 60;
     original.spectrum3dPalette = 3;
-    original.spectrum3dRotation = 70;
-    original.spectrum3dTilt = 30;
+    original.spectrum3dYaw = -135.5f;
+    original.spectrum3dPitch = 62.0f;
+    original.spectrum3dPerspective = 80;
     original.spectrum3dDepth = 90;
     original.spectrum3dHeight = 20;
     original.joyDivisionPalette = 5;
-    original.joyDivisionRotation = 10;
     original.joyDivisionTilt = 80;
     original.joyDivisionDepth = 40;
     original.joyDivisionHeight = 100;
@@ -122,12 +124,12 @@ void testSettings(const std::filesystem::path& directory) {
     CHECK(loaded.value.campfireParticleAmount == 90);
     CHECK(loaded.value.campfireParticleIntensity == 60);
     CHECK(loaded.value.spectrum3dPalette == 3);
-    CHECK(loaded.value.spectrum3dRotation == 70);
-    CHECK(loaded.value.spectrum3dTilt == 30);
+    CHECK(std::abs(loaded.value.spectrum3dYaw - (-135.5f)) < 0.01f);
+    CHECK(std::abs(loaded.value.spectrum3dPitch - 62.0f) < 0.01f);
+    CHECK(loaded.value.spectrum3dPerspective == 80);
     CHECK(loaded.value.spectrum3dDepth == 90);
     CHECK(loaded.value.spectrum3dHeight == 20);
     CHECK(loaded.value.joyDivisionPalette == 5);
-    CHECK(loaded.value.joyDivisionRotation == 10);
     CHECK(loaded.value.joyDivisionTilt == 80);
     CHECK(loaded.value.joyDivisionDepth == 40);
     CHECK(loaded.value.joyDivisionHeight == 100);
@@ -177,7 +179,7 @@ void testPluginCatalogAndStorage(const std::filesystem::path& directory) {
     CHECK(catalog.front().id == "builtin-oscilloscope");
     if (builtIn) {
         CHECK(builtIn->kind == vizrack::PluginKind::builtIn);
-        CHECK(builtIn->displayName == "Built-in Oscilloscope");
+        CHECK(builtIn->displayName == "Oscilloscope");
         CHECK(builtIn->installUrl.empty());
         CHECK(builtIn->searchLocations.empty());
     }
@@ -185,7 +187,7 @@ void testPluginCatalogAndStorage(const std::filesystem::path& directory) {
     CHECK(art != nullptr);
     if (art) {
         CHECK(art->kind == vizrack::PluginKind::builtIn);
-        CHECK(art->displayName == "Built-in Art Visualizer");
+        CHECK(art->displayName == "Art Visualizer");
         CHECK(art->installUrl.empty());
         CHECK(art->searchLocations.empty());
     }
@@ -193,7 +195,7 @@ void testPluginCatalogAndStorage(const std::filesystem::path& directory) {
     CHECK(campfire != nullptr);
     if (campfire) {
         CHECK(campfire->kind == vizrack::PluginKind::builtIn);
-        CHECK(campfire->displayName == "Built-in Campfire");
+        CHECK(campfire->displayName == "Campfire");
         CHECK(campfire->editionLabel == "Natural Flame / Audio Reactive");
         CHECK(campfire->installUrl.empty());
         CHECK(campfire->searchLocations.empty());
@@ -202,7 +204,7 @@ void testPluginCatalogAndStorage(const std::filesystem::path& directory) {
     CHECK(spectrum3d != nullptr);
     if (spectrum3d) {
         CHECK(spectrum3d->kind == vizrack::PluginKind::builtIn);
-        CHECK(spectrum3d->displayName == "Built-in 3D Spectrum");
+        CHECK(spectrum3d->displayName == "Classic Cascade");
         CHECK(spectrum3d->installUrl.empty());
         CHECK(spectrum3d->searchLocations.empty());
     }
@@ -210,7 +212,7 @@ void testPluginCatalogAndStorage(const std::filesystem::path& directory) {
     CHECK(joyDivision != nullptr);
     if (joyDivision) {
         CHECK(joyDivision->kind == vizrack::PluginKind::builtIn);
-        CHECK(joyDivision->displayName == "Built-in Joy Division");
+        CHECK(joyDivision->displayName == "Joy Division");
         CHECK(joyDivision->inspiration == "Inspired by Joy Division");
         CHECK(joyDivision->installUrl.empty());
         CHECK(joyDivision->searchLocations.empty());
@@ -219,11 +221,20 @@ void testPluginCatalogAndStorage(const std::filesystem::path& directory) {
     CHECK(starGuitar != nullptr);
     if (starGuitar) {
         CHECK(starGuitar->kind == vizrack::PluginKind::builtIn);
-        CHECK(starGuitar->displayName == "Built-in Star Guitar");
+        CHECK(starGuitar->displayName == "Star Guitar");
         CHECK(starGuitar->inspiration ==
               "Inspired by The Chemical Brothers / Michel Gondry's \"Star Guitar\"");
         CHECK(starGuitar->installUrl.empty());
         CHECK(starGuitar->searchLocations.empty());
+    }
+    const auto* rhythmRipple = vizrack::findPluginDefinition("builtin-rhythmripple");
+    CHECK(rhythmRipple != nullptr);
+    if (rhythmRipple) {
+        CHECK(rhythmRipple->kind == vizrack::PluginKind::builtIn);
+        CHECK(rhythmRipple->displayName == "Rhythm Ripple");
+        CHECK(rhythmRipple->inspiration.empty());
+        CHECK(rhythmRipple->installUrl.empty());
+        CHECK(rhythmRipple->searchLocations.empty());
     }
     for (const auto& item : catalog) {
         if (item.id != "builtin-joydivision" && item.id != "builtin-starguitar") {
@@ -762,6 +773,304 @@ void testStarGuitarCore() {
     CHECK(stress.commands().empty());
 }
 
+void testRhythmRippleCore() {
+    using vizrack::RhythmRippleOptions;
+    using vizrack::builtin::DrawList;
+    using vizrack::builtin::DrawPrimitive;
+    using vizrack::builtin::RhythmRippleEngine;
+
+    RhythmRippleEngine engine;
+    engine.setOptions(RhythmRippleOptions{});
+
+    // The sensitivity clamps to 0-100 and the sync delay to 0-300ms rather
+    // than being stored out of range.
+    RhythmRippleOptions outOfRange{};
+    outOfRange.sensitivity = -30;
+    outOfRange.syncDelayMs = -5;
+    engine.setOptions(outOfRange);
+    CHECK(engine.options().sensitivity == 0);
+    CHECK(engine.options().syncDelayMs == 0);
+    outOfRange.sensitivity = 250;
+    outOfRange.syncDelayMs = 900;
+    engine.setOptions(outOfRange);
+    CHECK(engine.options().sensitivity == 100);
+    CHECK(engine.options().syncDelayMs == RhythmRippleEngine::kMaxSyncDelayMs);
+    engine.setOptions(RhythmRippleOptions{});
+
+    engine.setSampleRate(96000);
+    engine.setSampleRate(1);  // out of range, ignored
+
+    auto left = engine.inputLeft();
+    auto right = engine.inputRight();
+    left[9] = std::numeric_limits<float>::quiet_NaN();
+    right[23] = std::numeric_limits<float>::infinity();
+
+    DrawList drawList;
+    // Feed a repeating "beat" pattern: a loud burst of samples followed by
+    // several quiet frames, simulating a steady kick roughly every ~8 frames
+    // at 60fps (~0.13s), exercising the band onset detector and refractory time.
+    for (int frame = 0; frame < 400; ++frame) {
+        const bool beat = (frame % 8) == 0;
+        if (beat) {
+            for (size_t index = 0; index < left.size(); ++index) {
+                const float phase = static_cast<float>(index) * 0.35f;
+                left[index] = std::sin(phase) * 0.9f;
+                right[index] = std::cos(phase * 0.91f) * 0.85f;
+            }
+            engine.update(left.size(), 1.0f / 60.0f);
+        } else {
+            engine.update(0, 1.0f / 60.0f);
+        }
+        engine.buildFrame(1920.0f, 1080.0f, drawList);
+        checkDrawList(drawList);
+    }
+    // The background wash must always be present once sizes are valid.
+    CHECK(!drawList.commands().empty());
+    CHECK(drawList.commands().front().primitive == DrawPrimitive::verticalGradient);
+
+    // A silent stretch must not spawn ripples nor crash.
+    for (int frame = 0; frame < 120; ++frame) {
+        engine.update(0, 1.0f / 60.0f);
+        engine.buildFrame(1280.0f, 720.0f, drawList);
+        checkDrawList(drawList);
+    }
+
+    // A click drops a ripple at the cursor: it is drawn at once, ignores the
+    // sync delay, and invalid sizes or points are ignored.
+    RhythmRippleEngine clicked;
+    DrawList clickedList;
+    clicked.buildFrame(1280.0f, 720.0f, clickedList);
+    const size_t emptyCommands = clickedList.commands().size();
+    RhythmRippleOptions slow{};
+    slow.syncDelayMs = 300;
+    clicked.setOptions(slow);
+    clicked.dropRippleAt(0.0f, 0.0f, 0.0f, 720.0f); // zero width
+    clicked.dropRippleAt(std::numeric_limits<float>::quiet_NaN(), 10.0f, 1280.0f, 720.0f);
+    CHECK(clicked.spawnedRippleCount() == 0);
+    clicked.dropRippleAt(640.0f, 360.0f, 1280.0f, 720.0f);
+    CHECK(clicked.spawnedRippleCount() == 1);
+    CHECK(clicked.lastSpawnStartAge() == 0.0f);
+    clicked.buildFrame(1280.0f, 720.0f, clickedList);
+    CHECK(clickedList.commands().size() > emptyCommands);
+    checkDrawList(clickedList);
+
+    // Reset returns the engine to its construction-time state.
+    engine.reset();
+    RhythmRippleEngine fresh;
+    DrawList afterReset;
+    DrawList afterConstruction;
+    engine.buildFrame(1280.0f, 720.0f, afterReset);
+    fresh.buildFrame(1280.0f, 720.0f, afterConstruction);
+    CHECK(afterReset.commands().size() == afterConstruction.commands().size());
+
+    // No steady-state per-frame heap growth across many frames and several
+    // window sizes, mirroring the other builtin engines' regression coverage.
+    DrawList stress;
+    engine.buildFrame(2560.0f, 1440.0f, stress);
+    const size_t commandCapacity = stress.commandCapacity();
+    const size_t pointCapacity = stress.pointCapacity();
+    for (int frame = 0; frame < 240; ++frame) {
+        if (frame % 5 == 0) {
+            engine.update(left.size(), frame % 2 == 0 ? 1.0f / 15.0f : 1.0f / 60.0f);
+        } else {
+            engine.update(0, frame % 2 == 0 ? 1.0f / 15.0f : 1.0f / 60.0f);
+        }
+        engine.buildFrame(frame % 3 == 0 ? 640.0f : 2560.0f,
+                          frame % 3 == 0 ? 480.0f : 1440.0f, stress);
+        CHECK(stress.commandCapacity() == commandCapacity);
+        CHECK(stress.pointCapacity() == pointCapacity);
+        checkDrawList(stress);
+    }
+
+    // Degenerate sizes must not draw anything.
+    engine.buildFrame(0.0f, 480.0f, stress);
+    CHECK(stress.commands().empty());
+    engine.update(0, std::numeric_limits<float>::quiet_NaN());
+    engine.buildFrame(std::numeric_limits<float>::infinity(), 480.0f, stress);
+    CHECK(stress.commands().empty());
+}
+
+// Synthetic drum hits at known sample positions, fed through the engine in
+// 60fps chunks. Measures how far the effective ripple start (frame end minus
+// the ripple's start age) lags the true hit, and how many ripples are spawned
+// that belong to no hit.
+struct DetectorTiming {
+    int hits{};
+    int detected{};
+    int extra{};
+    double meanLatencyMs{};
+    double worstLatencyMs{};
+};
+
+enum class Drum { kick, snare, hat };
+
+DetectorTiming measureDetector(Drum drum, bool withBed, bool swellOnly) {
+    using vizrack::RhythmRippleOptions;
+    using vizrack::builtin::RhythmRippleEngine;
+    constexpr double kRate = 48000.0;
+    constexpr size_t kChunk = 800; // one 60fps frame
+    constexpr size_t kTotal = 48000 * 6;
+    constexpr double kPi = 3.14159265358979323846;
+
+    std::vector<float> signal(kTotal, 0.0f);
+    std::vector<size_t> onsets;
+    uint32_t noise = 12345;
+    auto nextNoise = [&noise]() {
+        noise = noise * 1664525u + 1013904223u;
+        return static_cast<float>(noise >> 8) / 8388608.0f - 1.0f;
+    };
+    if (withBed) {
+        for (size_t i = 0; i < kTotal; ++i) {
+            const double t = static_cast<double>(i) / kRate;
+            signal[i] += static_cast<float>(0.07 * std::sin(2 * kPi * 220 * t) +
+                                            0.05 * std::sin(2 * kPi * 330 * t) +
+                                            0.04 * std::sin(2 * kPi * 523 * t));
+        }
+    }
+    if (swellOnly) {
+        for (size_t i = 0; i < kTotal; ++i) {
+            const double t = static_cast<double>(i) / kRate;
+            const double ramp = std::min(1.0, t / 2.0);
+            signal[i] += static_cast<float>(0.4 * ramp * std::sin(2 * kPi * 55 * t));
+        }
+    } else {
+        // 8 hits, 0.55s apart, each at a sample offset that is not a multiple
+        // of the 800-sample chunk so frame quantization shows up.
+        for (int hit = 0; hit < 8; ++hit) {
+            const size_t start = 24000 + static_cast<size_t>(hit) * 26400 + static_cast<size_t>(hit) * 137;
+            onsets.push_back(start);
+            float previousNoise = 0.0f;
+            for (size_t n = 0; n < 12000 && start + n < kTotal; ++n) {
+                const double t = static_cast<double>(n) / kRate;
+                float value = 0.0f;
+                if (drum == Drum::kick) {
+                    const double freq = 45.0 + 75.0 * std::exp(-t / 0.025);
+                    value = static_cast<float>(0.8 * std::exp(-t / 0.080) * std::sin(2 * kPi * freq * t));
+                } else if (drum == Drum::snare) {
+                    value = static_cast<float>(0.45 * nextNoise() * std::exp(-t / 0.040) +
+                                               0.30 * std::exp(-t / 0.060) * std::sin(2 * kPi * 190 * t));
+                } else {
+                    const float current = nextNoise();
+                    value = static_cast<float>(0.35 * (current - previousNoise) * std::exp(-t / 0.015));
+                    previousNoise = current;
+                }
+                signal[start + n] += value;
+            }
+        }
+    }
+
+    RhythmRippleEngine engine;
+    RhythmRippleOptions options{};
+    engine.setOptions(options);
+    engine.setSampleRate(48000);
+    auto left = engine.inputLeft();
+    auto right = engine.inputRight();
+
+    std::vector<double> spawnTimes; // effective ripple start, in seconds
+    uint32_t seenSpawns = 0;
+    for (size_t offset = 0; offset + kChunk <= kTotal; offset += kChunk) {
+        for (size_t i = 0; i < kChunk; ++i) {
+            left[i] = signal[offset + i];
+            right[i] = signal[offset + i];
+        }
+        engine.update(kChunk, 1.0f / 60.0f);
+        const double frameEnd = static_cast<double>(offset + kChunk) / kRate;
+        while (seenSpawns < engine.spawnedRippleCount()) {
+            ++seenSpawns;
+            // Several spawns in one frame all share the same lastSpawnStartAge
+            // only for the newest; the detector spawns at most one
+            // per band per block, so attribute the newest age to the batch.
+            spawnTimes.push_back(frameEnd - static_cast<double>(engine.lastSpawnStartAge()));
+        }
+    }
+
+    DetectorTiming result;
+    result.hits = static_cast<int>(onsets.size());
+    std::vector<bool> used(spawnTimes.size(), false);
+    double latencySum = 0.0;
+    for (const size_t onset : onsets) {
+        const double hitTime = static_cast<double>(onset) / kRate;
+        for (size_t index = 0; index < spawnTimes.size(); ++index) {
+            if (used[index]) continue;
+            const double latency = spawnTimes[index] - hitTime;
+            if (latency >= -0.005 && latency <= 0.15) {
+                used[index] = true;
+                ++result.detected;
+                latencySum += latency;
+                result.worstLatencyMs = std::max(result.worstLatencyMs, latency * 1000.0);
+                break;
+            }
+        }
+    }
+    // Spawns within the 150ms after a hit that are not its first one belong to
+    // that hit's ringing; count only spawns that are far from every hit.
+    for (size_t index = 0; index < spawnTimes.size(); ++index) {
+        bool nearHit = false;
+        for (const size_t onset : onsets) {
+            const double delta = spawnTimes[index] - static_cast<double>(onset) / kRate;
+            if (delta >= -0.005 && delta <= 0.25) nearHit = true;
+        }
+        if (!nearHit) ++result.extra;
+    }
+    result.meanLatencyMs = result.detected > 0 ? latencySum * 1000.0 / result.detected : 0.0;
+    return result;
+}
+
+void testRhythmRippleDetectorTiming() {
+    struct Scenario {
+        Drum drum;
+        bool bed;
+        bool swell;
+    };
+    const Scenario scenarios[] = {
+        {Drum::kick, false, false}, // kick, quiet
+        {Drum::kick, true, false},  // kick over a loud bed
+        {Drum::snare, false, false},
+        {Drum::snare, true, false},
+        {Drum::hat, false, false},
+        {Drum::kick, false, true},  // slow bass swell, no hits at all
+    };
+    for (const auto& scenario : scenarios) {
+        const auto result = measureDetector(scenario.drum, scenario.bed, scenario.swell);
+        if (scenario.swell) {
+            CHECK(result.extra <= 1);
+        } else {
+            CHECK(result.detected == result.hits);
+            CHECK(result.meanLatencyMs <= 8.0);
+            CHECK(result.worstLatencyMs <= 12.0);
+            CHECK(result.extra <= 2);
+        }
+    }
+}
+
+// A sync delay holds the ripple back: right after a hit it must not be drawn
+// yet (start age is negative), and it shows up once the delay has elapsed.
+void testRhythmRippleSyncDelay() {
+    using vizrack::RhythmRippleOptions;
+    using vizrack::builtin::DrawList;
+    using vizrack::builtin::RhythmRippleEngine;
+
+    RhythmRippleEngine engine;
+    RhythmRippleOptions options{};
+    options.syncDelayMs = 200;
+    engine.setOptions(options);
+    engine.setSampleRate(48000);
+    auto left = engine.inputLeft();
+    auto right = engine.inputRight();
+    for (size_t i = 0; i < 800; ++i) {
+        left[i] = right[i] = i > 300 ? 0.8f * std::sin(static_cast<float>(i) * 0.05f) : 0.0f;
+    }
+    DrawList drawList;
+    engine.update(800, 1.0f / 60.0f);
+    CHECK(engine.spawnedRippleCount() > 0);
+    CHECK(engine.lastSpawnStartAge() < -0.15f);
+    engine.buildFrame(1280.0f, 720.0f, drawList);
+    const size_t hiddenCommands = drawList.commands().size();
+    for (int frame = 0; frame < 16; ++frame) engine.update(0, 1.0f / 60.0f);
+    engine.buildFrame(1280.0f, 720.0f, drawList);
+    CHECK(drawList.commands().size() > hiddenCommands);
+}
+
 void testSpectrum3dCore() {
     using vizrack::Spectrum3dOptions;
     using vizrack::builtin::DrawList;
@@ -772,11 +1081,20 @@ void testSpectrum3dCore() {
     engine.setOptions({-3, 99});
     CHECK(engine.options().style == 0);
     CHECK(engine.options().palette == Spectrum3dEngine::kPaletteCount - 1);
-    engine.setOptions({0, 0, -20, 250, -1, 300});
-    CHECK(engine.options().rotation == 0);
+    engine.setOptions({0, 0, 250, -1, 300, 540.0f, 120.0f, 400});
     CHECK(engine.options().tilt == 100);
     CHECK(engine.options().depth == 0);
     CHECK(engine.options().heightScale == 100);
+    CHECK(std::abs(engine.options().yaw - 180.0f) < 0.01f);
+    CHECK(engine.options().pitch == 90.0f);
+    CHECK(engine.options().perspective == 100);
+    engine.setOptions({0, 0, 50, 50, 50, -190.0f, -120.0f, -5});
+    CHECK(std::abs(engine.options().yaw - 170.0f) < 0.01f);
+    CHECK(engine.options().pitch == -90.0f);
+    CHECK(engine.options().perspective == 0);
+    engine.setOptions({0, 0, 50, 50, 50, std::nanf(""), std::nanf(""), 50});
+    CHECK(engine.options().yaw == Spectrum3dOptions{}.yaw);
+    CHECK(engine.options().pitch == Spectrum3dOptions{}.pitch);
     engine.setOptions({});
     engine.setSampleRate(96000);
     engine.setSampleRate(1);  // out of range, ignored
@@ -842,6 +1160,20 @@ void testSpectrum3dCore() {
         CHECK(drawList.commands().size() <= 400);
         CHECK(drawList.points().size() <= Spectrum3dEngine::kMaxRenderedPoints);
         checkDrawList(drawList);
+    }
+
+    // Orbit camera: every view angle, including from behind and below, stays within the
+    // fixed buffers and emits finite geometry.
+    for (int yawStep = 0; yawStep < 12; ++yawStep) {
+        for (int pitchStep = -3; pitchStep <= 3; ++pitchStep) {
+            engine.setOptions({0, 0, 50, 100, 50, static_cast<float>(yawStep * 30 - 180),
+                               static_cast<float>(pitchStep * 30), (yawStep * 10) % 101});
+            engine.update(256, 1.0f / 60.0f);
+            engine.buildFrame(1280.0f, 720.0f, drawList);
+            CHECK(drawList.commands().size() <= 400);
+            CHECK(drawList.points().size() <= Spectrum3dEngine::kMaxRenderedPoints);
+            checkDrawList(drawList);
+        }
     }
 
     Spectrum3dEngine slow;
@@ -981,6 +1313,16 @@ void testI18n() {
     CHECK(vizrack::uiLanguageToken(UiLanguage::english) == "en");
     CHECK(vizrack::uiLanguageToken(UiLanguage::korean) == "ko");
 
+    // The sync-delay value label is a format string: it must take exactly one
+    // number in both languages.
+    const int delayMs = 150;
+    vizrack::setUiLanguage(UiLanguage::english);
+    CHECK(std::vformat(vizrack::trw(Str::RhythmRippleSyncDelayValue), std::make_wformat_args(delayMs)) ==
+          L"150 ms");
+    vizrack::setUiLanguage(UiLanguage::korean);
+    CHECK(std::vformat(vizrack::trw(Str::RhythmRippleSyncDelayValue), std::make_wformat_args(delayMs)) ==
+          L"150ms");
+
     vizrack::setUiLanguage(UiLanguage::english);
     CHECK(vizrack::currentUiLanguage() == UiLanguage::english);
 }
@@ -1009,6 +1351,9 @@ int main() {
     testArtVisualizerCore();
     testCampfireCore();
     testStarGuitarCore();
+    testRhythmRippleCore();
+    testRhythmRippleDetectorTiming();
+    testRhythmRippleSyncDelay();
     testSpectrum3dCore();
     testOscilloscopeCore();
     testReconnect();

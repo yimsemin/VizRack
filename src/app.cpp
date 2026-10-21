@@ -81,6 +81,7 @@ void mergeMainWindowSettings(Settings& destination, const Settings& source) {
     destination.alwaysOnTop = source.alwaysOnTop;
     destination.borderless = source.borderless;
     destination.opacityPercent = source.opacityPercent;
+    destination.showOverlayText = source.showOverlayText;
 }
 
 std::string editionForStatus(const PluginDefinition& definition,
@@ -99,7 +100,8 @@ std::string editionForStatus(const PluginDefinition& definition,
 App::App(HINSTANCE instance)
     : instance_(instance), vstHost_(audioRing_, logger_), oscilloscope_(audioRing_),
       artVisualizer_(audioRing_), campfire_(audioRing_), spectrum3d_(audioRing_, 0),
-      joyDivision_(audioRing_, 1), starGuitar_(audioRing_), capture_(audioRing_, logger_) {}
+      joyDivision_(audioRing_, 1), starGuitar_(audioRing_), rhythmRipple_(audioRing_),
+      capture_(audioRing_, logger_) {}
 
 App::~App() { shutdown(); }
 
@@ -171,23 +173,30 @@ bool App::initialize(std::string& error) {
             settings_.starGuitarAirSensitivity = options.airSensitivity;
             saveSettingsNow();
         });
+    rhythmRipple_.configure(
+        {settings_.rhythmRippleSensitivity, settings_.rhythmRippleSyncDelayMs},
+        [this](const RhythmRippleOptions& options) {
+            settings_.rhythmRippleSensitivity = options.sensitivity;
+            settings_.rhythmRippleSyncDelayMs = options.syncDelayMs;
+            saveSettingsNow();
+        });
     spectrum3d_.configure(
-        {0, settings_.spectrum3dPalette, settings_.spectrum3dRotation,
-         settings_.spectrum3dTilt, settings_.spectrum3dDepth, settings_.spectrum3dHeight},
+        {0, settings_.spectrum3dPalette, 50, settings_.spectrum3dDepth, settings_.spectrum3dHeight,
+         settings_.spectrum3dYaw, settings_.spectrum3dPitch, settings_.spectrum3dPerspective},
         [this](const Spectrum3dOptions& options) {
             settings_.spectrum3dPalette = options.palette;
-            settings_.spectrum3dRotation = options.rotation;
-            settings_.spectrum3dTilt = options.tilt;
+            settings_.spectrum3dYaw = options.yaw;
+            settings_.spectrum3dPitch = options.pitch;
+            settings_.spectrum3dPerspective = options.perspective;
             settings_.spectrum3dDepth = options.depth;
             settings_.spectrum3dHeight = options.heightScale;
             saveSettingsNow();
         });
     joyDivision_.configure(
-        {1, settings_.joyDivisionPalette, settings_.joyDivisionRotation,
-         settings_.joyDivisionTilt, settings_.joyDivisionDepth, settings_.joyDivisionHeight},
+        {1, settings_.joyDivisionPalette, settings_.joyDivisionTilt, settings_.joyDivisionDepth,
+         settings_.joyDivisionHeight},
         [this](const Spectrum3dOptions& options) {
             settings_.joyDivisionPalette = options.palette;
-            settings_.joyDivisionRotation = options.rotation;
             settings_.joyDivisionTilt = options.tilt;
             settings_.joyDivisionDepth = options.depth;
             settings_.joyDivisionHeight = options.heightScale;
@@ -216,8 +225,12 @@ bool App::initialize(std::string& error) {
         [this](const std::string& pluginId, const std::filesystem::path& path) {
             selectPluginPath(pluginId, path);
         };
+    callbacks.onPluginPropertiesRequested = [this](const std::string& pluginId) {
+        showPluginProperties(pluginId);
+    };
     callbacks.onSettingsChanged = [this](const Settings& settings) {
         mergeMainWindowSettings(settings_, settings);
+        applyOverlayVisibility();
         saveSettingsNow();
     };
     callbacks.onResume = [this] {
@@ -226,6 +239,7 @@ bool App::initialize(std::string& error) {
     };
     window_ = std::make_unique<MainWindow>(instance_, settings_, std::move(callbacks));
     if (!window_->create(error)) return false;
+    applyOverlayVisibility();
     window_->setEditorConstraintHandler([this](int width, int height) {
         if (builtInViewActive()) return std::pair{width, height};
         return vstHost_.constrainEditorSize(width, height);
@@ -238,12 +252,10 @@ bool App::initialize(std::string& error) {
         spectrum3d_.resize(width, height);
         joyDivision_.resize(width, height);
         starGuitar_.resize(width, height);
+        rhythmRipple_.resize(width, height);
     });
     window_->setEditorScaleHandler([this](float scale) { vstHost_.setEditorContentScale(scale); });
 
-    if (!portableWritable_) {
-        window_->setPluginStatus(tr(Str::StatusPortableReadOnly));
-    }
     loadInitialPlugin();
 
     captureStarted_ = capture_.start(
@@ -260,6 +272,7 @@ bool App::initialize(std::string& error) {
             spectrum3d_.setSampleRate(sampleRate);
             joyDivision_.setSampleRate(sampleRate);
             starGuitar_.setSampleRate(sampleRate);
+            rhythmRipple_.setSampleRate(sampleRate);
         },
         [this] { vstHost_.notifyDataReady(); });
     if (!captureStarted_) {
@@ -277,7 +290,7 @@ int App::run(int commandShow) {
     }
     if (!portableWritable_) {
         MessageBoxW(window_->handle(), fromUtf8(paths_.writeError).c_str(),
-                    trw(Str::DialogTitlePortableStorage).c_str(), MB_OK | MB_ICONWARNING);
+                    trw(Str::DialogTitlePortableStorage).c_str(), MB_OK);
     }
     if (pluginSelectionNeeded_ && !smokeTest) {
         const auto* definition = findPluginDefinition(settings_.selectedPluginId);
@@ -286,7 +299,7 @@ int App::run(int commandShow) {
             std::vformat(trw(Str::DialogBodyPluginRequiredFmt), std::make_wformat_args(displayName));
         const int choice = MessageBoxW(
             window_->handle(), message.c_str(), trw(Str::DialogTitlePluginRequired).c_str(),
-            MB_YESNOCANCEL | MB_ICONINFORMATION);
+            MB_YESNOCANCEL);
         if (choice == IDYES && definition) {
             window_->openPluginInstallPage(definition->id);
         } else if (choice == IDNO && definition) {
@@ -308,7 +321,8 @@ void App::loadInitialPlugin() {
         std::string error;
         if (!activateBuiltInPlugin(*definition, error)) {
             logger_.error(definition->displayName + " activation failed: " + error);
-            window_->setPluginStatus(error);
+            MessageBoxW(window_->handle(), fromUtf8(error).c_str(),
+                        trw(Str::DialogTitleBuiltinStartFailed).c_str(), MB_OK);
             return;
         }
         commitPluginSelection(*definition);
@@ -321,14 +335,12 @@ void App::loadInitialPlugin() {
     const auto inspection = findSupportedPlugin(*definition, savedPath);
     if (!inspection.compatible) {
         logger_.warning(definition->displayName + " discovery failed: " + inspection.error);
-        window_->setPluginStatus(inspection.error);
         pluginSelectionNeeded_ = true;
         return;
     }
     std::string error;
     if (!activatePlugin(*definition, inspection.descriptor, error)) {
         logger_.error(definition->displayName + " activation failed: " + error);
-        window_->setPluginStatus(error);
         pluginSelectionNeeded_ = true;
         return;
     }
@@ -429,6 +441,8 @@ bool App::startBuiltInPlugin(const PluginDefinition& definition, std::string& er
         attached = joyDivision_.attach(instance_, window_->pluginParent(), error);
     } else if (definition.id == "builtin-starguitar") {
         attached = starGuitar_.attach(instance_, window_->pluginParent(), error);
+    } else if (definition.id == "builtin-rhythmripple") {
+        attached = rhythmRipple_.attach(instance_, window_->pluginParent(), error);
     } else {
         error = "Unsupported built-in visualizer: " + definition.id;
     }
@@ -440,13 +454,13 @@ bool App::startBuiltInPlugin(const PluginDefinition& definition, std::string& er
     spectrum3d_.setSampleRate(sampleRate);
     joyDivision_.setSampleRate(sampleRate);
     starGuitar_.setSampleRate(sampleRate);
+    rhythmRipple_.setSampleRate(sampleRate);
     activeBuiltInPluginId_ = definition.id;
     if (definition.id == "builtin-joydivision") {
         joyDivision_.setInspiration(definition.inspiration);
     } else if (definition.id == "builtin-starguitar") {
         starGuitar_.setInspiration(definition.inspiration);
     }
-    window_->setPluginStatus(definition.displayName);
     pluginSelectionNeeded_ = false;
     logger_.info("Built-in visualization activated: id='" + definition.id + "'");
     return true;
@@ -480,10 +494,6 @@ bool App::startPluginInstance(const PluginDefinition& definition,
         vstHost_.unload();
         return false;
     }
-    std::string status = descriptor.name + " " + descriptor.version;
-    const std::string edition = editionForStatus(definition, descriptor);
-    if (!edition.empty()) status += " (" + edition + ")";
-    window_->setPluginStatus(std::move(status));
     pluginSelectionNeeded_ = false;
     return true;
 }
@@ -495,7 +505,7 @@ void App::selectPlugin(const std::string& pluginId) {
         std::string error;
         if (!activateBuiltInPlugin(*definition, error)) {
             MessageBoxW(window_->handle(), fromUtf8(error).c_str(),
-                        trw(Str::DialogTitleBuiltinStartFailed).c_str(), MB_OK | MB_ICONERROR);
+                        trw(Str::DialogTitleBuiltinStartFailed).c_str(), MB_OK);
             return;
         }
         commitPluginSelection(*definition);
@@ -509,13 +519,13 @@ void App::selectPlugin(const std::string& pluginId) {
     if (!inspection.compatible) {
         logger_.warning(definition->displayName + " selection failed: " + inspection.error);
         MessageBoxW(window_->handle(), fromUtf8(inspection.error).c_str(),
-                    trw(Str::DialogTitleSupportedPluginMissing).c_str(), MB_OK | MB_ICONERROR);
+                    trw(Str::DialogTitleSupportedPluginMissing).c_str(), MB_OK);
         return;
     }
     std::string error;
     if (!activatePlugin(*definition, inspection.descriptor, error)) {
         MessageBoxW(window_->handle(), fromUtf8(error).c_str(),
-                    trw(Str::DialogTitleVst3LoadFailed).c_str(), MB_OK | MB_ICONERROR);
+                    trw(Str::DialogTitleVst3LoadFailed).c_str(), MB_OK);
         return;
     }
     commitPluginSelection(*definition, &inspection.descriptor);
@@ -528,16 +538,40 @@ void App::selectPluginPath(const std::string& pluginId, const std::filesystem::p
     if (!inspection.compatible) {
         logger_.warning("Manual plug-in selection rejected: " + inspection.error);
         MessageBoxW(window_->handle(), fromUtf8(inspection.error).c_str(),
-                    trw(Str::DialogTitleIncompatibleVst3).c_str(), MB_OK | MB_ICONERROR);
+                    trw(Str::DialogTitleIncompatibleVst3).c_str(), MB_OK);
         return;
     }
     std::string error;
     if (!activatePlugin(*definition, inspection.descriptor, error)) {
         MessageBoxW(window_->handle(), fromUtf8(error).c_str(),
-                    trw(Str::DialogTitleVst3LoadFailed).c_str(), MB_OK | MB_ICONERROR);
+                    trw(Str::DialogTitleVst3LoadFailed).c_str(), MB_OK);
         return;
     }
     commitPluginSelection(*definition, &inspection.descriptor);
+}
+
+void App::showPluginProperties(const std::string& pluginId) {
+    const auto* definition = findPluginDefinition(pluginId);
+    if (!definition || definition->kind != PluginKind::vst3) return;
+    const auto storage = pluginStoragePaths(paths_.plugins, definition->id);
+    std::string warning;
+    const auto savedPath = loadPluginLocation(storage.location, warning);
+    const auto inspection = findSupportedPlugin(*definition, savedPath);
+    const std::wstring title = MainWindow::localizedPluginName(*definition);
+    if (!inspection.compatible) {
+        MessageBoxW(window_->handle(), trw(Str::PluginPropertiesNotFound).c_str(), title.c_str(),
+                    MB_OK);
+        return;
+    }
+    const auto& descriptor = inspection.descriptor;
+    const std::string edition = editionForStatus(*definition, descriptor);
+    std::wstring text =
+        trw(Str::PluginPropertiesVersion) + L": " + fromUtf8(descriptor.version) + L"\n";
+    if (!edition.empty()) {
+        text += trw(Str::PluginPropertiesEdition) + L": " + fromUtf8(edition) + L"\n";
+    }
+    text += trw(Str::PluginPropertiesFile) + L": " + descriptor.modulePath.wstring();
+    MessageBoxW(window_->handle(), text.c_str(), title.c_str(), MB_OK);
 }
 
 void App::commitPluginSelection(const PluginDefinition& definition,
@@ -577,7 +611,8 @@ void App::logEnvironment() {
 
 bool App::builtInViewActive() const noexcept {
     return oscilloscope_.active() || artVisualizer_.active() || campfire_.active() ||
-           spectrum3d_.active() || joyDivision_.active() || starGuitar_.active();
+           spectrum3d_.active() || joyDivision_.active() || starGuitar_.active() ||
+           rhythmRipple_.active();
 }
 
 const PluginDefinition* App::activeBuiltInDefinition() const {
@@ -591,7 +626,18 @@ void App::detachBuiltInViews() {
     spectrum3d_.detach();
     joyDivision_.detach();
     starGuitar_.detach();
+    rhythmRipple_.detach();
     activeBuiltInPluginId_.clear();
+}
+
+void App::applyOverlayVisibility() {
+    oscilloscope_.setShowOverlay(settings_.showOverlayText);
+    artVisualizer_.setShowOverlay(settings_.showOverlayText);
+    campfire_.setShowOverlay(settings_.showOverlayText);
+    spectrum3d_.setShowOverlay(settings_.showOverlayText);
+    joyDivision_.setShowOverlay(settings_.showOverlayText);
+    starGuitar_.setShowOverlay(settings_.showOverlayText);
+    rhythmRipple_.setShowOverlay(settings_.showOverlayText);
 }
 
 void App::shutdown() {

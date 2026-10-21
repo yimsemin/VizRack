@@ -30,10 +30,22 @@ $tag = "v$version"
 $date = (Get-Date).ToString('yyyy-MM-dd')
 $notePath = Join-Path $repo ("docs/release-notes/" + ($version -replace '\.', '_') + '.md')
 
-$baseTag = (& git -C $repo describe --tags --abbrev=0 --match 'v[0-9]*' HEAD 2>$null | Out-String).Trim()
-if ($LASTEXITCODE -ne 0 -or $baseTag -notmatch '^v\d+\.\d+\.\d+$') {
-    throw 'No reachable vMAJOR.MINOR.PATCH tag was found for the current branch.'
+# The previous release tag is found by version order across ALL tags in the
+# repo, not by ancestry (`git describe`): release tags live on `main`, not on
+# `develop` (docs/RELEASE_PROCESS.md ▸ Cutting a release only merges
+# `develop` into `main`, so a tag commit is never an ancestor of `develop`).
+# `git describe --tags HEAD` run from `develop` would silently fall back to
+# whatever older tag *is* reachable, producing a wrong "Full changelog" link.
+$existingTags = @(& git -C $repo tag --list 'v[0-9]*.[0-9]*.[0-9]*' 2>$null)
+$parsedTags = $existingTags | Where-Object { $_ -match '^v(\d+)\.(\d+)\.(\d+)$' } |
+    ForEach-Object { [pscustomobject]@{ Tag = $_; V = [version]$_.TrimStart('v') } }
+$targetVersion = [version]$version
+$baseTagEntry = $parsedTags | Where-Object { $_.V -lt $targetVersion } |
+    Sort-Object V -Descending | Select-Object -First 1
+if (-not $baseTagEntry) {
+    throw "No existing vMAJOR.MINOR.PATCH tag older than $tag was found."
 }
+$baseTag = $baseTagEntry.Tag
 if ($baseTag -eq $tag) {
     throw "HEAD is already at $tag; bump project(VizRack VERSION ...) before generating notes."
 }

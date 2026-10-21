@@ -341,16 +341,34 @@ void CampfireEngine::drawStars(DrawList& output, float width, float height,
         return Point{poleX + dx * cosine - dy * sine,
                      poleY + (dx * sine + dy * cosine) * ellipseScale};
     };
+    // Stars orbit a pole below the sky; without a per-star phase offset they all
+    // share the same rotation angle and sweep past the horizon as one clump,
+    // leaving the sky visibly empty while that clump glows near the ground.
+    // Randomizing each star's phase keeps a steady number visible at all times.
+    // The horizon fade then hides whatever's left below the fire line instead of
+    // letting it glow on the ground.
+    const float horizonY = skyHeight;
+    const float fadeBand = std::max(1.0f, skyHeight * 0.08f);
+    const auto horizonFade = [&](float y) {
+        if (y >= horizonY) return 0.0f;
+        if (y <= horizonY - fadeBand) return 1.0f;
+        return (horizonY - y) / fadeBand;
+    };
     for (uint32_t star = 0; star < static_cast<uint32_t>(kStarCount); ++star) {
         const float depth = hash01(star * 47u + 3u);
         const float initialX =
             width * (0.025f + hash01(star * 71u + 13u) * 0.95f);
         const float initialY =
             skyHeight * (0.035f + hash01(star * 97u + 31u) * 0.88f);
+        const float phaseOffset = hash01(star * 151u + 61u) * kPi * 2.0f;
         const auto positionAt = [&](float secondsFromNow) {
-            return rotateFromInitial(initialX, initialY,
-                                     starRotation_ + secondsFromNow * angularSpeed);
+            return rotateFromInitial(
+                initialX, initialY,
+                starRotation_ + phaseOffset + secondsFromNow * angularSpeed);
         };
+        const Point position = positionAt(0.0f);
+        const float horizonAlpha = horizonFade(position.y);
+        if (horizonAlpha <= 0.0f) continue;
         const float naturalTwinkle =
             0.72f + 0.26f * std::sin(time_ * (0.48f + depth * 0.82f) +
                                      hash01(star * 19u + 7u) * kPi * 2.0f);
@@ -361,8 +379,9 @@ void CampfireEngine::drawStars(DrawList& output, float width, float height,
         const float radius = scale * (0.45f + depth * 0.95f) *
                              (1.0f + responsePulse * 0.38f);
         const float starAlpha = std::clamp(
-            (42.0f + brightnessSetting * 178.0f) * brightness +
-                responsePulse * 95.0f,
+            ((42.0f + brightnessSetting * 178.0f) * brightness +
+                responsePulse * 95.0f) *
+                horizonAlpha,
             0.0f, 255.0f);
         constexpr int trailSegments = 5;
         const float trailSeconds = 3.0f + speedSetting * 5.5f;
@@ -372,14 +391,16 @@ void CampfireEngine::drawStars(DrawList& output, float width, float height,
                 static_cast<float>(segment + 1) / trailSegments;
             const Point current =
                 positionAt(-trailSeconds * (1.0f - progress));
-            const float trailAlpha =
-                starAlpha * (0.10f + progress * progress * 0.38f);
-            output.addLine(previous.x, previous.y, current.x, current.y,
-                           color(0xa9caff, static_cast<uint8_t>(trailAlpha)),
-                           std::max(0.45f, radius * (0.34f + progress * 0.12f)), true);
+            const float trailFade = horizonFade(current.y);
+            if (trailFade > 0.0f) {
+                const float trailAlpha =
+                    starAlpha * (0.10f + progress * progress * 0.38f) * trailFade;
+                output.addLine(previous.x, previous.y, current.x, current.y,
+                               color(0xa9caff, static_cast<uint8_t>(trailAlpha)),
+                               std::max(0.45f, radius * (0.34f + progress * 0.12f)), true);
+            }
             previous = current;
         }
-        const Point position = positionAt(0.0f);
         output.addFillEllipse(
             position.x - radius * 2.8f, position.y - radius * 2.8f,
             radius * 5.6f, radius * 5.6f,
@@ -540,7 +561,8 @@ void CampfireEngine::drawLogs(DrawList& output, float centerX, float baseY, floa
 }
 
 void CampfireEngine::drawForegroundLogs(DrawList& output, float centerX,
-                                         float baseY, float extent) {
+                                         float baseY, float flameBaseY,
+                                         float extent) {
     addSilhouetteLog(output, centerX + extent * 0.040f,
                      baseY - extent * 0.068f, extent * 0.31f,
                      extent * 0.025f, -1.99f, 0x6ad21583u, color(0x000000));
@@ -557,7 +579,7 @@ void CampfireEngine::drawForegroundLogs(DrawList& output, float centerX,
         const float x =
             centerX + (hash01(coal * 71u + 13u) - 0.5f) * extent * 0.20f + wander;
         const float y =
-            baseY + extent * (0.004f + hash01(coal * 31u + 19u) * 0.020f);
+            flameBaseY + extent * (0.004f + hash01(coal * 31u + 19u) * 0.020f);
         const float size =
             extent * (0.0045f + hash01(coal * 53u + 7u) * 0.0055f);
         const float pulse =
@@ -644,15 +666,18 @@ void CampfireEngine::addFlameTongue(DrawList& output, float centerX, float baseY
     output.addFillPolygon(output.appendPoints(scratch_), value);
 }
 
+float CampfireEngine::flameIntensity() const noexcept {
+    const float responseScale =
+        static_cast<float>(options_.flameResponse) / 80.0f;
+    return 1.0f + (lowLevel_ * 0.12f + midLevel_ * 0.04f + beatLevel_ * 0.22f) *
+                      responseScale;
+}
+
 void CampfireEngine::drawFlames(DrawList& output, float centerX, float baseY,
                                 float flameHeight, float extent) {
     const float naturalPulse =
         0.96f + smoothNoise(time_ * 2.15f, 0x4a39b70du) * 0.06f;
-    const float responseScale =
-        static_cast<float>(options_.flameResponse) / 80.0f;
-    const float audioHeight =
-        1.0f + (lowLevel_ * 0.12f + midLevel_ * 0.04f + beatLevel_ * 0.22f) *
-                   responseScale;
+    const float audioHeight = flameIntensity();
     const float height =
         flameHeight * naturalPulse * audioHeight * fireScale_;
     const float halfWidth =
@@ -755,19 +780,15 @@ void CampfireEngine::buildFrame(float width, float height, DrawList& output) {
     drawSmoke(output, centerX, flameBaseY, flameHeight * fireScale_, extent);
     drawLogs(output, centerX, baseY, extent);
     drawFlames(output, centerX, flameBaseY, flameHeight, extent);
-    drawForegroundLogs(output, centerX, baseY, extent);
+    drawForegroundLogs(output, centerX, baseY, flameBaseY, extent);
     drawEmbers(output, centerX, flameBaseY, flameHeight, extent);
 }
 
 CampfireFrameInfo CampfireEngine::frameInfo() const noexcept {
     const float particleActivity =
         clampUnit(activityLevel_ * 0.35f + highLevel_ * 0.45f + beatLevel_ * 0.65f);
-    const float responseScale =
-        static_cast<float>(options_.flameResponse) / 80.0f;
     return {lowLevel_, midLevel_, highLevel_, stereoLevel_, beatLevel_,
-            particleActivity,
-            1.0f + (lowLevel_ * 0.12f + midLevel_ * 0.04f + beatLevel_ * 0.22f) *
-                       responseScale,
+            particleActivity, flameIntensity(),
             fireScale_, quietSeconds_,
             meteorActive_ && meteorLifetime_ > 0.0f
                 ? std::sin(clampUnit(meteorAge_ / meteorLifetime_) * kPi)
