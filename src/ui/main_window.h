@@ -59,6 +59,7 @@ private:
     void createMenus();
     void retranslate();
     void rebuildDeviceMenu();
+    void refreshViewMenuChecks();
     void showContextMenu(POINT point);
     void applyWindowOptions();
     void updateLayout();

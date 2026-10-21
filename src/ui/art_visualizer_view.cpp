@@ -3,6 +3,7 @@
 #include "core/audio_ring.h"
 #include "core/i18n.h"
 #include "core/utf.h"
+#include "ui/borderless_strip.h"
 #include "ui/overlay_font.h"
 
 #include <windowsx.h>
@@ -269,6 +270,9 @@ LRESULT ArtVisualizerView::proc(UINT message, WPARAM wParam, LPARAM lParam) {
                 notifyOptionsChanged();
                 return 0;
             }
+            break;
+        case WM_NCHITTEST:
+            if (isInBorderlessDragStrip(hwnd_, lParam)) return HTTRANSPARENT;
             break;
         case WM_GETDLGCODE: return DLGC_WANTARROWS | DLGC_WANTCHARS;
         case WM_NCDESTROY: {

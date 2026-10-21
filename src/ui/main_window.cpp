@@ -1,5 +1,7 @@
 #include "ui/main_window.h"
 
+#include "ui/borderless_strip.h"
+
 #include "core/i18n.h"
 #include "core/utf.h"
 #include "platform/audio_devices.h"
@@ -286,8 +288,7 @@ void MainWindow::rebuildDeviceMenu() {
     }
 }
 
-void MainWindow::showContextMenu(POINT point) {
-    rebuildDeviceMenu();
+void MainWindow::refreshViewMenuChecks() {
     CheckMenuItem(viewMenu_, kCommandAlwaysOnTop,
                   MF_BYCOMMAND | (settings_.alwaysOnTop ? MF_CHECKED : MF_UNCHECKED));
     CheckMenuItem(viewMenu_, kCommandBorderless,
@@ -300,6 +301,11 @@ void MainWindow::showContextMenu(POINT point) {
                                           ? MF_CHECKED
                                           : MF_UNCHECKED));
     }
+}
+
+void MainWindow::showContextMenu(POINT point) {
+    rebuildDeviceMenu();
+    refreshViewMenuChecks();
     // The menu bar is hidden while borderless, so this is the only route to
     // Exit; splice it onto the View popup for the call and detach it again
     // (RemoveMenu, not DeleteMenu — fileMenu_ still owns the item).
@@ -645,6 +651,7 @@ LRESULT MainWindow::proc(UINT message, WPARAM wParam, LPARAM lParam) {
             return 0;
         case WM_INITMENUPOPUP:
             rebuildDeviceMenu();
+            refreshViewMenuChecks();
             return 0;
         case WM_CONTEXTMENU: {
             POINT point{GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
@@ -659,6 +666,16 @@ LRESULT MainWindow::proc(UINT message, WPARAM wParam, LPARAM lParam) {
         case WM_NCRBUTTONUP:
             if (settings_.borderless && wParam == HTCAPTION) {
                 showContextMenu(POINT{GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)});
+                return 0;
+            }
+            break;
+        case WM_NCLBUTTONDBLCLK:
+            // Double-clicking the drag strip of a borderless window brings the
+            // border back, so it can be undone with the mouse alone.
+            if (settings_.borderless && wParam == HTCAPTION) {
+                settings_.borderless = false;
+                applyWindowOptions();
+                notifySettingsChanged();
                 return 0;
             }
             break;
@@ -686,7 +703,7 @@ LRESULT MainWindow::proc(UINT message, WPARAM wParam, LPARAM lParam) {
             if (settings_.borderless && hit == HTCLIENT) {
                 POINT point{GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
                 ScreenToClient(hwnd_, &point);
-                const int dragStrip = static_cast<int>(24.0f * dpiScale());
+                const int dragStrip = static_cast<int>(kBorderlessDragStripHeight * dpiScale());
                 if (point.y >= 0 && point.y < dragStrip) return HTCAPTION;
             }
             return hit;
