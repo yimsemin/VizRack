@@ -1,5 +1,7 @@
 #include "ui/main_window.h"
 
+#include "ui/borderless_strip.h"
+
 #include "core/i18n.h"
 #include "core/utf.h"
 #include "platform/audio_devices.h"
@@ -667,6 +669,16 @@ LRESULT MainWindow::proc(UINT message, WPARAM wParam, LPARAM lParam) {
                 return 0;
             }
             break;
+        case WM_NCLBUTTONDBLCLK:
+            // Double-clicking the drag strip of a borderless window brings the
+            // border back, so it can be undone with the mouse alone.
+            if (settings_.borderless && wParam == HTCAPTION) {
+                settings_.borderless = false;
+                applyWindowOptions();
+                notifySettingsChanged();
+                return 0;
+            }
+            break;
         case WM_KEYDOWN:
             if (wParam == VK_F10) {
                 RECT rect{};
@@ -691,7 +703,7 @@ LRESULT MainWindow::proc(UINT message, WPARAM wParam, LPARAM lParam) {
             if (settings_.borderless && hit == HTCLIENT) {
                 POINT point{GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
                 ScreenToClient(hwnd_, &point);
-                const int dragStrip = static_cast<int>(24.0f * dpiScale());
+                const int dragStrip = static_cast<int>(kBorderlessDragStripHeight * dpiScale());
                 if (point.y >= 0 && point.y < dragStrip) return HTCAPTION;
             }
             return hit;

@@ -3,6 +3,7 @@
 #include "core/audio_ring.h"
 #include "core/i18n.h"
 #include "core/utf.h"
+#include "ui/borderless_strip.h"
 #include "ui/overlay_font.h"
 
 #include <windowsx.h>
@@ -231,6 +232,9 @@ LRESULT RhythmRippleView::proc(UINT message, WPARAM wParam, LPARAM lParam) {
             SetFocus(hwnd_);
             showOptionsMenu({GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)});
             return 0;
+        case WM_NCHITTEST:
+            if (isInBorderlessDragStrip(hwnd_, lParam)) return HTTRANSPARENT;
+            break;
         case WM_GETDLGCODE: return DLGC_WANTARROWS | DLGC_WANTCHARS;
         case WM_NCDESTROY: {
             const HWND destroyed = hwnd_;

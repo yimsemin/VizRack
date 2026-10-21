@@ -92,6 +92,9 @@ ZIP attached. How these notes are written and cut: `docs/RELEASE_NOTES_STYLE.md`
 
 ### Fixed
 
+- **Hidden window border can be restored with the mouse.** Double-click the top
+  strip of a borderless window to bring the border back. That strip now also
+  moves the window on the built-in visualizers, where it used to be inert.
 - **View menu check marks are always current.** Opening View from the menu bar
   no longer shows a stale check for Hide window border, Always on top, Show
   overlay text or Opacity.
