@@ -181,22 +181,22 @@ bool App::initialize(std::string& error) {
             saveSettingsNow();
         });
     spectrum3d_.configure(
-        {0, settings_.spectrum3dPalette, settings_.spectrum3dRotation,
-         settings_.spectrum3dTilt, settings_.spectrum3dDepth, settings_.spectrum3dHeight},
+        {0, settings_.spectrum3dPalette, 50, settings_.spectrum3dDepth, settings_.spectrum3dHeight,
+         settings_.spectrum3dYaw, settings_.spectrum3dPitch, settings_.spectrum3dPerspective},
         [this](const Spectrum3dOptions& options) {
             settings_.spectrum3dPalette = options.palette;
-            settings_.spectrum3dRotation = options.rotation;
-            settings_.spectrum3dTilt = options.tilt;
+            settings_.spectrum3dYaw = options.yaw;
+            settings_.spectrum3dPitch = options.pitch;
+            settings_.spectrum3dPerspective = options.perspective;
             settings_.spectrum3dDepth = options.depth;
             settings_.spectrum3dHeight = options.heightScale;
             saveSettingsNow();
         });
     joyDivision_.configure(
-        {1, settings_.joyDivisionPalette, settings_.joyDivisionRotation,
-         settings_.joyDivisionTilt, settings_.joyDivisionDepth, settings_.joyDivisionHeight},
+        {1, settings_.joyDivisionPalette, settings_.joyDivisionTilt, settings_.joyDivisionDepth,
+         settings_.joyDivisionHeight},
         [this](const Spectrum3dOptions& options) {
             settings_.joyDivisionPalette = options.palette;
-            settings_.joyDivisionRotation = options.rotation;
             settings_.joyDivisionTilt = options.tilt;
             settings_.joyDivisionDepth = options.depth;
             settings_.joyDivisionHeight = options.heightScale;

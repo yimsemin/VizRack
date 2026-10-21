@@ -88,12 +88,12 @@ void testSettings(const std::filesystem::path& directory) {
     original.campfireParticleAmount = 90;
     original.campfireParticleIntensity = 60;
     original.spectrum3dPalette = 3;
-    original.spectrum3dRotation = 70;
-    original.spectrum3dTilt = 30;
+    original.spectrum3dYaw = -135.5f;
+    original.spectrum3dPitch = 62.0f;
+    original.spectrum3dPerspective = 80;
     original.spectrum3dDepth = 90;
     original.spectrum3dHeight = 20;
     original.joyDivisionPalette = 5;
-    original.joyDivisionRotation = 10;
     original.joyDivisionTilt = 80;
     original.joyDivisionDepth = 40;
     original.joyDivisionHeight = 100;
@@ -123,12 +123,12 @@ void testSettings(const std::filesystem::path& directory) {
     CHECK(loaded.value.campfireParticleAmount == 90);
     CHECK(loaded.value.campfireParticleIntensity == 60);
     CHECK(loaded.value.spectrum3dPalette == 3);
-    CHECK(loaded.value.spectrum3dRotation == 70);
-    CHECK(loaded.value.spectrum3dTilt == 30);
+    CHECK(std::abs(loaded.value.spectrum3dYaw - (-135.5f)) < 0.01f);
+    CHECK(std::abs(loaded.value.spectrum3dPitch - 62.0f) < 0.01f);
+    CHECK(loaded.value.spectrum3dPerspective == 80);
     CHECK(loaded.value.spectrum3dDepth == 90);
     CHECK(loaded.value.spectrum3dHeight == 20);
     CHECK(loaded.value.joyDivisionPalette == 5);
-    CHECK(loaded.value.joyDivisionRotation == 10);
     CHECK(loaded.value.joyDivisionTilt == 80);
     CHECK(loaded.value.joyDivisionDepth == 40);
     CHECK(loaded.value.joyDivisionHeight == 100);
@@ -907,11 +907,20 @@ void testSpectrum3dCore() {
     engine.setOptions({-3, 99});
     CHECK(engine.options().style == 0);
     CHECK(engine.options().palette == Spectrum3dEngine::kPaletteCount - 1);
-    engine.setOptions({0, 0, -20, 250, -1, 300});
-    CHECK(engine.options().rotation == 0);
+    engine.setOptions({0, 0, 250, -1, 300, 540.0f, 120.0f, 400});
     CHECK(engine.options().tilt == 100);
     CHECK(engine.options().depth == 0);
     CHECK(engine.options().heightScale == 100);
+    CHECK(std::abs(engine.options().yaw - 180.0f) < 0.01f);
+    CHECK(engine.options().pitch == 90.0f);
+    CHECK(engine.options().perspective == 100);
+    engine.setOptions({0, 0, 50, 50, 50, -190.0f, -120.0f, -5});
+    CHECK(std::abs(engine.options().yaw - 170.0f) < 0.01f);
+    CHECK(engine.options().pitch == -90.0f);
+    CHECK(engine.options().perspective == 0);
+    engine.setOptions({0, 0, 50, 50, 50, std::nanf(""), std::nanf(""), 50});
+    CHECK(engine.options().yaw == Spectrum3dOptions{}.yaw);
+    CHECK(engine.options().pitch == Spectrum3dOptions{}.pitch);
     engine.setOptions({});
     engine.setSampleRate(96000);
     engine.setSampleRate(1);  // out of range, ignored
@@ -977,6 +986,20 @@ void testSpectrum3dCore() {
         CHECK(drawList.commands().size() <= 400);
         CHECK(drawList.points().size() <= Spectrum3dEngine::kMaxRenderedPoints);
         checkDrawList(drawList);
+    }
+
+    // Orbit camera: every view angle, including from behind and below, stays within the
+    // fixed buffers and emits finite geometry.
+    for (int yawStep = 0; yawStep < 12; ++yawStep) {
+        for (int pitchStep = -3; pitchStep <= 3; ++pitchStep) {
+            engine.setOptions({0, 0, 50, 100, 50, static_cast<float>(yawStep * 30 - 180),
+                               static_cast<float>(pitchStep * 30), (yawStep * 10) % 101});
+            engine.update(256, 1.0f / 60.0f);
+            engine.buildFrame(1280.0f, 720.0f, drawList);
+            CHECK(drawList.commands().size() <= 400);
+            CHECK(drawList.points().size() <= Spectrum3dEngine::kMaxRenderedPoints);
+            checkDrawList(drawList);
+        }
     }
 
     Spectrum3dEngine slow;

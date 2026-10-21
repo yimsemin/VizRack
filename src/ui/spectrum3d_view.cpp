@@ -9,6 +9,7 @@
 #include <windowsx.h>
 
 #include <algorithm>
+#include <cmath>
 #include <chrono>
 #include <string>
 #include <utility>
@@ -18,10 +19,27 @@ namespace {
 
 constexpr UINT_PTR kRefreshTimer = 0x5350;
 constexpr UINT kPaletteCommand = 700;
-constexpr UINT kRotationCommand = 720;
+constexpr UINT kRotationCommand = 720;  // 12 yaw presets
 constexpr UINT kTiltCommand = 740;
 constexpr UINT kDepthCommand = 760;
 constexpr UINT kHeightCommand = 780;
+constexpr UINT kPitchCommand = 800;  // 13 pitch presets
+constexpr UINT kPerspectiveCommand = 820;
+constexpr UINT kViewPresetCommand = 860;  // kViewPresets entries
+
+struct ViewPreset {
+    Str label;
+    float yaw;
+    float pitch;
+};
+// The first entry is the default view and also restores the default perspective.
+const ViewPreset kViewPresets[] = {
+    {Str::SpectrumViewDefault, 30.0f, 22.5f}, {Str::SpectrumViewFront, 0.0f, 12.0f},
+    {Str::SpectrumViewSide, 90.0f, 12.0f},    {Str::SpectrumViewBack, 180.0f, 12.0f},
+    {Str::SpectrumViewLow, 30.0f, -25.0f},
+};
+constexpr float kDragDegreesPerPixel = 0.4f;
+constexpr int kWheelPerspectiveStep = 5;
 
 void appendValueMenu(HMENU parent, const wchar_t* label, UINT commandBase, int currentValue) {
     HMENU values = CreatePopupMenu();
@@ -29,6 +47,20 @@ void appendValueMenu(HMENU parent, const wchar_t* label, UINT commandBase, int c
         AppendMenuW(values, MF_STRING | (value == currentValue ? MF_CHECKED : 0),
                     commandBase + static_cast<UINT>(value / 10),
                     std::to_wstring(value).c_str());
+    }
+    AppendMenuW(parent, MF_POPUP, reinterpret_cast<UINT_PTR>(values), label);
+}
+
+// Preset menu of angles in degrees: first, first + step, ... first + (count - 1) * step.
+void appendAngleMenu(HMENU parent, const wchar_t* label, UINT commandBase, float current,
+                     int first, int step, int count) {
+    HMENU values = CreatePopupMenu();
+    for (int index = 0; index < count; ++index) {
+        const int degrees = first + index * step;
+        const bool checked = std::abs(current - static_cast<float>(degrees)) < 0.5f;
+        AppendMenuW(values, MF_STRING | (checked ? MF_CHECKED : 0),
+                    commandBase + static_cast<UINT>(index),
+                    (std::to_wstring(degrees) + L"\u00B0").c_str());
     }
     AppendMenuW(parent, MF_POPUP, reinterpret_cast<UINT_PTR>(values), label);
 }
@@ -155,6 +187,11 @@ void Spectrum3dView::drawOverlay(HDC dc, float width, float height) const {
     const std::wstring hint = trw(Str::HintRightClickOptions);
     graphics.DrawString(hint.c_str(), -1, &smallFont,
                         {width - 208.0f, height - 27.0f, 190.0f, 18.0f}, &right, &dim);
+    if (style_ == 0) {
+        const std::wstring dragHint = trw(Str::HintDragRotate);
+        graphics.DrawString(dragHint.c_str(), -1, &smallFont,
+                            {width - 308.0f, height - 47.0f, 290.0f, 18.0f}, &right, &dim);
+    }
     if (!inspiration_.empty()) {
         const std::wstring inspiration = fromUtf8(inspiration_);
         graphics.DrawString(inspiration.c_str(), -1, &smallFont, {18.0f, 34.0f}, &dim);
@@ -186,6 +223,12 @@ void Spectrum3dView::notifyOptionsChanged() {
     if (hwnd_) InvalidateRect(hwnd_, nullptr, FALSE);
 }
 
+void Spectrum3dView::endDrag() {
+    dragging_ = false;
+    if (GetCapture() == hwnd_) ReleaseCapture();
+    notifyOptionsChanged();
+}
+
 void Spectrum3dView::changePalette(int offset) {
     auto options = engine_.options();
     options.palette = (options.palette + offset + builtin::Spectrum3dEngine::kPaletteCount) %
@@ -211,13 +254,32 @@ void Spectrum3dView::showOptionsMenu(POINT point) {
     }
     AppendMenuW(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(palettes),
                 trw(Str::SpectrumMenuPalette).c_str());
+    // Groups are separated by menu separators, not nested menus: palette, then view
+    // presets and angle values, then the surface shape.
     if (style_ == 0) {
-        appendValueMenu(menu, trw(Str::SpectrumMenuRotation).c_str(), kRotationCommand,
-                        options.rotation);
+        AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
+        for (size_t index = 0; index < std::size(kViewPresets); ++index) {
+            const auto& preset = kViewPresets[index];
+            const bool checked = std::abs(options.yaw - preset.yaw) < 0.5f &&
+                                 std::abs(options.pitch - preset.pitch) < 0.5f;
+            AppendMenuW(menu, MF_STRING | (checked ? MF_CHECKED : 0),
+                        kViewPresetCommand + static_cast<UINT>(index), trw(preset.label).c_str());
+        }
+        AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
+        appendAngleMenu(menu, trw(Str::SpectrumMenuRotation).c_str(), kRotationCommand,
+                        options.yaw, -180, 30, 12);
+        appendAngleMenu(menu, trw(Str::SpectrumMenuPitch).c_str(), kPitchCommand,
+                        options.pitch, -90, 15, 13);
+        appendValueMenu(menu, trw(Str::SpectrumMenuPerspective).c_str(), kPerspectiveCommand,
+                        options.perspective);
+    } else {
+        AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
+        appendValueMenu(menu, trw(Str::SpectrumMenuTilt).c_str(), kTiltCommand, options.tilt);
     }
-    appendValueMenu(menu, trw(Str::SpectrumMenuTilt).c_str(), kTiltCommand, options.tilt);
+    AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
     appendValueMenu(menu, trw(Str::SpectrumMenuDepth).c_str(), kDepthCommand, options.depth);
-    appendValueMenu(menu, trw(Str::SpectrumMenuHeight).c_str(), kHeightCommand, options.heightScale);
+    appendValueMenu(menu, trw(Str::SpectrumMenuHeight).c_str(), kHeightCommand,
+                    options.heightScale);
 
     const UINT command = TrackPopupMenu(menu, TPM_RETURNCMD | TPM_RIGHTBUTTON,
                                         point.x, point.y, 0, hwnd_, nullptr);
@@ -235,10 +297,25 @@ void Spectrum3dView::showOptionsMenu(POINT point) {
         updated.palette = static_cast<int>(command - kPaletteCommand);
         changed = true;
     } else {
-        changed = applyValue(kRotationCommand, updated.rotation) ||
-                  applyValue(kTiltCommand, updated.tilt) ||
-                  applyValue(kDepthCommand, updated.depth) ||
-                  applyValue(kHeightCommand, updated.heightScale);
+        if (style_ == 0 && command >= kRotationCommand && command < kRotationCommand + 12) {
+            updated.yaw = static_cast<float>(-180 + 30 * static_cast<int>(command - kRotationCommand));
+            changed = true;
+        } else if (style_ == 0 && command >= kPitchCommand && command < kPitchCommand + 13) {
+            updated.pitch = static_cast<float>(-90 + 15 * static_cast<int>(command - kPitchCommand));
+            changed = true;
+        } else if (style_ == 0 && command >= kViewPresetCommand &&
+                   command < kViewPresetCommand + std::size(kViewPresets)) {
+            const auto& preset = kViewPresets[command - kViewPresetCommand];
+            updated.yaw = preset.yaw;
+            updated.pitch = preset.pitch;
+            if (command == kViewPresetCommand) updated.perspective = Spectrum3dOptions{}.perspective;
+            changed = true;
+        } else {
+            changed = (style_ == 0 && applyValue(kPerspectiveCommand, updated.perspective)) ||
+                      (style_ == 1 && applyValue(kTiltCommand, updated.tilt)) ||
+                      applyValue(kDepthCommand, updated.depth) ||
+                      applyValue(kHeightCommand, updated.heightScale);
+        }
     }
     if (changed) {
         engine_.setOptions(updated);
@@ -266,7 +343,46 @@ LRESULT Spectrum3dView::proc(UINT message, WPARAM wParam, LPARAM lParam) {
             break;
         case WM_PAINT: paint(); return 0;
         case WM_ERASEBKGND: return 1;
-        case WM_LBUTTONDOWN: SetFocus(hwnd_); return 0;
+        case WM_LBUTTONDOWN:
+            SetFocus(hwnd_);
+            if (style_ == 0) {
+                dragging_ = true;
+                lastDragPoint_ = {GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
+                SetCapture(hwnd_);
+            }
+            return 0;
+        case WM_MOUSEMOVE:
+            if (dragging_) {
+                const POINT point{GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
+                auto options = engine_.options();
+                options.yaw += static_cast<float>(point.x - lastDragPoint_.x) * kDragDegreesPerPixel;
+                options.pitch += static_cast<float>(point.y - lastDragPoint_.y) * kDragDegreesPerPixel;
+                lastDragPoint_ = point;
+                engine_.setOptions(options);
+                InvalidateRect(hwnd_, nullptr, FALSE);
+                return 0;
+            }
+            break;
+        case WM_LBUTTONUP:
+            if (dragging_) {
+                endDrag();
+                return 0;
+            }
+            break;
+        case WM_CAPTURECHANGED:
+        case WM_CANCELMODE:
+            if (dragging_) endDrag();
+            break;
+        case WM_MOUSEWHEEL:
+            if (style_ == 0) {
+                auto options = engine_.options();
+                options.perspective += (GET_WHEEL_DELTA_WPARAM(wParam) > 0 ? 1 : -1) *
+                                       kWheelPerspectiveStep;
+                engine_.setOptions(options);
+                notifyOptionsChanged();
+                return 0;
+            }
+            break;
         case WM_CONTEXTMENU:
             SetFocus(hwnd_);
             showOptionsMenu({GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)});
