@@ -19,7 +19,9 @@ Deeper design docs: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md),
 
 - 루트에는 `README.md`·`AGENTS.md`·`CLAUDE.md`·`LICENSE`·`CHANGELOG.md`처럼 관례상 필요한 파일만 두고, 기획·인수인계·결정 기록·가이드 같은 나머지 문서는 `docs/`에 둔다. 사용자가 폴더에 넣어 둔 입력 문서도 `docs/`로 옮긴다.
 - 같은 규칙·사실은 한 문서에만 쓰고 나머지는 링크한다. 문서 종류마다 자리를 하나로 정한다(README는 개요·사용법, 로드맵은 앞으로 할 일만이며 끝난 항목은 지운다). 문서를 늘리기보다 합친다. 날짜를 박은 "현재 수준" 표를 두지 않는다.
-- 방향이 바뀌거나 큰 변경이 끝나면 문서 간 모순·중복·낡은 내용을 점검한다.
+- 방향이 바뀌거나 큰 변경·커밋 묶음·릴리즈가 끝나면 요청이 없어도 낡은 정보·중복·모순·사족을 점검하고 무엇을 고쳤는지 보고한다(스킬 `audit-docs`).
+- `CHANGELOG.md`는 Added·Changed·Fixed·Removed로 나누고, 같은 주제는 한 줄로 합쳐 간결하게 쓴다.
+- 작업 끝에 다음에도 쓸모 있는 시행착오만 문서나 스킬에 사족 없이 남긴다.
 
 ### UI가 있는 프로젝트
 
@@ -32,12 +34,20 @@ Deeper design docs: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md),
 - force push, 푸시한 이력의 수정, 브랜치·태그 강제 삭제, 공유 브랜치의 `reset --hard`는 사용자가 그 대화에서 직접 요청했을 때만 한다. 푸시 전 로컬 커밋의 amend·fixup 정리는 이력 재작성이 아니다. `--no-verify`로 훅을 우회하지 않는다.
 - 첫 커밋 이후의 작업은 `main`이 아닌 작업 브랜치(`feat/` `fix/` `docs/` `chore/` + kebab-case)에서 한다. 프로젝트가 `main` 직행을 명시하면 예외다. 병렬 작업은 브랜치마다 `git worktree`로 분리한다.
 - 커밋은 의미·작업 단위 하나씩 만든다. 같은 목적의 후속 수정(오타·누락·리뷰 반영)은 새 커밋으로 쌓지 말고 푸시 전에 amend·fixup으로 합쳐 원격 이력을 깔끔하게 유지한다.
+- 프로젝트가 `develop`을 쓴다고 명시하면 작업 브랜치는 `develop`에서 따서 `develop`으로 병합하고(미리보기), `main`은 릴리즈로만 갱신한다(정식). 릴리즈 요청은 버전 결정·CHANGELOG·병합·태그·브랜치 정리·검증까지 전체이며(스킬 `release-project`), 병합 요청은 릴리즈를 뜻하지 않는다.
+- 버전은 사용자가 올리라고 지시했거나 릴리즈를 요청받았을 때만 올린다. 커밋·푸시마다 올리지 않는다.
 - 커밋 제목은 `<type>(<선택 scope>): <요약>`이다. type은 `feat` `fix` `perf` `refactor` `docs` `test` `build` `ci` `chore` `style` `revert`, 72자 이내, 끝에 마침표 없음. 형식은 `.githooks/commit-msg`가 검사한다. 이유가 필요하면 본문에 쓴다. 제목 언어는 프로젝트가 정한다.
 - 커밋 이메일은 GitHub noreply 주소를 쓴다(프로젝트에 설정되어 있으면 `.githooks/pre-commit`이 검사한다).
 - PR 본문은 요약(무엇을·왜), 확인한 방법(실제 실행한 것만), 남은 결정 순서로 짧게 쓴다(`.github/pull_request_template.md`).
 - 커밋 메시지와 PR 본문에 AI 생성 표식이나 co-author 트레일러(`Co-Authored-By: Claude …`, `🤖 Generated with …` 등)를 넣지 않는다. 커밋은 훅이 제거하지만 PR 본문은 직접 지킨다.
-- 병합이 끝난 브랜치는 로컬·원격 모두 지운다. 푸시·병합까지 요청받은 작업은 로컬과 원격이 일치하고 미커밋 변경이 없는 상태로 마친다.
+- 작업이 끝나 사용하지 않는 브랜치는 로컬·원격 모두 지운다(`main`·`develop` 같은 장기 브랜치 제외). GitHub의 "Automatically delete head branches"는 켜지 않는다. 푸시·병합까지 요청받은 작업은 로컬과 원격이 일치하고 미커밋 변경이 없는 상태로 마친다.
 - 새 클론에서는 한 번 `git config core.hooksPath .githooks`를 실행한다(Claude Code는 세션 시작 때 자동 실행).
+
+### 코드와 테스트
+
+- 테스트는 중요한 동작과 회귀 위험만 둔다. 극단 상황, 다른 테스트와 중복, 구현 세부 확인은 쓰지 않고, 빨리 끝난다는 이유만으로 남기지 않는다.
+- 기존 테스트도 검증한다. 단언이 없거나 항상 통과하는 것, 건너뛴 것, 불안정한 것을 찾고, 핵심 테스트는 대상 동작을 임시로 깨 보아 실패하는지 확인한다. 통과시키려고 기대값을 현재 결과에 맞추지 않는다.
+- 코드를 바꾸면 쓰지 않게 된 코드·스타일·의존성·테스트를 같은 변경에서 지운다. 큰 변경이 끝나면 구조·중복·미사용을 점검한다(스킬 `tidy-code`).
 
 ### 의존성과 환경
 
@@ -51,4 +61,5 @@ Deeper design docs: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md),
 
 - 저장소는 언제 공개되어도 문제가 없는 상태로 유지한다. `.env`, 키, 토큰, 개인정보, 개인 절대경로, 개인 취향·운영 데이터, 실제 업무 문서를 저장소에 넣거나 읽어 출력하지 않는다. 환경변수 예시는 값이 없는 `.env.example`만 둔다.
 - 비밀값으로 보이는 파일·문자열이 staged에 있으면 `.githooks/pre-commit`이 커밋을 막는다.
+- GitHub Actions 워크플로는 `permissions: contents: read`로 시작하고 `pull_request_target`은 쓰지 않으며, 포크 PR 실행에 시크릿을 노출하지 않는다.
 <!-- ysm-baseline:end -->
