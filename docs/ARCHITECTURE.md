@@ -89,7 +89,7 @@ control hint) is localized the same way; the one exception is a scene/palette
 name read from `src/builtin/` engine state, which stays English because the
 core has no `core/i18n` dependency to draw from.
 
-The string rules to follow when adding UI text are in `CLAUDE.md` ▸ Localization.
+The string rules to follow when adding UI text are in `AGENTS.md` ▸ Localization.
 
 ## UI conventions
 
