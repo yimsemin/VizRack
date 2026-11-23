@@ -2,7 +2,7 @@
 
 // Shared font rule for every built-in visualizer's overlay text (title +
 // status/hint captions). One family and one size pair, so a new built-in
-// visualizer never has to invent its own — see CLAUDE.md ▸ UI conventions.
+// visualizer never has to invent its own — see AGENTS.md ▸ UI conventions.
 //
 // "Segoe UI" is the Windows system UI font (Vista+): no bundling, no license
 // to track, and Uniscribe/DirectWrite font-linking substitutes Malgun Gothic
