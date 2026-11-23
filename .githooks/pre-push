@@ -1,0 +1,52 @@
+#!/bin/sh
+# 보호 브랜치(main·master·develop)와 태그를 지키는 하드 게이트다.
+#   - 보호 브랜치 삭제는 막는다.
+#   - force push(이력 재작성)와 태그 삭제·이동은 YSM_ALLOW_FORCE=1 일 때만 통과한다. 사용자가 그 대화에서 직접 요청했을 때만 쓴다.
+#   - 보호 브랜치로의 직접 푸시는 막는다. 변경은 작업 브랜치에서 PR로 병합한다.
+#     예외: AGENTS.md에 `<!-- ysm:direct-main -->` 줄이 있는 프로젝트의 main (develop은 예외 없음).
+#   - 브랜치·태그를 처음 만드는 푸시와 일반 브랜치 푸시는 막지 않는다.
+# 프로젝트 전용 검사는 이 파일을 고치지 말고 .githooks/pre-push.local 에 둔다. 있으면 같은 인자와 표준입력으로 실행하고, 실패하면 푸시를 막는다.
+# 우회(--no-verify)는 사용자만 결정한다. Node 등 런타임이 필요 없다.
+# 활성화: git config core.hooksPath .githooks
+root="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+direct_main=0
+grep -qs '^<!-- ysm:direct-main -->' "$root/AGENTS.md" && direct_main=1
+fail=0
+input="$(cat)"
+
+deny() {
+  echo "푸시 차단: $1 ($2)" >&2
+  fail=1
+}
+is_zero() { printf '%s' "$1" | grep -qE '^0+$'; }
+
+while read -r lref lsha rref rsha; do
+  [ -n "${rref:-}" ] || continue
+  case "$rref" in
+    refs/heads/main|refs/heads/master|refs/heads/develop)
+      b="${rref#refs/heads/}"
+      if is_zero "$lsha"; then
+        deny "$b 브랜치 삭제" "보호 브랜치는 지우지 않는다"
+      elif ! is_zero "$rsha"; then
+        if ! git merge-base --is-ancestor "$rsha" "$lsha" 2>/dev/null; then
+          [ "${YSM_ALLOW_FORCE:-}" = "1" ] || deny "$b force push" "사용자가 직접 요청한 경우에만 YSM_ALLOW_FORCE=1 을 붙인다"
+        elif [ "$b" = "develop" ] || [ "$direct_main" = 0 ]; then
+          deny "$b 직접 푸시" "작업 브랜치(feat/ fix/ docs/ chore/)에서 PR로 병합한다"
+        fi
+      fi
+      ;;
+    refs/tags/*)
+      if is_zero "$lsha" || { ! is_zero "$rsha" && [ "$rsha" != "$lsha" ]; }; then
+        [ "${YSM_ALLOW_FORCE:-}" = "1" ] || deny "태그 ${rref#refs/tags/} 삭제·이동" "사용자가 직접 요청한 경우에만 YSM_ALLOW_FORCE=1 을 붙인다"
+      fi
+      ;;
+  esac
+done <<EOF
+$input
+EOF
+
+if [ -f "$root/.githooks/pre-push.local" ]; then
+  printf '%s\n' "$input" | sh "$root/.githooks/pre-push.local" "$@" || fail=1
+fi
+
+exit "$fail"

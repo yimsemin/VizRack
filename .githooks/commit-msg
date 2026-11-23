@@ -27,11 +27,22 @@ rm -f "$tmp"
 
 subject="$(grep -v '^#' "$msg_file" | sed -n '/[^[:space:]]/{p;q;}')"
 [ -n "$subject" ] || exit 0
-printf '%s' "$subject" | grep -qE '^(Merge |Release |Revert "|(fixup|squash|amend)! )' && exit 0
+printf '%s' "$subject" | grep -qE '^(Merge |Revert "|(fixup|squash|amend)! )' && exit 0
 
 fail() { echo "커밋 제목 형식 오류: $1" >&2; echo "  제목: $subject" >&2; echo "  형식: <type>(<선택 scope>): <요약>  예) feat(login): 로그인 화면 추가" >&2; exit 1; }
 printf '%s' "$subject" | grep -qE '^(feat|fix|perf|refactor|docs|test|build|ci|chore|style|revert)(\([a-z0-9._-]+\))?!?: [^[:space:]]' \
   || fail "type 접두어가 필요하다 (feat fix perf refactor docs test build ci chore style revert)"
+# 제목 언어: AGENTS.md의 `<!-- ysm:commit-lang=ko -->`(또는 en) 선언을 따른다. 선언이 없으면 검사하지 않는다.
+# 한국어(ko)는 제목에 ASCII가 아닌 글자가 있어야 하고, 영어(en)는 없어야 한다. 릴리스 준비 커밋(chore(release): vX.Y.Z)은 제외한다.
+root="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+lang="$(sed -n 's/^<!-- ysm:commit-lang=\([a-z][a-z]*\) -->.*/\1/p' "$root/AGENTS.md" 2>/dev/null | sed -n 1p)"
+if [ -n "$lang" ] && ! printf '%s' "$subject" | grep -qE '^chore\(release\): v[0-9]'; then
+  if printf '%s' "$subject" | LC_ALL=C grep -q '[^ -~]'; then wide=1; else wide=0; fi
+  case "$lang" in
+    ko) [ "$wide" = 1 ] || fail "이 프로젝트의 커밋 제목은 한국어로 쓴다(AGENTS.md ysm:commit-lang=ko)" ;;
+    en) [ "$wide" = 0 ] || fail "이 프로젝트의 커밋 제목은 영어로 쓴다(AGENTS.md ysm:commit-lang=en)" ;;
+  esac
+fi
 len="$(printf '%s' "$subject" | LC_ALL=C tr -d '\200-\277' | LC_ALL=C wc -c | tr -d ' ')"
 [ "$len" -le 72 ] || fail "제목은 72자 이내여야 한다(현재 ${len}자)"
 printf '%s' "$subject" | grep -qE '(\.|。)$' && fail "제목 끝에 마침표를 찍지 않는다"

@@ -1,5 +1,5 @@
 #!/bin/sh
-# 비밀값으로 보이는 파일·문자열이 staged에 있으면, 그리고 noreply 이메일이 요구되는 프로젝트에서 다른 이메일이면 커밋을 막는다. Node 등 런타임이 필요 없다.
+# 보호 브랜치에 직접 커밋하면, 비밀값으로 보이는 파일·문자열이 staged에 있으면, 그리고 noreply 이메일이 요구되는 프로젝트에서 다른 이메일이면 커밋을 막는다. Node 등 런타임이 필요 없다.
 # 오탐이면 해당 줄·파일을 고치거나 사용자에게 알린다. 우회(--no-verify)는 사용자만 결정한다.
 # 활성화: git config core.hooksPath .githooks
 
@@ -15,6 +15,22 @@ if [ "$(git config --get ysm.requireNoreply)" = "true" ]; then
       ;;
   esac
 fi
+
+# 보호 브랜치(main·master·develop)에는 직접 커밋하지 않는다. 첫 커밋은 허용한다.
+# main 직행은 AGENTS.md에 `<!-- ysm:direct-main -->` 줄이 있는 프로젝트만 허용한다(develop은 예외 없음).
+branch="$(git symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
+case "$branch" in
+  main|master|develop)
+    if git rev-parse --verify -q HEAD >/dev/null 2>&1; then
+      root="$(git rev-parse --show-toplevel)"
+      if [ "$branch" = "develop" ] || ! grep -qs '^<!-- ysm:direct-main -->' "$root/AGENTS.md"; then
+        echo "보호 브랜치 '$branch'에는 직접 커밋할 수 없다." >&2
+        echo "작업 브랜치를 만든다: git switch -c <feat|fix|docs|chore>/<kebab-case>" >&2
+        exit 1
+      fi
+    fi
+    ;;
+esac
 
 files="$(git diff --cached --name-only --diff-filter=ACM)"
 bad_files="$(printf '%s\n' "$files" | grep -E '(^|/)(\.env(\..+)?|id_rsa|id_ed25519|[^/]+\.(pem|key|p12|pfx))$' | grep -vE '\.env\.(example|sample)$')"

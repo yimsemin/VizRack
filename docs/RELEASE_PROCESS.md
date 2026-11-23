@@ -4,49 +4,38 @@
 
 | Branch | Purpose |
 | --- | --- |
-| `main` | Released code only. Every release is a `--no-ff` merge from `develop` plus an annotated `vX.Y.Z` tag. Never commit directly. |
-| `develop` | The integration branch. Branched once from `main`; long-lived, never deleted. Only `--no-ff` feature merges and release-prep commits land here — no feature work directly on `develop`. Pushed to `origin` after every merge. |
-| `<type>/<slug>` | One branch per unit of work, cut from an up-to-date `develop`. `<type>` is the Conventional Commit type the branch's main commit carries (`feat`, `fix`, `perf`, `refactor`, `docs`, …); `<slug>` is 2–4 kebab-case words. Short-lived; deleted (local + `origin`) once merged. |
-
-`main` and the tags use `vX.Y.Z`; the integration branch is `develop`, so a bare
-ref is never ambiguous.
+| `main` | The only long-lived branch. Protected: changes land only through a squash-merged PR. Every release is tagged `vX.Y.Z` (annotated) on a `main` commit. |
+| `<type>/<slug>` | One branch per unit of work, cut from an up-to-date `origin/main`. `<type>` is the Conventional Commit type of the branch's main commit (`feat`, `fix`, `perf`, `refactor`, `docs`, …); `<slug>` is 2–4 kebab-case words. Short-lived; deleted (local + `origin`) once merged. |
 
 ## Parallel work
 
 Several branches can be in flight at once. Keep them independent:
 
-- **One worktree per branch.** `git worktree add .claude/worktrees/<slug> -b <type>/<slug> develop`
+- **One worktree per branch.** `git worktree add .claude/worktrees/<slug> -b <type>/<slug> origin/main`
   gives each branch its own directory (inside the project folder, git-ignored) and its
   own `out/` build tree, so parallel builds never collide. A new worktree has no
   `external/vst3sdk`; pass `-DVIZRACK_VST3_SDK_PATH=<main checkout>/external/vst3sdk`
   to reuse it instead of fetching again. `git worktree remove .claude/worktrees/<slug>` when the branch
   merges.
-- **Branch from a fresh `develop`.** `git fetch origin` first; base the branch on
-  `origin/develop`.
 - **Never merge one branch into another.** Each branch stays a clean delta against
-  `develop`. When `develop` moves, `git rebase origin/develop` on the branch and
-  resolve conflicts there, not at merge time.
+  `main`. When `main` moves, `git fetch origin && git rebase origin/main` on the
+  branch and resolve conflicts there.
 - **Sequence shared-contract changes.** If two in-flight branches both need to
   touch `src/builtin/` public headers, `draw_list.*`, the catalog registration or
   `src/core/i18n_strings.inc`, land one first and rebase the other onto the new
-  `develop` — do not develop the conflicting halves in parallel.
+  `main` — do not develop the conflicting halves in parallel.
 - **Gate every branch on its own.** `cmake --build`, `ctest` and
   `VizRack.exe --smoke-test` must pass on the branch before it is handed off.
-- Push each active branch you want backed up; delete it from `origin` after it
-  merges.
 
 ## Merging a finished branch
 
-1. `git fetch origin`; on the branch, `git rebase origin/develop`.
+1. `git fetch origin`; on the branch, `git rebase origin/main`.
 2. Resolve conflicts. A `CHANGELOG.md` `## [Unreleased]` conflict is expected when
    several branches added notes — keep every side's bullets.
 3. Re-run `cmake --build`, `ctest` and `--smoke-test` on the rebased tip.
-4. `git checkout develop && git merge --ff-only origin/develop`, then
-   `git merge --no-ff <type>/<slug>`. The merge commit is the integration point
-   and keeps the branch revertable as a unit.
-5. `git push origin develop` immediately.
-6. `git branch -d <type>/<slug>`, `git push origin --delete <type>/<slug>` if it
-   was pushed, and `git worktree remove` its worktree.
+4. Push the branch and open a PR to `main`; squash-merge it (the PR title becomes
+   the commit subject). Merge commits and rebase merges are disabled.
+5. Delete the branch (local + `origin`) and `git worktree remove` its worktree.
 
 ## Commits
 
@@ -63,19 +52,15 @@ Several branches can be in flight at once. Keep them independent:
   worded.
 - Optional body explains the *why*, wrapped near 72 columns.
 
-## Pushing
-
-Push `develop` to `origin` after every merge, and push in-flight `<type>/<slug>`
-branches you want backed up. Do **not** push tags or create GitHub releases
-outside the release flow below.
-
 ## Cutting a release
 
-Only after the user gives explicit approval for a version:
+Only after the user gives explicit approval for a version. Do not push tags or
+create GitHub releases outside this flow.
 
-1. Make sure `## [Unreleased]` in `CHANGELOG.md` reads the way the release
-   should, including the italic one-line lead under the heading.
-2. On `develop`, bump `project(VizRack VERSION X.Y.Z ...)` in `CMakeLists.txt`.
+1. On a `chore/release-vX-Y-Z` branch cut from `origin/main`, make sure
+   `## [Unreleased]` in `CHANGELOG.md` reads the way the release should,
+   including the italic one-line lead under the heading.
+2. Bump `project(VizRack VERSION X.Y.Z ...)` in `CMakeLists.txt`.
 3. Build Release, run `ctest`, `--smoke-test`, then `scripts\package.ps1` (it
    writes `out/package/VizRack-win-x64.zip.sha256`).
 4. Generate the notes:
@@ -89,15 +74,15 @@ Only after the user gives explicit approval for a version:
    `docs/release-notes/X_Y_Z.md` (that section plus a download/requirements
    footer with the SHA-256 filled in). Read the note once and fix any wording the
    script could not. It never invents entries.
-5. Commit the version bump, changelog and generated note on `develop`
-   (`docs: release vX.Y.Z`) and push.
-6. Merge into `main` and tag:
+5. Commit the version bump, changelog and generated note
+   (`chore(release): vX.Y.Z`), push, and squash-merge the PR into `main`.
+6. Tag the merged `main` commit and push the tag:
 
    ```powershell
    git checkout main
-   git merge --no-ff refs/heads/develop
+   git pull --ff-only origin main
    git tag -a vX.Y.Z -m "VizRack vX.Y.Z"
-   git push origin refs/heads/main refs/tags/vX.Y.Z
+   git push origin refs/tags/vX.Y.Z
    ```
 
 7. Publish:
@@ -109,14 +94,3 @@ Only after the user gives explicit approval for a version:
        --notes-file docs/release-notes/X_Y_Z.md `
        out/package/VizRack-win-x64.zip
    ```
-
-8. `git checkout develop && git merge --ff-only origin/main && git push origin develop`.
-   `develop` never receives feature work directly, but the version-bump/tag
-   merge commits from step 6 are a fast-forward for `develop` here (they carry
-   no content it doesn't already have) — this brings `vX.Y.Z` into `develop`'s
-   own history. Skipping this step doesn't break anything by itself, but
-   leaves the release tag unreachable from `develop`, which is exactly the
-   failure mode `generate-release-notes.ps1` finds the previous tag by version
-   sort (not `git describe --tags HEAD`) to avoid — do this anyway, since
-   other tooling or a future script change could reasonably assume ordinary
-   `git describe` reachability. `develop` is not deleted.
