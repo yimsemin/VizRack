@@ -38,6 +38,5 @@
       "Read(./.env.local)",
       "Read(./.env.production)"
     ]
-  },
-  "includeCoAuthoredBy": false
+  }
 }
