@@ -31,7 +31,7 @@ while read -r lref lsha rref rsha; do
         if ! git merge-base --is-ancestor "$rsha" "$lsha" 2>/dev/null; then
           [ "${YSM_ALLOW_FORCE:-}" = "1" ] || deny "$b force push" "사용자가 직접 요청한 경우에만 YSM_ALLOW_FORCE=1 을 붙인다"
         elif [ "$b" = "develop" ] || [ "$direct_main" = 0 ]; then
-          deny "$b 직접 푸시" "작업 브랜치(feat/ fix/ docs/ chore/)에서 PR로 병합한다"
+          deny "$b 직접 푸시" "작업 브랜치(feat/ fix/ docs/ chore/ ci/)에서 PR로 병합한다"
         fi
       fi
       ;;
