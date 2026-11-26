@@ -5,7 +5,7 @@
 | Branch | Purpose |
 | --- | --- |
 | `main` | The only long-lived branch. Protected: changes land only through a squash-merged PR. Every release is tagged `vX.Y.Z` (annotated) on a `main` commit. |
-| `<type>/<slug>` | One branch per unit of work, cut from an up-to-date `origin/main`. `<type>` is the Conventional Commit type of the branch's main commit (`feat`, `fix`, `perf`, `refactor`, `docs`, …); `<slug>` is 2–4 kebab-case words. Short-lived; deleted (local + `origin`) once merged. |
+| `<type>/<slug>` | One branch per unit of work, cut from an up-to-date `origin/main`. `<type>` is one of `feat`, `fix`, `docs`, `chore` (also for refactoring, performance, tests and build work), `ci`; `<slug>` is 2–4 kebab-case words. Short-lived; deleted (local + `origin`) once merged. |
 
 ## Parallel work
 
@@ -43,8 +43,8 @@ Several branches can be in flight at once. Keep them independent:
   once `cmake --build`, `ctest` and `VizRack.exe --smoke-test` all pass. Do not
   batch unrelated work into one commit, and never commit `out/` or other build
   artifacts.
-- Conventional Commit subject: imperative mood, English, roughly ≤ 72 characters.
-  Types: `feat`, `fix`, `perf`, `refactor`, `docs`, `test`, `build`, `chore`.
+- Subject: imperative mood. Format, types, length and language follow the Git
+  rules in [`AGENTS.md`](../AGENTS.md) and are checked by `.githooks/commit-msg`.
 - The changelog is **not** derived from commit subjects. Any commit that changes
   what a user sees also edits `## [Unreleased]` in `CHANGELOG.md` in the same
   commit; internal commits (`refactor` / `docs` / `test` / `build` / `chore`)

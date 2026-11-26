@@ -25,14 +25,16 @@ case "$branch" in
       root="$(git rev-parse --show-toplevel)"
       if [ "$branch" = "develop" ] || ! grep -qs '^<!-- ysm:direct-main -->' "$root/AGENTS.md"; then
         echo "보호 브랜치 '$branch'에는 직접 커밋할 수 없다." >&2
-        echo "작업 브랜치를 만든다: git switch -c <feat|fix|docs|chore>/<kebab-case>" >&2
+        echo "작업 브랜치를 만든다: git switch -c <feat|fix|docs|chore|ci>/<kebab-case>" >&2
         exit 1
       fi
     fi
     ;;
 esac
 
-files="$(git diff --cached --name-only --diff-filter=ACM)"
+# 검사할 변경을 읽지 못하면 통과시키지 않는다.
+unreadable() { echo "staged 변경을 읽지 못해 비밀값을 검사할 수 없다. 커밋하지 않는다." >&2; exit 1; }
+files="$(git diff --cached --name-only --diff-filter=ACM)" || unreadable
 bad_files="$(printf '%s\n' "$files" | grep -E '(^|/)(\.env(\..+)?|id_rsa|id_ed25519|[^/]+\.(pem|key|p12|pfx))$' | grep -vE '\.env\.(example|sample)$')"
 if [ -n "$bad_files" ]; then
   echo "비밀 파일로 보이는 파일은 커밋할 수 없다:" >&2
@@ -42,7 +44,9 @@ if [ -n "$bad_files" ]; then
 fi
 
 pattern='(ghp_[A-Za-z0-9]{20,}|gho_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|sk-[A-Za-z0-9_-]{20,}|AKIA[0-9A-Z]{16}|xox[baprs]-[A-Za-z0-9-]{10,}|-----BEGIN [A-Z ]*PRIVATE KEY-----)'
-hits="$(git diff --cached -U0 --no-color | grep -E '^\+[^+]' | grep -E "$pattern")"
+# 텍스트 변환기(예: Git for Windows의 PDF 변환)가 실패하면 diff 전체가 멈추므로 쓰지 않는다.
+changes="$(git diff --cached -U0 --no-color --no-ext-diff --no-textconv)" || unreadable
+hits="$(printf '%s\n' "$changes" | grep -aE '^\+[^+]' | grep -aE "$pattern")"
 if [ -n "$hits" ]; then
   echo "비밀값으로 보이는 문자열이 staged 변경에 있다. 커밋하지 않는다:" >&2
   printf '%s\n' "$hits" | cut -c1-80 >&2
